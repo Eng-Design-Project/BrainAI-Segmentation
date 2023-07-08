@@ -1,0 +1,9 @@
+run command prompt as admin
+navigate to the project folder
+make sure there is a myenv file in your project folder
+if not, run: python -m venv myenv
+activate the virtual environment: myenv\Scripts\activate
+some python stuff:
+pip install --upgrade pip setuptools wheel
+pip install numpy
+pip install image_registration
