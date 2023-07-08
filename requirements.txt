@@ -6,4 +6,3 @@ activate the virtual environment: myenv\Scripts\activate
 some python stuff:
 pip install --upgrade pip setuptools wheel
 pip install numpy
-pip install image_registration
