@@ -3,10 +3,16 @@ navigate to the project folder
 make sure there is a myenv file in your project folder
 if not, run: python -m venv myenv
 activate the virtual environment: myenv\Scripts\activate
+
+
+
+below this line, not working yet
 some python stuff:
 pip install --upgrade pip setuptools wheel
 pip install numpy
 needed for ANTsPy: pip install cmake
+
+
 
 next: pip install antspyx
 
