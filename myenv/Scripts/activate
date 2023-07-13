@@ -38,7 +38,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="C:\Users\Consul\Documents\GitHub\BrainAI-Segmentation\myenv"
+VIRTUAL_ENV="C:\Users\kevin\Documents\classes\ED1\BrainAI-Segmentation\myenv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"
