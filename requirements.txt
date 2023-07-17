@@ -4,5 +4,8 @@ make sure there is a myenv file in your project folder
 if not, run: python -m venv myenv
 activate the virtual environment: myenv\Scripts\activate
 
-pip install numpy
 pip install SimpleITK
+pip install numpy
+pip install matplotlib
+pip install pydicom
+pip install scikit.image
