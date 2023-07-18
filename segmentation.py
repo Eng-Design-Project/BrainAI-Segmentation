@@ -1,4 +1,6 @@
 import SimpleITK as sitk
+#import matplotlib.pyplot as plt
+#import numpy as np
 
 # Replace 'image.dcm' with the path to your DICOM file
 image = sitk.ReadImage('mytest.dcm')
@@ -30,3 +32,16 @@ def segment_image(image):
     #   DL and Clustering more complex?
 
     print("function incomplete")
+
+
+    #some known sitk methods
+    '''
+    sitk image copied into numpy array
+    npy_array = sitk.GetArrayFromImage(image)
+
+    np array to sitk image
+    new_image = sitk.GetImageFromArray(npy_array)
+
+
+
+    '''
