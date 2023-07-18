@@ -1,9 +1,15 @@
 import SimpleITK as sitk
-#import matplotlib.pyplot as plt
-#import numpy as np
+import matplotlib.pyplot as plt
+import numpy as np
 
 # Replace 'image.dcm' with the path to your DICOM file
 image = sitk.ReadImage('mytest.dcm')
+
+pixarray = sitk.GetArrayFromImage(image)
+pixarray = np.squeeze(pixarray)
+print(pixarray.ndim)
+plt.imshow(pixarray, 'gray', origin='lower')
+plt.show()
 
 # Print the size of the image
 print(image.GetSize())
