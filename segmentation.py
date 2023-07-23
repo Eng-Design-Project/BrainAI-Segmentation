@@ -3,20 +3,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import SimpleITK as sitk
 
-# Load DICOM files
+# Load DICOM filepaths
 dicom_path1 = "ADNI_007_S_1339_PT_TRANSAXIAL_BRAIN_3D_FDG_ADNI_CTAC__br_raw_20070402142342697_9_S29177_I47688.dcm"
 dicom_path2 = "ADNI_007_S_1339_PT_TRANSAXIAL_BRAIN_3D_FDG_ADNI_CTAC__br_raw_20070402142344709_12_S29177_I47688.dcm"
 
-dicom1 = pydicom.dcmread(dicom_path1)
-dicom2 = pydicom.dcmread(dicom_path2)
-
-# Extract pixel arrays from DICOM files
-pixel_array1 = dicom1.pixel_array
-pixel_array2 = dicom2.pixel_array
-
-# Convert pixel arrays to SimpleITK images
-image1 = sitk.GetImageFromArray(pixel_array1.astype(np.float32))
-image2 = sitk.GetImageFromArray(pixel_array2.astype(np.float32))
+# get sitk images
+image1 = sitk.ReadImage(dicom_path1, sitk.sitkFloat32)
+image2 = sitk.ReadImage(dicom_path2, sitk.sitkFloat32)
 
 # Print the dimensions of image1 and image2 before resampling
 print("Image 1 - Before Resampling:")
@@ -55,8 +48,14 @@ print("Spacing:", image2.GetSpacing())
 print("Direction:", image2.GetDirection())
 print()
 
+
 # Initialize the registration with an identity transformation
-initial_transform = sitk.CenteredTransformInitializer(image1, image2, sitk.CenteredTransformInitializerFilterType.PLAIN)
+# Initialize the transformation with an identity transformation
+initial_transform = sitk.CenteredTransformInitializer(image1, 
+                                                      image2, 
+                                                      sitk.Euler3DTransform(), 
+                                                      sitk.CenteredTransformInitializerFilter.GEOMETRY)
+
 
 # Perform image registration
 registration_method = sitk.ImageRegistrationMethod()
@@ -74,9 +73,11 @@ registration_method.SetInterpolator(sitk.sitkLinear)
 final_transform = registration_method.Execute(image1, image2, initial_transform)
 
 # Apply the final transformation to image2
-registered_image = sitk.Resample(image2, image1, final_transform, sitk.sitkLinear, 0.0, sitk.sitkFloat32)
+registered_image = sitk.Resample(image1, image2, final_transform, sitk.sitkLinear, 0.0, sitk.sitkFloat32)
 
-# Convert SimpleITK image back to numpy array
+# Convert SimpleITK imags to numpy arrays for displaying and atlas segmentation
+pixel_array1 = sitk.GetArrayFromImage(image1)
+pixel_array2 = sitk.GetArrayFromImage(image2)
 registered_array = sitk.GetArrayFromImage(registered_image)
 
 # Plot the original and registered images
@@ -152,3 +153,20 @@ def segment_image(image):
 
 '''
   
+#registration testing
+#get two similar images
+#register one to the other
+#display both original and new for comparison
+
+#optimizers
+#gradient descent-based methods and LBFGS 
+# Gradient Descent Optimizer and its variants like 
+# Gradient Descent Line Search, Regular Step Gradient Descent,
+#  and Conjugate Gradient are often used.
+
+#similarity metrics
+#start with mean squares or normalized cross-correlation. 
+# If these do not give satisfactory results, you may try mutual information.
+
+#interpolator
+#sitk.sitkLinear
