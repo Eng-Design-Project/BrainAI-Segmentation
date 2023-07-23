@@ -56,8 +56,13 @@ dcm_files = (
     os.path.join(current_directory, 'scan2.dcm'),
     os.path.join(current_directory, 'scan3.dcm')
 )
-
-
+def get_dcm_files():
+    dcm_files = (
+        os.path.join(current_directory, 'scan1.dcm'),
+        os.path.join(current_directory, 'scan2.dcm'),
+        os.path.join(current_directory, 'scan3.dcm')
+    )
+    return dcm_files
 # the function below converts a tuple of DCM files to a list of pixel arrays and displays it with plt
 # it takes a tuple as its parameter, and returns a list
 def p_arrays(*files):
