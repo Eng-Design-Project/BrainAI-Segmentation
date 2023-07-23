@@ -4,7 +4,7 @@ import gui_module
 
 class Core:
     def __init__(self):
-        self.gui = gui_module.GUIApp("Hello, World!")
+        self.gui = gui_module.GUIApp("TEST")
 
     def run(self):
         self.gui.start()
