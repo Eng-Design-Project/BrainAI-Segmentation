@@ -3,6 +3,25 @@ import numpy as np
 import matplotlib.pyplot as plt
 import SimpleITK as sitk
 
+#registration testing
+#get two similar images
+#register one to the other
+#display both original and new for comparison
+
+#optimizers
+#gradient descent-based methods and LBFGS 
+# Gradient Descent Optimizer and its variants like 
+# Gradient Descent Line Search, Regular Step Gradient Descent,
+#  and Conjugate Gradient are often used.
+
+#similarity metrics
+#start with mean squares or normalized cross-correlation. 
+# If these do not give satisfactory results, you may try mutual information.
+
+#interpolator
+#sitk.sitkLinear
+
+
 # Load DICOM filepaths
 dicom_path1 = "ADNI_007_S_1339_PT_TRANSAXIAL_BRAIN_3D_FDG_ADNI_CTAC__br_raw_20070402142342697_9_S29177_I47688.dcm"
 dicom_path2 = "ADNI_007_S_1339_PT_TRANSAXIAL_BRAIN_3D_FDG_ADNI_CTAC__br_raw_20070402142344709_12_S29177_I47688.dcm"
@@ -105,15 +124,6 @@ plt.show()
 
 
 
-
-
-
-
-
-
-
-
-'''
 # Replace 'image.dcm' with the path to your DICOM file
 image = sitk.ReadImage('mytest.dcm')
 
@@ -130,6 +140,8 @@ print(image.GetSize())
 #this will recieve a tuple of unspecified size as arguments, 
 #a loop will go through and call segment_image on each
 
+
+
 def segment_image(image):
     #register image to unmarked atlas
     #create a blank image (3d np array)
@@ -144,14 +156,17 @@ def segment_image(image):
 
     #some known sitk methods
     
-    sitk image copied into numpy array
+    #sitk image copied into numpy array
     npy_array = sitk.GetArrayFromImage(image)
 
-    np array to sitk image
+    #np array to sitk image
     new_image = sitk.GetImageFromArray(npy_array)
 
+    #return a 3d array of tuples: each tuple is the pixel value of the registered image 
+    # and a number indicating the region
 
-'''
+
+
   
 #registration testing
 #get two similar images
