@@ -1,24 +1,57 @@
-# you need to pip install the following:
-# pip install numpy
-# pip install matplotlib
-# pip install pydicom
-# pip install scikit.image
-
 import matplotlib.pyplot as plt
 import numpy as np
 import SimpleITK as sitk
 import skimage
 import os
-
 from skimage.transform import resize
 #from pydicom import dcmread
 
 
-def get_3d_image_from_directory(directory):
+
+def get_3d_image(directory):
     # Get a list of all DICOM files in the directory
-    scan1_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")]
-    image = sitk.ReadImage(scan1_files)
+    scan_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")]
+    # Read in the image series
+    image = sitk.ReadImage(scan_files)
     return image
+
+def view_sitk_3d_image(image, numSlices):
+    array = sitk.GetArrayFromImage(image)
+
+    # Calculate the step size
+    step = array.shape[0] // numSlices
+    
+    # Generate the slices
+    slices = [array[i*step, :, :] for i in range(numSlices)]
+
+    #display the slices
+    fig, axes = plt.subplots(1, numSlices, figsize=(18, 18))
+    for i, slice in enumerate(slices):
+        axes[i].imshow(slice, cmap='gray')
+        axes[i].axis('off')
+    plt.show()
+
+def view_slice_metadata_from_directory(directory):
+    scan_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")]
+    for filename in scan_files:
+        image = sitk.ReadImage(filename)
+        print(image.GetMetaData("0020|0032"))
+
+# Path to the directory that contains the DICOM files
+directory1 = "scan1"
+directory2 = "scan2"
+
+# Create 3d image with SITK
+image1 = get_3d_image(directory1)
+image2 = get_3d_image(directory2)
+
+#view slices of 3d image
+view_sitk_3d_image(image1, 10)
+view_sitk_3d_image(image2, 10)
+
+#view metadata of slices in directory
+view_slice_metadata_from_directory(directory1)
+view_slice_metadata_from_directory(directory2)
 
 
 #get the current working directory
