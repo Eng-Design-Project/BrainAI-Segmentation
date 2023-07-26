@@ -1,4 +1,3 @@
-import pydicom
 import numpy as np
 import matplotlib.pyplot as plt
 import SimpleITK as sitk
