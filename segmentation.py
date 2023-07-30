@@ -17,43 +17,14 @@ image2 = sitk.ReadImage(dicom_path2, sitk.sitkFloat32)
 pixel_array1 = sitk.GetArrayFromImage(image1)
 pixel_array2 = sitk.GetArrayFromImage(image2)
 
-# Print the dimensions of image1 and image2 before resampling
-print("Image 1 - Before Resampling:")
+# Print the dimensions of image1 and image2 before registration
+print("Image 1 - Before Registration:")
 print("Size:", image1.GetSize())
 print("Spacing:", image1.GetSpacing())
 print("Direction:", image1.GetDirection())
 print()
 
-print("Image 2 - Before Resampling:")
-print("Size:", image2.GetSize())
-print("Spacing:", image2.GetSpacing())
-print("Direction:", image2.GetDirection())
-print()
-
-# Get the size and spacing of image1
-size_image1 = image1.GetSize()
-spacing_image1 = image1.GetSpacing()
-
-# Calculate the new size of image2 based on the spacing of image1
-size_image2 = [int(round(sz*spc1/spc2)) for sz, spc1, spc2 in zip(size_image1, spacing_image1, image2.GetSpacing())]
-
-# Resample image2 to match the size and spacing of image1
-resampler = sitk.ResampleImageFilter()
-resampler.SetSize(size_image1)
-resampler.SetOutputSpacing(spacing_image1)
-resampler.SetOutputDirection(image1.GetDirection())
-resampler.SetOutputOrigin(image1.GetOrigin())
-resampled_image2 = resampler.Execute(image2)
-image2 = resampled_image2
-
-# Print the dimensions of image1 and image2 after resampling
-print("Image 1 - After Resampling:")
-print("Size:", image1.GetSize())
-print("Spacing:", image1.GetSpacing())
-print("Direction:", image1.GetDirection())
-print()
-
-print("Image 2 - After Resampling:")
+print("Image 2 - Before Registration:")
 print("Size:", image2.GetSize())
 print("Spacing:", image2.GetSpacing())
 print("Direction:", image2.GetDirection())
@@ -66,7 +37,7 @@ final_transform = demons_registration_filter.Execute(image1, image2)
 # Explicitly set the transformation type to DisplacementFieldTransform
 final_transform = sitk.DisplacementFieldTransform(final_transform)
 
-# Apply the final transformation to image2
+# Apply the final transformation to image2 (moving image)
 registered_image = sitk.Resample(image2, image1, final_transform, sitk.sitkLinear, 0.0, sitk.sitkFloat32)
 
 # Convert SimpleITK images to numpy arrays for displaying
@@ -77,28 +48,28 @@ registered_array = sitk.GetArrayFromImage(registered_image)
 # Plot the original and registered images
 plt.figure(figsize=(20, 5))
 
-# Plot Image 1 - Before Resampling
+# Plot Image 1 - Before Registration
 plt.subplot(151)
 plt.imshow(pixel_array1.squeeze(), cmap='gray')
-plt.title("Image 1 - Before Resampling")
+plt.title("Image 1 - Before Registration")
 plt.axis('off')
 
-# Plot Image 2 - Before Resampling
+# Plot Image 2 - Before Registration
 plt.subplot(152)
 plt.imshow(pixel_array2.squeeze(), cmap='gray')
-plt.title("Image 2 - Before Resampling")
+plt.title("Image 2 - Before Registration")
 plt.axis('off')
 
-# Plot Image 1 - After Resampling
+# Plot Image 1 - After Registration
 plt.subplot(153)
-plt.imshow(pixel_array1.squeeze(), cmap='gray')
-plt.title("Image 1 - After Resampling")
+plt.imshow(sitk.GetArrayFromImage(image1).squeeze(), cmap='gray')
+plt.title("Image 1 - After Registration")
 plt.axis('off')
 
-# Plot Image 2 - After Resampling
+# Plot Image 2 - After Registration
 plt.subplot(154)
 plt.imshow(pixel_array2.squeeze(), cmap='gray')
-plt.title("Image 2 - After Resampling")
+plt.title("Image 2 - After Registration")
 plt.axis('off')
 
 # Plot Registered Image
@@ -108,6 +79,7 @@ plt.title("Registered Image")
 plt.axis('off')
 
 plt.show()
+
 
 
 
