@@ -15,7 +15,7 @@ def get_3d_image(directory):
     image = sitk.ReadImage(scan_files)
     return image
 
-def view_sitk_3d_image(image, numSlices):
+def view_sitk_3d_image(image, numSlices, displayText):
     array = sitk.GetArrayFromImage(image)
 
     # Calculate the step size
@@ -26,6 +26,10 @@ def view_sitk_3d_image(image, numSlices):
 
     #display the slices
     fig, axes = plt.subplots(1, numSlices, figsize=(18, 18))
+
+    # Set the title for the plot
+    fig.suptitle(displayText, fontsize=16)
+
     for i, slice in enumerate(slices):
         axes[i].imshow(slice, cmap='gray')
         axes[i].axis('off')
@@ -61,20 +65,20 @@ def save_sitk_3d_img_png(directory, new_dir):
         plt.imsave(output_file, png_file)
 
 # Path to the directory that contains the DICOM files
-directory1 = "scan1"
-directory2 = "scan2"
+#directory1 = "scan1"
+#directory2 = "scan2"
 
 # Create 3d image with SITK
-image1 = get_3d_image(directory1)
-image2 = get_3d_image(directory2)
+#image1 = get_3d_image(directory1)
+#image2 = get_3d_image(directory2)
 
 #view slices of 3d image
-view_sitk_3d_image(image1, 10)
-view_sitk_3d_image(image2, 10)
+#view_sitk_3d_image(image1, 10, "scan1")
+#view_sitk_3d_image(image2, 10, "scan2")
 
 #view metadata of slices in directory
-view_slice_metadata_from_directory(directory1)
-view_slice_metadata_from_directory(directory2)
+#view_slice_metadata_from_directory(directory1)
+#view_slice_metadata_from_directory(directory2)
 
 #Save all of the DCM files in directory1 as PNG files in new directory
 ##save_sitk_3d_img_png(directory1, "PNGs")
