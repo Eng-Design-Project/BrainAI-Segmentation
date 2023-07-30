@@ -1,17 +1,50 @@
-#import data
+import data
 #import tkinter as tk
+# core.py
 import gui_module
 
 class Core:
     def __init__(self):
-        self.gui = gui_module.GUIApp("TEST")
+        self.gui = gui_module.GUIApp(self.handle_gui_click)
+
+    def handle_gui_click(self, input_value):
+        # Implement your logic here to handle the data received from the GUI
+        print(f"Received input value from GUI: {input_value}")
 
     def run(self):
         self.gui.start()
 
+    def get_3d_image(directory):
+        image = data.get_3d_image(directory)
+        return image
+    
+    def view_sitk_3d_image(image, numslices):
+        data.view_sitk_3d_image(image, numslices)
+
+    def view_slice_metadata_from_directory(directory):
+        data.view_slice_metadata_from_directory(directory)
+
 if __name__ == "__main__":
     core = Core()
     core.run()
+    # Path to the directory that contains the DICOM files
+    directory1 = "scan1"
+    directory2 = "scan2"
+
+    # Create 3d image with SITK
+    #image1 = core.get_3d_image(directory1)
+    #image2 = core.get_3d_image(directory2)
+
+    #view slices of 3d image
+    #core.view_sitk_3d_image(image1, 10)
+    #core.view_sitk_3d_image(image2, 10)
+
+    #view metadata of slices in directory
+    #core.view_slice_metadata_from_directory(directory1)
+    #core.view_slice_metadata_from_directory(directory2)
+
+    
+
 
     
 

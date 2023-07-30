@@ -1,56 +1,37 @@
-import dearpygui.dearpygui as dpg
-
+# gui_module.py
 import dearpygui.dearpygui as dpg
 
 dpg.create_context()
 
-def change_text(sender, app_data):
-    dpg.set_value("text item", f"Mouse Button ID: {app_data}")
-
-def visible_call(sender, app_data):
-    print("I'm visible")
-
-with dpg.item_handler_registry(tag="widget handler") as handler:
-    dpg.add_item_clicked_handler(callback=change_text)
-    dpg.add_item_visible_handler(callback=visible_call)
-
-with dpg.window(width=500, height=300):
-    dpg.add_text("Click me with any mouse button", tag="text item")
-    dpg.add_text("Close window with arrow to change visible state printing to console", tag="text item 2")
-
-# bind item handler registry to item
-dpg.bind_item_handler_registry("text item", "widget handler")
-dpg.bind_item_handler_registry("text item 2", "widget handler")
-
-dpg.create_viewport(title='Custom Title', width=800, height=600)
-dpg.setup_dearpygui()
-dpg.show_viewport()
-dpg.start_dearpygui()
-dpg.destroy_context()
-
 class GUIApp:
-    def __init__(self, input_value):
-        self.input_value = input_value
+    def __init__(self, callback):
+        self.segment_flag = False
+        self.callback = callback
+        self.input_value = ""
 
     def handle_click(self, sender, app_data):
-        print(f"Button clicked, input value is: {self.input_value}")
+        # Get the actual input value from the GUI input text field
+        self.input_value = dpg.get_value(self.input_value)
+        self.callback(self.input_value)
+        self.handle_segment_flag_toggle()
+
+    def handle_segment_flag_toggle(self):
+        self.segment_flag = not self.segment_flag
+        print(f"Segment flag is now: {self.segment_flag}")
+
+    def create_submit_button(self):
+        with dpg.window(label="Example Window"):
+            self.input_value = dpg.add_input_text(label="Input Value", width=200)
+            dpg.add_button(label="Submit", width=500, height=200, callback=self.handle_click)
 
     def start(self):
-        with dpg.handler_registry():
-            dpg.add_handler(dpg.mvEvent_MouseRelease, self.handle_click())
+        self.create_submit_button()
 
-        with dpg.window(label="Example Window"):
-            dpg.add_button(label="Submit")
-
-        dpg.create_context()
         dpg.create_viewport(title='Dear PyGui', width=600, height=300)
         dpg.setup_dearpygui()
         dpg.show_viewport()
         dpg.start_dearpygui()
         dpg.destroy_context()
-
-
-
 
 
 
@@ -94,3 +75,4 @@ class GUI:
     def run(self):
         self.running = True
         self.window.mainloop()"""
+
