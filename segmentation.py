@@ -41,8 +41,8 @@ final_transform = sitk.DisplacementFieldTransform(final_transform)
 registered_image = sitk.Resample(image2, image1, final_transform, sitk.sitkLinear, 0.0, sitk.sitkFloat32)
 
 # Convert SimpleITK images to numpy arrays for displaying
-pixel_array1 = sitk.GetArrayFromImage(image1)
-pixel_array2 = sitk.GetArrayFromImage(image2)
+pixel_array3 = sitk.GetArrayFromImage(image1)
+pixel_array4 = sitk.GetArrayFromImage(image2)
 registered_array = sitk.GetArrayFromImage(registered_image)
 
 # Plot the original and registered images
@@ -62,13 +62,13 @@ plt.axis('off')
 
 # Plot Image 1 - After Registration
 plt.subplot(153)
-plt.imshow(sitk.GetArrayFromImage(image1).squeeze(), cmap='gray')
+plt.imshow(pixel_array3.squeeze(), cmap='gray')
 plt.title("Image 1 - After Registration")
 plt.axis('off')
 
 # Plot Image 2 - After Registration
 plt.subplot(154)
-plt.imshow(pixel_array2.squeeze(), cmap='gray')
+plt.imshow(pixel_array4.squeeze(), cmap='gray')
 plt.title("Image 2 - After Registration")
 plt.axis('off')
 
