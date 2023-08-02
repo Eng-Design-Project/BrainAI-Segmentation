@@ -1,9 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import SimpleITK as sitk
-#import skimage
+import skimage
 import os
-#from skimage.transform import resize
+from skimage.transform import resize
 #from pydicom import dcmread
 
 
