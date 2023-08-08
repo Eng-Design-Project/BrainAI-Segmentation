@@ -64,6 +64,47 @@ def save_sitk_3d_img_png(directory, new_dir):
         output_file = os.path.join(new_dir+"\\", output_file.split(".")[0]+".png")
         plt.imsave(output_file, png_file)
 
+#takes sitk image and saves to directory as dcm files
+def save_sitk_3d_img_to_dcm(original_image, transformed_image, new_dir):
+    # Check if the directory exists, if not, create it
+    if not os.path.exists(new_dir):
+        os.makedirs(new_dir)
+
+    # Get the 3D image size to iterate through the slices
+    size = transformed_image.GetSize()
+
+    # Create a DICOM writer
+    writer = sitk.ImageFileWriter()
+
+    # Get metadata from the original image
+    study_id = original_image.GetMetaData('0020|000D') if original_image.HasMetaDataKey('0020|000D') else ""
+    series_id = original_image.GetMetaData('0020|000E') if original_image.HasMetaDataKey('0020|000E') else ""
+
+    # Iterate through the slices and save each one
+    for z in range(size[2]):
+        slice_image = transformed_image[:,:,z]
+        slice_image = sitk.Cast(slice_image, sitk.sitkInt32)
+
+        # Set the metadata attributes
+        slice_image.SetMetaData('0020|000D', study_id) # Study Instance UID
+        slice_image.SetMetaData('0020|000E', series_id) # Series Instance UID
+        slice_image.SetMetaData('0020|0011', str(z))    # Series Number
+        slice_image.SetMetaData('0020|0013', str(z))    # Instance Number
+
+        # Create a filename for the slice
+        filename = os.path.join(new_dir, "slice_{:03d}.dcm".format(z))
+
+        # Set the filename to the writer
+        writer.SetFileName(filename)
+
+        # Write the slice
+        writer.Execute(slice_image)
+
+        print("Saved slice {} to {}".format(z, filename))
+
+    print("Saved 3D image to {}".format(new_dir))
+
+
 # Path to the directory that contains the DICOM files
 #directory1 = "scan1"
 #directory2 = "scan2"
