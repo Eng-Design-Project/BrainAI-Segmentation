@@ -3,6 +3,7 @@ import numpy as np
 import SimpleITK as sitk
 import skimage
 import os
+import pydicom
 from skimage.transform import resize
 #from pydicom import dcmread
 
@@ -35,6 +36,7 @@ def view_sitk_3d_image(image, numSlices, displayText):
         axes[i].axis('off')
     plt.show()
 
+#note: simple ITK does not get all metadata, only most useful metadata for registration
 def view_slice_metadata_from_directory(directory):
     scan_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")]
     for filename in scan_files:
@@ -64,8 +66,35 @@ def save_sitk_3d_img_png(directory, new_dir):
         output_file = os.path.join(new_dir+"\\", output_file.split(".")[0]+".png")
         plt.imsave(output_file, png_file)
 
+def copy_meta_data(metadata_dcm_file, target_dcm_file):
+    # Read the original DICOM file
+    metadata_dcm = pydicom.dcmread(metadata_dcm_file)
+
+    # Read the target DICOM file (the one you want to copy the metadata to)
+    target_dcm = pydicom.dcmread(target_dcm_file)
+
+    pixel_data = target_dcm.PixelData
+
+    metadata_dcm.PixelData = pixel_data
+
+    # Copy metadata from original to target
+    # for elem in original_dcm.iterall():
+    #     if elem.tag != (0x7FE0, 0x0010) and elem.tag.group not in (0x0002, 0x0004):
+    #         target_dcm.add(elem)
+
+    # Save the target DICOM file with the updated metadata
+    metadata_dcm.save_as(target_dcm_file)
+
+#takes a directory and index, spits out filepath
+def get_filepath(directory, index):
+    filenames = [f for f in os.listdir(directory) if f.endswith(".dcm")]
+    if index < len(filenames):
+        return os.path.join(directory, filenames[index])
+    else:
+        return None
+
 #takes sitk image and saves to directory as dcm files
-def save_sitk_3d_img_to_dcm(original_image, transformed_image, new_dir):
+def save_sitk_3d_img_to_dcm(transformed_image, atlas_dir, new_dir):
     # Check if the directory exists, if not, create it
     if not os.path.exists(new_dir):
         os.makedirs(new_dir)
@@ -76,9 +105,7 @@ def save_sitk_3d_img_to_dcm(original_image, transformed_image, new_dir):
     # Create a DICOM writer
     writer = sitk.ImageFileWriter()
 
-    # Get metadata from the original image
-    study_id = original_image.GetMetaData('0020|000D') if original_image.HasMetaDataKey('0020|000D') else ""
-    series_id = original_image.GetMetaData('0020|000E') if original_image.HasMetaDataKey('0020|000E') else ""
+    #study ID and series ID, hard coded for now, maybe based on user input later on
 
     # Iterate through the slices and save each one
     for z in range(size[2]):
@@ -86,10 +113,10 @@ def save_sitk_3d_img_to_dcm(original_image, transformed_image, new_dir):
         slice_image = sitk.Cast(slice_image, sitk.sitkInt32)
 
         # Set the metadata attributes
-        slice_image.SetMetaData('0020|000D', study_id) # Study Instance UID
-        slice_image.SetMetaData('0020|000E', series_id) # Series Instance UID
-        slice_image.SetMetaData('0020|0011', str(z))    # Series Number
-        slice_image.SetMetaData('0020|0013', str(z))    # Instance Number
+        # slice_image.SetMetaData('0020|000D', 'registered scans') # Study Instance UID
+        # slice_image.SetMetaData('0020|000E', 'registered scan') # Series Instance UID
+        # slice_image.SetMetaData('0020|0011', str(z))    # Series Number
+        # slice_image.SetMetaData('0020|0013', str(z))    # Instance Number
 
         # Create a filename for the slice
         filename = os.path.join(new_dir, "slice_{:03d}.dcm".format(z))
@@ -99,6 +126,10 @@ def save_sitk_3d_img_to_dcm(original_image, transformed_image, new_dir):
 
         # Write the slice
         writer.Execute(slice_image)
+
+        # Copy meta data to new slice
+        original_path = get_filepath(atlas_dir, z)
+        #copy_meta_data(original_path, filename)
 
         print("Saved slice {} to {}".format(z, filename))
 
