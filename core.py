@@ -10,6 +10,10 @@ class Core:
     def handle_gui_click(self, input_value):
         # Implement your logic here to handle the data received from the GUI
         print(f"Received input value from GUI: {input_value}")
+        if self.gui.segment_flag == True:
+            print("seg flag set true")
+            #this currently does not work, 
+            #the segment flag is retrieved here before it is set in the GUI module 
 
     def run(self):
         self.gui.start()

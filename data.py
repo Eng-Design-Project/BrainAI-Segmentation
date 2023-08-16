@@ -94,7 +94,7 @@ def get_filepath(directory, index):
         return None
 
 #takes sitk image and saves to directory as dcm files
-def save_sitk_3d_img_to_dcm(transformed_image, atlas_dir, new_dir):
+def save_sitk_3d_img_to_dcm(transformed_image, new_dir):
     # Check if the directory exists, if not, create it
     if not os.path.exists(new_dir):
         os.makedirs(new_dir)
@@ -128,6 +128,7 @@ def save_sitk_3d_img_to_dcm(transformed_image, atlas_dir, new_dir):
         writer.Execute(slice_image)
 
         # Copy meta data to new slice
+        atlas_dir = get_atlas_path()
         original_path = get_filepath(atlas_dir, z)
         #copy_meta_data(original_path, filename)
 
@@ -135,6 +136,9 @@ def save_sitk_3d_img_to_dcm(transformed_image, atlas_dir, new_dir):
 
     print("Saved 3D image to {}".format(new_dir))
 
+def get_atlas_path():
+    atlas_dir = "scan1"
+    return atlas_dir
 
 # Path to the directory that contains the DICOM files
 #directory1 = "scan1"

@@ -7,7 +7,7 @@ import SimpleITK as sitk
 import data
 
 
-def basic_segment(atlas, image, 
+def atlas_segment(atlas, image, 
                   simMetric="MeanSquares", optimizer="GradientDescent", 
                   interpolator="Linear", samplerInterpolator="Linear"):
     
@@ -63,27 +63,27 @@ def basic_segment(atlas, image,
     registered_image = resampler.Execute(image)
     return registered_image
 
+def test_atlas_segment_hardcoded():
+    # Path to the directory that contains the DICOM files
+    atlas_dir = "scan1"
+    input_dir = "scan2"
+    # Create 3d image with SITK
+    atlas_image = data.get_3d_image(atlas_dir)
+    input_image = data.get_3d_image(input_dir)
+    #does it need to by cast to float32?
 
-# Path to the directory that contains the DICOM files
-map_dir = "scan1"
-input_dir = "scan2"
-# Create 3d image with SITK
-map_image = data.get_3d_image(map_dir)
-input_image = data.get_3d_image(input_dir)
-#does it need to by cast to float32?
+    study_id = input_image.GetMetaData('0020|000D') if input_image.HasMetaDataKey('0020|000D') else ""
+    series_id = input_image.GetMetaData('0020|000E') if input_image.HasMetaDataKey('0020|000E') else ""
+    print("study id: ", study_id)
+    print("series id: ", series_id)
 
-study_id = input_image.GetMetaData('0020|000D') if input_image.HasMetaDataKey('0020|000D') else ""
-series_id = input_image.GetMetaData('0020|000E') if input_image.HasMetaDataKey('0020|000E') else ""
-print("study id: ", study_id)
-print("series id: ", series_id)
+    registered_image = atlas_segment(atlas_image, input_image)
 
-registered_image = basic_segment(map_image, input_image)
+    #data.view_sitk_3d_image(map_image, 5, "map image")
+    #data.view_sitk_3d_image(input_image, 5, "input image")
+    #data.view_sitk_3d_image(registered_image, 5, "registered image")
 
-#data.view_sitk_3d_image(map_image, 5, "map image")
-#data.view_sitk_3d_image(input_image, 5, "input image")
-#data.view_sitk_3d_image(registered_image, 5, "registered image")
-
-data.save_sitk_3d_img_to_dcm(registered_image, map_dir, "registered")
+    data.save_sitk_3d_img_to_dcm(registered_image, "registered")
 
 def initial_segment_test():
     # Load DICOM filepaths
