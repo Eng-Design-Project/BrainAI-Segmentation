@@ -135,6 +135,32 @@ def save_sitk_3d_img_to_dcm(transformed_image, atlas_dir, new_dir):
 
     print("Saved 3D image to {}".format(new_dir))
 
+def get_file_path():
+    
+    initial_dir = os.getcwd()  # Get the current working directory
+
+    #folder_path = filedialog.askdirectory(initialdir=initial_dir, title="Select a folder")
+
+    #return folder_path
+
+#selected_folder = get_file_path()
+#print("Selected folder:", selected_folder)
+
+import subprocess
+import sys
+
+def open_folder_dialog():
+    if sys.platform.startswith('win'):
+        subprocess.run(['explorer', '/select,', '.'], shell=True)
+    elif sys.platform.startswith('darwin'):
+        subprocess.run(['open', '-a', 'Finder', '.'])
+    elif sys.platform.startswith('linux'):
+        subprocess.run(['xdg-open', '.'])
+    else:
+        print("Unsupported platform")
+
+open_folder_dialog()    
+
 
 # Path to the directory that contains the DICOM files
 #directory1 = "scan1"

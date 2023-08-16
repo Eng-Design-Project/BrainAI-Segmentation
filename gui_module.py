@@ -24,6 +24,24 @@ class GUIApp:
             self.input_value = dpg.add_input_text(label="Input Value", width=200)
             dpg.add_button(label="Submit", width=500, height=200, callback=self.handle_click)
 
+    def callback(sender, app_data):
+        print('OK was clicked.')
+        print("Sender: ", sender)
+        print("App Data: ", app_data)
+
+    def cancel_callback(sender, app_data):
+        print('Cancel was clicked.')
+        print("Sender: ", sender)
+        print("App Data: ", app_data)
+
+    def select_folder(callback, cancel_callback):
+        dpg.add_file_dialog(
+            directory_selector=True, show=False, callback=callback, tag="file_dialog_id",
+            cancel_callback=cancel_callback, width=700 ,height=400)
+
+        with dpg.window(label="Tutorial", width=800, height=300):
+            dpg.add_button(label="Directory Selector", callback=lambda: dpg.show_item("file_dialog_id"))
+
     def start(self):
         self.create_submit_button()
 
@@ -32,6 +50,7 @@ class GUIApp:
         dpg.show_viewport()
         dpg.start_dearpygui()
         dpg.destroy_context()
+
 
 
 
