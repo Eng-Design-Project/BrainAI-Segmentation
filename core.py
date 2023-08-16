@@ -6,7 +6,8 @@ import gui_module
 
 class Core:
     def __init__(self):
-        self.gui = gui_module.GUIApp(self.handle_gui_click, self.perform_segmentation)
+        self.gui = gui_module.GUIApp(self.handle_gui_click)
+        #attempted to pass another arg: , self.perform_segmentation, but got error of too many args 
         self.directory1 = ""
         self.directory2 = ""
 

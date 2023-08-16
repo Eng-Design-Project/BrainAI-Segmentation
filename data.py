@@ -163,7 +163,7 @@ def open_folder_dialog():
     else:
         print("Unsupported platform")
 
-open_folder_dialog()    
+#open_folder_dialog()    
 
 
 # Path to the directory that contains the DICOM files
