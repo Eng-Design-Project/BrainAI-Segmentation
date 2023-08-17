@@ -53,18 +53,20 @@ def resize_and_convert_to_3d_image(directory):
     return new_images
 
 #takes all of the dcm files in a directory, and saves them as png files in (string)new_dir
-def save_sitk_3d_img_png(directory, new_dir):
+def save_dcm_dir_to_png_dir(directory, new_dir):
     #create a directory called new_dir
-    os.mkdir(os.path.join("", new_dir)) 
+    if not os.path.exists(new_dir):
+        os.mkdir(new_dir)
+
     # Get a list of all DICOM files in the directory
     scan_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")]
     # convert each file to a PNG and save it to the directory
     for i in range(0, len(scan_files)):
         image = sitk.ReadImage(scan_files[i])
         png_file = sitk.GetArrayFromImage(image)[0,:,:]
-        output_file=scan_files[i].split("\\")[1]
-        output_file = os.path.join(new_dir+"\\", output_file.split(".")[0]+".png")
-        plt.imsave(output_file, png_file)
+        output_file = os.path.basename(scan_files[i]).split(".")[0] + ".png"
+        output_file_path = os.path.join(new_dir, output_file)
+        plt.imsave(output_file_path, png_file, cmap='gray')
 
 def copy_meta_data(metadata_dcm_file, target_dcm_file):
     # Read the original DICOM file
@@ -94,13 +96,13 @@ def get_filepath(directory, index):
         return None
 
 #takes sitk image and saves to directory as dcm files
-def save_sitk_3d_img_to_dcm(transformed_image, new_dir):
+def save_sitk_3d_img_to_dcm(image, new_dir):
     # Check if the directory exists, if not, create it
     if not os.path.exists(new_dir):
         os.makedirs(new_dir)
 
     # Get the 3D image size to iterate through the slices
-    size = transformed_image.GetSize()
+    size = image.GetSize()
 
     # Create a DICOM writer
     writer = sitk.ImageFileWriter()
@@ -109,7 +111,7 @@ def save_sitk_3d_img_to_dcm(transformed_image, new_dir):
 
     # Iterate through the slices and save each one
     for z in range(size[2]):
-        slice_image = transformed_image[:,:,z]
+        slice_image = image[:,:,z]
         slice_image = sitk.Cast(slice_image, sitk.sitkInt32)
 
         # Set the metadata attributes

@@ -35,7 +35,7 @@ class Core:
         return new_images
 
     def save_sitk_3d_img_png(directory, new_dir):
-        data.save_sitk_3d_img_png(directory, new_dir)
+        data.save_dcm_dir_to_png_dir(directory, new_dir)
 
     def basic_segment(atlas, image):
         registered_image = segmentation.basic_segment(atlas, image)
