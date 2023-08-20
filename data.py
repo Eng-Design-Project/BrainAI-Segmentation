@@ -3,9 +3,65 @@ import numpy as np
 import SimpleITK as sitk
 import skimage
 import os
+import pydicom
 from skimage.transform import resize
 #from pydicom import dcmread
 
+
+def copy_meta_data(sourcefile_dcm, targetfile_dcm):
+    # source dcm file
+    source_dcm = pydicom.dcmread(sourcefile_dcm)
+
+    # read new file
+    target_dcm = pydicom.dcmread(targetfile_dcm)
+
+    '''
+    # Copy specific metadata elements from source
+    target_dcm.PatientName = source_dcm.PatientName
+    target_dcm.PatientID = source_dcm.PatientID
+    # ... etc
+    '''
+    #copy all elements from source
+    target_dcm.update(source_dcm)
+
+    target_dcm.save_as(targetfile_dcm)
+
+def new_func(targetfile_dcm):
+    return targetfile_dcm
+
+def save_segmented_image(segmented_image, new_directory):
+    if not os.path.exists(new_directory):
+        os.makedirs(new_directory)
+
+    # 3D image size iterates through slices
+    size = segmented_image.GetSize()
+
+    # DICOM writer
+    dicom_writer = sitk.ImageFileWriter()
+
+    # Iterate through the slices and save each one
+    for z in range(size[2]):
+        slice_image = segmented_image[:,:,z]
+        slice_image = sitk.Cast(slice_image, sitk.sitkInt32)
+
+        # name the file
+        filename = os.path.join(new_directory, "segmented_slice_{:03d}.dcm".format(z))
+
+        # assign file name to writer
+        dicom_writer.SetFileName(filename)
+
+        # Write the slice
+        dicom_writer.Execute(slice_image)
+
+        # Copy metadata from the original DCM file, through atlas image
+        #will need to redefine this once we have the atlas directory and created its path
+        atlas_directory = get_atlas_path()
+        original_path = get_filepath(atlas_directory, z)
+        copy_meta_data(original_path, filename)
+
+        print("Saved segmented slice {} to {}".format(z, filename))
+
+    print("Saved segmented image to {}".format(new_directory))
 
 
 def get_3d_image(directory):
