@@ -20,6 +20,18 @@ class Core:
         self.another_button = tk.Button(self.master, text="Another Action", command=self.another_action)
         self.another_button.pack(pady=20)
 
+        # Button for displaying a PNG (in progress/subject to change)
+        self.image_file_path='mytest.png' # this example file path can be changed by other functions
+        self.image_button = tk.Button(self.master, text="Display Image", command= self.display_file_png)
+        self.image_button.pack(pady=20)
+    
+    def display_file_png(self):
+        # print("display image clicked")
+        file_path = self.image_file_path
+        self.image1=tk.PhotoImage(file=file_path)
+        self.label = tk.Label(self.master, image = self.image1)
+        self.label.place(x=20, y=20) # arbitrary position coordinates, they can be made into arguments for the function
+
     def select_folder(self):
         folder_path = filedialog.askdirectory()
         if folder_path:
