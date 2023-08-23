@@ -72,6 +72,10 @@ def save_dcm_dir_to_png_dir(directory, new_dir):
         output_file_path = os.path.join(new_dir, output_file)
         plt.imsave(output_file_path, png_file, cmap='gray')
 
+
+#currently only copies single files
+#a rework would involve getting the whole block of files, 
+#then sorting them by meta data
 def copy_meta_data(metadata_dcm_file, target_dcm_file):
     # Read the original DICOM file
     metadata_dcm = pydicom.dcmread(metadata_dcm_file)
@@ -90,6 +94,7 @@ def copy_meta_data(metadata_dcm_file, target_dcm_file):
 
     # Save the target DICOM file with the updated metadata
     metadata_dcm.save_as(target_dcm_file)
+#copy_meta_data('scan1', 'registered')
 
 #takes a directory and index, spits out filepath
 def get_filepath(directory, index):

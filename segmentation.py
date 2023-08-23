@@ -6,11 +6,70 @@ import matplotlib.pyplot as plt
 import SimpleITK as sitk
 import data
 
+import numpy as np
+from scipy.ndimage import affine_transform
+from scipy.signal import fftconvolve
+
+#for expand region of interest
+from scipy.ndimage import convolve
+
+def scipy_register_images(target, moving):
+    """
+    Register the moving image to the target image using cross-correlation and return the transformed image.
+    """
+    
+    # Calculate the cross-correlation in 3D
+    cross_correlation = fftconvolve(target, moving[::-1, ::-1, ::-1], mode='same')
+    
+    # Find the shift for which cross-correlation is maximum
+    shifts = np.unravel_index(np.argmax(cross_correlation), cross_correlation.shape)
+
+    # Calculate how much to shift to align the images at the center
+    center_shifts = np.array(target.shape) / 2 - np.array(shifts)
+    
+    # Use affine transform to shift the moving image
+    registered_image = affine_transform(moving, matrix=np.eye(3), offset=center_shifts)
+    
+    return registered_image
+
+
+# Example usage
+#target_image = np.random.rand(100, 100, 100)
+#moving_image = np.roll(target_image, shift=5, axis=0)  # Let's shift target image by 5 pixels in x-direction
+#registered_image = scipy_register_images(target_image, moving_image)
+# Now, the 'registered_image' should be closely aligned with 'target_image'
+
+
+#expand region of interest
+#this adds an extra layer of pixels to a segmented image from the original image
+#currently takes 2 3d arrays. Unsure if this will take simpleITK images instead
+def expand_roi(original, segment):
+    # Define a kernel for 3D convolution that checks for 26 neighbors in 3D
+    kernel = np.ones((3, 3, 3))
+    kernel[1, 1, 1] = 0  # We don't want the center pixel
+    
+    # Convolve with the segment to find the boundary of ROI
+    boundary = convolve(segment > 0, kernel) > 0
+    boundary[segment > 0] = 0  # Remove areas that are already part of the segment
+    
+    # Create a copy of the segment
+    expanded_segment = segment.copy()
+    
+    # Copy pixel values from the original image to the boundary in the expanded segment
+    expanded_segment[boundary] = original[boundary]
+    
+    return expanded_segment
+
+# Example usage:
+# original = np.random.rand(10, 10, 10)
+# segment = np.zeros((10, 10, 10))
+# segment[4:7, 4:7, 4:7] = 1
+# result = expand_roi(original, segment)
+
 
 def atlas_segment(atlas, image, 
                   simMetric="MeanSquares", optimizer="GradientDescent", 
                   interpolator="Linear", samplerInterpolator="Linear"):
-    
 
     #set up the registration framework
     registration_method = sitk.ImageRegistrationMethod()
@@ -163,6 +222,13 @@ def initial_segment_test():
 
 data.save_dcm_dir_to_png_dir("atlas", "atlas pngs")
 data.save_dcm_dir_to_png_dir("scan2", "scan 2")
+
+#extra pixel layer algo
+#takes the registered scan, a brain region scan
+#for all non-black voxels, note coordinates of adjacent black voxels
+#copy pixel data at those coordinates from the registered image 
+# to a copy of brain region image
+#return 'blurred' brain region image
 
 
 #registration testing
