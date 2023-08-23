@@ -5,6 +5,8 @@ import skimage
 import os
 import pydicom
 from skimage.transform import resize
+import subprocess
+import sys
 #from pydicom import dcmread
 
 
@@ -44,6 +46,8 @@ def view_slice_metadata_from_directory(directory):
         print(image.GetMetaData("0020|0032"))
 
 #takes all the dcm files in a directory, and returns a list of numpy pixel arrays of dimensions 224x224
+#note, image registration (for the atlas segmentation) cannot be done
+#  after an image has been converted to an array: the meta data used by sitk is lost
 def resize_and_convert_to_3d_image(directory):
     image=get_3d_image(directory)
     array = sitk.GetArrayFromImage(image)
@@ -152,8 +156,7 @@ def get_file_path():
 #selected_folder = get_file_path()
 #print("Selected folder:", selected_folder)
 
-import subprocess
-import sys
+
 
 def open_folder_dialog():
     if sys.platform.startswith('win'):
@@ -164,6 +167,40 @@ def open_folder_dialog():
         subprocess.run(['xdg-open', '.'])
     else:
         print("Unsupported platform")
+
+def rescale_image(input_image):
+    """
+    Rescale the input image to have a size of 128x128 in width and height
+    while keeping the depth the same.
+    """
+    # Original spacing and size
+    original_spacing = input_image.GetSpacing()
+    original_size = input_image.GetSize()
+
+    # New size (keeping the depth the same)
+    new_size = [128, 128, original_size[2]]
+    
+    # Compute new spacing given the original and new sizes
+    new_spacing = [
+        original_spacing[0] * (original_size[0] / new_size[0]),
+        original_spacing[1] * (original_size[1] / new_size[1]),
+        original_spacing[2]
+    ]
+
+    # Use the Resample function to rescale the image
+    resampled_image = sitk.Resample(input_image, new_size, sitk.Transform(), 
+                                    sitk.sitkLinear, input_image.GetOrigin(),
+                                    new_spacing, input_image.GetDirection(), 0.0,
+                                    input_image.GetPixelID())
+
+    return resampled_image
+
+def rescale_image_test(orig_dir):
+    orig_img = get_3d_image(orig_dir)
+    new_img = rescale_image(orig_img)
+    save_sitk_3d_img_to_dcm(new_img, "rescaled test")
+
+#rescale_image_test("registered")
 
 #open_folder_dialog()    
 

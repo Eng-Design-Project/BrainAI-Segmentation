@@ -161,8 +161,8 @@ def initial_segment_test():
 
     plt.show()
 
-data.save_dcm_dir_to_png_dir("scan1", "scan 1")
-data.save_dcm_dir_to_png_dir("scan2", "scan 2")
+data.save_dcm_dir_to_png_dir("atlas", "atlas pngs")
+#data.save_dcm_dir_to_png_dir("scan2", "scan 2")
 
 
 #registration testing
