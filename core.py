@@ -1,116 +1,65 @@
-#import tkinter as tk
-# core.py
-import data
 import segmentation
-import gui_module
+import data
+import tkinter as tk
+from tkinter import filedialog
 
 class Core:
-    def __init__(self):
-        self.gui = gui_module.GUIApp(self.handle_gui_click)
-        #attempted to pass another arg: , self.perform_segmentation, but got error of too many args 
-        self.directory1 = ""
-        self.directory2 = ""
+    def __init__(self, master):
+        self.master = master
 
-    def handle_gui_click(self, input_value):
-        # Implement your logic here to handle the data received from the GUI
-        print(f"Received input value from GUI: {input_value}")
-        self.directory1 = input_value
-        self.directory2 = input_value
+        # Button for selecting a folder
+        self.select_folder_button = tk.Button(self.master, text="Select Folder", command=self.select_folder)
+        self.select_folder_button.pack(pady=20)
+        self.selected_folder = ""
 
-    def run(self):
-        self.gui.start()
+        # Button for atlas segmenting a scan
+        self.atlas_segment_button = tk.Button(self.master, text="Atlas Segment", command=self.atlas_segment)
+        self.atlas_segment_button.pack(pady=20)
 
-    def get_3d_image(directory):
-        image = data.get_3d_image(directory)
-        return image
+        # Additional button for demonstration
+        self.another_button = tk.Button(self.master, text="Another Action", command=self.another_action)
+        self.another_button.pack(pady=20)
+
+        # Button for displaying a PNG (in progress/subject to change)
+        self.image_file_path='mytest.png' # this example file path can be changed by other functions
+        self.image_button = tk.Button(self.master, text="Display Image", command= self.display_file_png)
+        self.image_button.pack(pady=20)
     
-    def view_sitk_3d_image(image, numslices, displayText):
-        data.view_sitk_3d_image(image, numslices)
+    def display_file_png(self):
+        # print("display image clicked")
+        file_path = self.image_file_path
+        self.image1=tk.PhotoImage(file=file_path)
+        self.label = tk.Label(self.master, image = self.image1)
+        self.label.place(x=20, y=20) # arbitrary position coordinates, they can be made into arguments for the function
 
-    def view_slice_metadata_from_directory(directory):
-        data.view_slice_metadata_from_directory(directory)
-
-    def resize_and_convert_to_3d_image(directory):
-        new_images = data.resize_and_convert_to_3d_image(directory)
-        return new_images
-
-    def save_sitk_3d_img_png(directory, new_dir):
-        data.save_dcm_dir_to_png_dir(directory, new_dir)
-
-    def basic_segment(atlas, image):
-        registered_image = segmentation.basic_segment(atlas, image)
-        return registered_image
-
-    def perform_segmentation(self):
-        if self.directory1 and self.directory2:
-            self.image1 = data.get_3d_image(self.directory1)
-            self.image2 = data.get_3d_image(self.directory2)
-            if self.image1 and self.image2:
-                registered_image = segmentation.basic_segment(self.image1, self.image2)
-                data.view_sitk_3d_image(registered_image, 5, "Segmented Image")
-
-    """ def perform_segmentation(self):
-        if self.directory1 and self.directory2:
-            atlas_image = data.get_3d_image(self.directory1)  # Load atlas image
-            input_image = data.get_3d_image(self.directory2)  # Load input image
-            if atlas_image and input_image:
-                registered_image = self.basic_segment(atlas_image, input_image)  # Call basic_segment
-                data.view_sitk_3d_image(registered_image, 5, "Segmented Image")"""
-
-    def select_folder(self): 
-        self.gui.select_folder()
-                                    
-
-if __name__ == "__main__":
-    core = Core()
-    core.run()
-    # Path to the directory that contains the DICOM files
-    directory1 = "scan1"
-    directory2 = "scan2"
-
-    #core.select_folder()
+    def select_folder(self):
+        folder_path = filedialog.askdirectory()
+        if folder_path:
+            print("Selected folder:", folder_path)
+            self.selected_folder = folder_path
     
+    def atlas_segment(self):
+        print("Atlas Segmentation called")
+        # Path to the directory that contains the DICOM files
+        atlas_dir = data.get_atlas_path()
+        if self.selected_folder == "":
+            self.select_folder()
+        if self.selected_folder != "":
+            input_dir = self.selected_folder
 
-    # Create 3d image with SITK
-    #image1 = core.get_3d_image(directory1)
-    #image2 = core.get_3d_image(directory2)
+            # Create 3d image with SITK
+            atlas_image = data.get_3d_image(atlas_dir)
+            input_image = data.get_3d_image(input_dir)
 
-    #view slices of 3d image
-    #core.view_sitk_3d_image(image1, 10)
-    #core.view_sitk_3d_image(image2, 10)
-
-    #view metadata of slices in directory
-    #core.view_slice_metadata_from_directory(directory1)
-    #core.view_slice_metadata_from_directory(directory2)
-
-    
-
-
-    
+            registered_image = segmentation.atlas_segment(atlas_image, input_image)
+            data.save_sitk_3d_img_to_dcm(registered_image, "registered")
 
 
-#for using tkinter, this was inside the core class
-"""
-    def call_gui_method(self):
-        # Dummy method to simulate the core calling a method in the GUI
-        # In the actual implementation, you'll perform more meaningful actions
-        if self.gui_instance is None:
-            self.gui_instance = gui.GUI(root, self.segment_flag, self)  # Pass the Core instance to the GUI
-        print("Core is calling a GUI method.")
-        self.segment_flag = self.gui_instance.get_segment_flag()
+    def another_action(self):
+        print("Another action was performed!")
 
-    def run_gui(self):
-        if self.gui_instance is not None:
-            self.gui_instance.run()
-"""
-#for tkinter, this was in the if __name__ == "__main__":
-"""root = tk.Tk()  # Create the root Tkinter window
-    root.title("Core with GUI")
-
-    # Run the core.call_gui_method after initializing the GUI
-    core.call_gui_method()
-
-    # Run the GUI initialization in the main thread using 'after()'
-    root.after(0, core.run_gui)
-
-    root.mainloop()"""
+# Usage
+root = tk.Tk()
+root.geometry("600x400")
+app = Core(root)
+root.mainloop()
