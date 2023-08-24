@@ -7,6 +7,41 @@ import pydicom
 from skimage.transform import resize
 #from pydicom import dcmread
 
+'''
+#NOT TESTED YET:
+
+def registered_images_to_dcm(images, new_directory):
+    if not os.path.exists(new_directory):
+        os.makedirs(new_directory)
+
+    # iterate image size
+    size = images[0].GetSize()
+
+    # DICOM writer
+    dicom_writer = sitk.ImageFileWriter()
+
+    # Iterate through the slices and save each image
+    for z in range(size[2]):
+        slice_images = [image[:,:,z] for image in images]
+        slice_images = [sitk.Cast(slice_image, sitk.sitkInt32) for slice_image in slice_images]
+
+        
+        metadata_image = images[0]
+        slice_images[0].CopyInformation(metadata_image)
+
+        # Create a filename for the slice
+        filename = os.path.join(new_directory, "registered_slice_{:03d}.dcm".format(z))
+
+        # Set the filename to the writer
+        dicom_writer.SetFileName(filename)
+
+        # Write the slice images
+        dicom_writer.Execute(slice_images)
+
+        print("Saved registered slice {} to {}".format(z, filename))
+
+    print("Saved registered images to {}".format(new_directory))
+
 
 def copy_meta_data(sourcefile_dcm, targetfile_dcm):
     # source dcm file
@@ -15,12 +50,12 @@ def copy_meta_data(sourcefile_dcm, targetfile_dcm):
     # read new file
     target_dcm = pydicom.dcmread(targetfile_dcm)
 
-    '''
+    
     # Copy specific metadata elements from source
-    target_dcm.PatientName = source_dcm.PatientName
-    target_dcm.PatientID = source_dcm.PatientID
+    #target_dcm.PatientName = source_dcm.PatientName
+    #target_dcm.PatientID = source_dcm.PatientID
     # ... etc
-    '''
+   
     #copy all elements from source
     target_dcm.update(source_dcm)
 
@@ -62,6 +97,7 @@ def save_segmented_image(segmented_image, new_directory):
         print("Saved segmented slice {} to {}".format(z, filename))
 
     print("Saved segmented image to {}".format(new_directory))
+    '''
 
 
 def get_3d_image(directory):
