@@ -2,26 +2,35 @@ import numpy as np
 import matplotlib.pyplot as plt
 import SimpleITK as sitk
 
-# Define the patch size and stride (how much patches overlap)
-patch_size = (64, 64, 64)  # Adjust the size according to your model's input requirements
-stride = (32, 32, 32)  # Adjust the stride for overlap
+# Define the patch size
+patch_size = (64, 64, 64)
 
-# Function to split an image into regions based on coordinates
-def split_image_into_regions(image, region_coordinates_list, patch_size):
-    region_images = []
+def create_image_from_regions(image, region_dict, patch_size):
     half_patch_size = [size // 2 for size in patch_size]
+    output_images = {}
     
-    for coordinates in region_coordinates_list:
-        x, y, z = coordinates
-        if (0 <= x < image.GetSize()[0]) and \
-           (0 <= y < image.GetSize()[1]) and \
-           (0 <= z < image.GetSize()[2]):
-            region = image[x - half_patch_size[0]:x + half_patch_size[0],
-                           y - half_patch_size[1]:y + half_patch_size[1],
-                           z - half_patch_size[2]:z + half_patch_size[2]]
-            region_images.append(region)
-    
-    return region_images
+    for region_name, coordinates_list in region_dict.items():
+        blank_image = sitk.Image(image.GetSize(), image.GetPixelID())
+        blank_image.SetSpacing(image.GetSpacing())
+        blank_image.SetOrigin(image.GetOrigin())
+        
+        for coordinates in coordinates_list:
+            x, y, z = coordinates
+            if (0 <= x < image.GetSize()[0]) and \
+               (0 <= y < image.GetSize()[1]) and \
+               (0 <= z < image.GetSize()[2]):
+                region = image[x - half_patch_size[0]:x + half_patch_size[0],
+                               y - half_patch_size[1]:y + half_patch_size[1],
+                               z - half_patch_size[2]:z + half_patch_size[2]]
+                
+                # Debug: print the unique pixel values in the region
+                print(f"Unique pixel values in the region at coordinates {coordinates}: {np.unique(sitk.GetArrayFromImage(region))}")
+
+                blank_image = sitk.Paste(blank_image, region, region.GetSize(), [0, 0, 0], coordinates)
+        
+        output_images[region_name] = blank_image
+
+    return output_images
 
 # Load DICOM image series
 dicom_series_path = "scan1"
@@ -30,23 +39,27 @@ dicom_names = reader.GetGDCMSeriesFileNames(dicom_series_path)
 reader.SetFileNames(dicom_names)
 image = reader.Execute()
 
-# Define region_coordinates based on your requirements
-region_coordinates_list = [[x, y, z] for x in range(0, image.GetSize()[0], stride[0])
-                                       for y in range(0, image.GetSize()[1], stride[1])
-                                       for z in range(0, image.GetSize()[2], stride[2])]
+# Define your regions and their coordinates here
+region_dict = {
+    "Region1": [[40, 40, 40], [80, 80, 80]],
+    "Region2": [[120, 120, 120], [160, 160, 160]]
+}
 
-# Split the image into regions
-region_images = split_image_into_regions(image, region_coordinates_list, patch_size)
+# Create images from the regions
+region_images = create_image_from_regions(image, region_dict, patch_size)
 
 # Display each valid region image in a separate window
-for i, region in enumerate(region_images):
-    if region.GetNumberOfPixels() > 0:  # Display only if the region has valid pixels
+for region_name, region_image in region_images.items():
+    if region_image.GetNumberOfPixels() > 0:
         plt.figure(figsize=(6, 6))
-        plt.imshow(sitk.GetArrayFromImage(region)[0, :, :], cmap='gray')
-        plt.axis('off')
-        plt.title(f"Segmented Brain Region {i+1}")
-        plt.show()
-
+        array_from_image = sitk.GetArrayFromImage(region_image)
+        if array_from_image.any():
+            plt.imshow(array_from_image[0, :, :], cmap='gray')
+            plt.axis('off')
+            plt.title(f"Region: {region_name}")
+            plt.show()
+        else:
+            print(f"Region: {region_name} is all black.")
 
 
 
