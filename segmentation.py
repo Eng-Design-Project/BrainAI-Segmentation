@@ -123,12 +123,25 @@ def atlas_segment(atlas, image,
 
     #initial transform
     initial_transform = sitk.TranslationTransform(atlas.GetDimension())
+        #transforms only translation? affline instead?
+    #Rigid Transform (Rotation + Translation):
+    #initial_transform = sitk.Euler3DTransform()
+    #Similarity Transform (Rigid + isotropic scaling):
+    #initial_transform = sitk.Similarity3DTransform()
+    #Affine Transform (includes rotations, translations, scaling, and shearing):
+    #initial_transform = sitk.AffineTransform(atlas.GetDimension())
+    #BSpline Transform (a non-rigid, deformable transform): *DOES NOT CURRENTLY WORK*
+    #order_x, order_y, order_z = 5, 5, 5
+    #initial_transform = sitk.BSplineTransformInitializer(atlas, [order_x, order_y, order_z])
+
+
     registration_method.SetInitialTransform(initial_transform)
 
     #set interpolator
     if interpolator == "Linear":
         registration_method.SetInterpolator(sitk.sitkLinear)
     else:
+        print("default interpolator: Linear")
         registration_method.SetInterpolator(sitk.sitkLinear)
 
     #execute registration
@@ -174,6 +187,8 @@ def test_atlas_segment_hardcoded():
     #data.view_sitk_3d_image(registered_image, 5, "registered image")
 
     data.save_sitk_3d_img_to_dcm(registered_image, "registered")
+    data.save_dcm_dir_to_png_dir("registered", "reg pngs")
+test_atlas_segment_hardcoded()
 
 def initial_segment_test():
     # Load DICOM filepaths
@@ -251,8 +266,47 @@ def initial_segment_test():
 
     plt.show()
 
-data.save_dcm_dir_to_png_dir("atlas", "atlas pngs")
-data.save_dcm_dir_to_png_dir("scan2", "scan 2")
+#data.save_dcm_dir_to_png_dir("atlas", "atlas pngs")
+#data.save_dcm_dir_to_png_dir("registered", "reg pngs")
+
+
+
+def image_splitting_test():
+
+    image = data.get_3d_image("scan1")
+
+    def generate_regions():
+        region1 = [[x, y, z] for x in range(0, 51) for y in range(0, 51) for z in range(0, 51)]
+        region2 = [[x, y, z] for x in range(50, 101) for y in range(50, 101) for z in range(0, 50)]
+
+        region_dict = {
+            "Region1": region1,
+            "Region2": region2
+        }
+
+        return region_dict
+
+
+    # Define your regions and their coordinates here
+    region_dict = generate_regions()
+
+    region_images = create_image_from_regions(image, region_dict)
+
+    # Display each region
+    for region_name, region_image in region_images.items():
+        print(region_name)
+        print(region_image.GetSize())
+
+        plt.figure(figsize=(6, 6))
+        array_from_image = sitk.GetArrayFromImage(region_image)
+            # Displaying the first slice of the 3D image
+        plt.imshow(array_from_image[0, :, :], cmap='gray')
+        plt.axis('off')
+        plt.title(f"Region: {region_name}")
+        plt.show()
+
+#image_splitting_test()
+
 
 #extra pixel layer algo
 #takes the registered scan, a brain region scan
@@ -346,40 +400,3 @@ def segment_image(image):
 #interpolator
 #sitk.sitkLinear
 '''
-
-
-def image_splitting_test():
-
-    image = data.get_3d_image("scan1")
-
-    def generate_regions():
-        region1 = [[x, y, z] for x in range(0, 51) for y in range(0, 51) for z in range(0, 51)]
-        region2 = [[x, y, z] for x in range(50, 101) for y in range(50, 101) for z in range(0, 50)]
-
-        region_dict = {
-            "Region1": region1,
-            "Region2": region2
-        }
-
-        return region_dict
-
-
-    # Define your regions and their coordinates here
-    region_dict = generate_regions()
-
-    region_images = create_image_from_regions(image, region_dict)
-
-    # Display each region
-    for region_name, region_image in region_images.items():
-        print(region_name)
-        print(region_image.GetSize())
-
-        plt.figure(figsize=(6, 6))
-        array_from_image = sitk.GetArrayFromImage(region_image)
-            # Displaying the first slice of the 3D image
-        plt.imshow(array_from_image[0, :, :], cmap='gray')
-        plt.axis('off')
-        plt.title(f"Region: {region_name}")
-        plt.show()
-
-image_splitting_test()
