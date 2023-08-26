@@ -35,8 +35,6 @@ def create_image_from_regions(image, region_dict):
     return output_images
 
 
-
-
 image = data.get_3d_image("scan1")
 
 def generate_regions():
