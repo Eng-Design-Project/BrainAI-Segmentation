@@ -9,7 +9,17 @@ import data
 import numpy as np
 from scipy.ndimage import affine_transform
 from scipy.signal import fftconvolve
+import SimpleITK as sitk
 
+def create_black_copy(image: sitk.Image) -> sitk.Image:
+    # Create a copy of the input image
+    black_image = sitk.Image(image.GetSize(), image.GetPixelID())
+    black_image.SetOrigin(image.GetOrigin())
+    black_image.SetSpacing(image.GetSpacing())
+    black_image.SetDirection(image.GetDirection())
+
+    # All pixel values are already set to 0 (black) upon initialization
+    return black_image
 #for expand region of interest
 from scipy.ndimage import convolve
 

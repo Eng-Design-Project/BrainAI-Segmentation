@@ -1,59 +1,67 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import SimpleITK as sitk
+import data
 
 # Define the patch size
-patch_size = (64, 64, 64)
+def create_black_copy(image: sitk.Image) -> sitk.Image:
+    # Create a copy of the input image
+    black_image = sitk.Image(image.GetSize(), image.GetPixelID())
+    black_image.SetOrigin(image.GetOrigin())
+    black_image.SetSpacing(image.GetSpacing())
+    black_image.SetDirection(image.GetDirection())
 
-def create_image_from_regions(image, region_dict, patch_size):
-    half_patch_size = [size // 2 for size in patch_size]
+    # All pixel values are already set to 0 (black) upon initialization
+    return black_image
+
+def create_image_from_regions(image, region_dict):
     output_images = {}
-    
+    #my_dict['key3'] = 'value3'
     for region_name, coordinates_list in region_dict.items():
-        blank_image = sitk.Image(image.GetSize(), image.GetPixelID())
-        blank_image.SetSpacing(image.GetSpacing())
+        blank_image = image
+        blank_image = create_black_copy(image)
         blank_image.SetOrigin(image.GetOrigin())
+        
         
         for coordinates in coordinates_list:
             x, y, z = coordinates
             if (0 <= x < image.GetSize()[0]) and \
-               (0 <= y < image.GetSize()[1]) and \
-               (0 <= z < image.GetSize()[2]):
-                region = image[x - half_patch_size[0]:x + half_patch_size[0],
-                               y - half_patch_size[1]:y + half_patch_size[1],
-                               z - half_patch_size[2]:z + half_patch_size[2]]
-                
-                # Debug: print the unique pixel values in the region
-                print(f"Unique pixel values in the region at coordinates {coordinates}: {np.unique(sitk.GetArrayFromImage(region))}")
-
-                blank_image = sitk.Paste(blank_image, region, region.GetSize(), [0, 0, 0], coordinates)
-        
-        output_images[region_name] = blank_image
+                (0 <= y < image.GetSize()[1]) and \
+                (0 <= z < image.GetSize()[2]):
+                # Get pixel value from the original image at the given coordinates
+                pixel_value = image[x, y, z]
+                blank_image[x, y, z] = pixel_value
+                print(f"Pixel value at coordinates {coordinates}: {pixel_value}")
+                output_images[region_name] = blank_image
 
     return output_images
 
-# Load DICOM image series
-dicom_series_path = "scan1"
-reader = sitk.ImageSeriesReader()
-dicom_names = reader.GetGDCMSeriesFileNames(dicom_series_path)
-reader.SetFileNames(dicom_names)
-image = reader.Execute()
+image = data.get_3d_image("scan1")
+
+def generate_regions():
+    region1 = [[x, y, z] for x in range(0, 51) for y in range(0, 51) for z in range(0, 51)]
+    region2 = [[x, y, z] for x in range(50, 101) for y in range(50, 101) for z in range(50, 101)]
+
+    region_dict = {
+        "Region1": region1,
+        "Region2": region2
+    }
+
+    return region_dict
+
 
 # Define your regions and their coordinates here
-region_dict = {
-    "Region1": [[40, 40, 40], [80, 80, 80]],
-    "Region2": [[120, 120, 120], [160, 160, 160]]
-}
+region_dict = generate_regions()
 
-# Create images from the regions
-region_images = create_image_from_regions(image, region_dict, patch_size)
+region_images = create_image_from_regions(image, region_dict)
 
-# Display each valid region image in a separate window
+# Display each region
 for region_name, region_image in region_images.items():
     if region_image.GetNumberOfPixels() > 0:
         plt.figure(figsize=(6, 6))
         array_from_image = sitk.GetArrayFromImage(region_image)
         if array_from_image.any():
+            # Displaying the first slice of the 3D image
             plt.imshow(array_from_image[0, :, :], cmap='gray')
             plt.axis('off')
             plt.title(f"Region: {region_name}")
