@@ -188,7 +188,7 @@ def test_atlas_segment_hardcoded():
 
     data.save_sitk_3d_img_to_dcm(registered_image, "registered")
     data.save_dcm_dir_to_png_dir("registered", "reg pngs")
-test_atlas_segment_hardcoded()
+#test_atlas_segment_hardcoded()
 
 def initial_segment_test():
     # Load DICOM filepaths
