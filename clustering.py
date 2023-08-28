@@ -51,8 +51,6 @@ for i, image in enumerate(image_list):
     cluster_label = cluster_labels[i]
     # Perform actions based on cluster label, like saving to cluster-specific folders
 
-# Note: This example provides a basic framework. You may need to customize preprocessing,
-# post-processing, and visualization steps based on your project requirements.
 
 
 #AGGLOMERATIVE CLUSTERING:
