@@ -207,6 +207,32 @@ def rescale_image_test(orig_dir):
 
 #rescale_image_test("registered")
 
+# this function takes a dictionary as input - with the keys being brain region names and 
+# the values being sitk images, then converts the sitk image to dcm and stores it in
+# a subfolder based on the key (brain region name) which in turn is stored in a higher
+# level folder (new_dir)
+def store_seg_img_on_file(dict, new_dir):
+    # Check if the directory exists, if not, create it (higher level folder)
+    if not os.path.exists(new_dir):
+        os.makedirs(new_dir)
+    
+    for key in dict:
+        # making a sub folder based on the brain region name
+        sub_dir = os.path.join(new_dir, key)
+        os.makedirs(sub_dir)
+
+        save_sitk_3d_img_to_dcm(dict[key], sub_dir)
+        #print("key:", key)
+
+## the following code tests the "store_sec_img_on_file() functions"
+# directory1 = "scan1"
+# directory2 = "scan2"
+# image1 = get_3d_image(directory1)
+# image2 = get_3d_image(directory2)
+# dictionary = {"neocortex":image1, "frontal lobe":image2}
+# store_seg_img_on_file(dictionary, "brain1")
+
+
 #open_folder_dialog()    
 
 
