@@ -8,3 +8,5 @@ scan2/
 example scan pngs/
 reg pngs/
 reg png/
+scipy reg image dcm/
+scipy reg png/

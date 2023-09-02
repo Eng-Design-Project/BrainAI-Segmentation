@@ -44,6 +44,17 @@ def create_image_from_regions(image, region_dict):
 #for expand region of interest
 from scipy.ndimage import convolve
 
+def array_to_image_with_ref(data: np.ndarray, reference_image: sitk.Image) -> sitk.Image:
+    # Convert the numpy array to a SimpleITK image
+    new_image = sitk.GetImageFromArray(data)
+    
+    # Set the spatial information from the reference_image
+    new_image.SetSpacing(reference_image.GetSpacing())
+    new_image.SetOrigin(reference_image.GetOrigin())
+    new_image.SetDirection(reference_image.GetDirection())
+
+    return new_image
+
 def scipy_register_images(target, moving):
     """
     Register the moving image to the target image using cross-correlation and return the transformed image.
@@ -63,6 +74,25 @@ def scipy_register_images(target, moving):
     
     return registered_image
 
+def test_scipy_register_images(atlas, image):
+    print("testing scipy image reg")
+    #get sitk images
+    sitk_moving_image = data.get_3d_image(image)
+    sitk_target_image = data.get_3d_image(atlas)
+    # Convert the SimpleITK Images to NumPy arrays
+    moving_image = sitk.GetArrayFromImage(sitk_moving_image)
+    target_image = sitk.GetArrayFromImage(sitk_target_image)
+    #register the 3d array to atlas 3d array
+    reg_image = scipy_register_images(target_image, moving_image)
+    #convert registered array to sitk image
+    reg_image = array_to_image_with_ref(reg_image, sitk_moving_image)
+    #save registered image as dcm first, then as png
+    data.save_sitk_3d_img_to_dcm(reg_image, "scipy reg image dcm")
+    data.save_dcm_dir_to_png_dir("scipy reg image dcm", "scipy reg png")
+
+    #note: the problem may be with sitk registration where the dcm's have different values 
+    # for metadata like spacing
+test_scipy_register_images("scan1", "scan2")
 
 # Example usage
 #target_image = np.random.rand(100, 100, 100)
