@@ -307,6 +307,42 @@ def image_splitting_test():
 
 #image_splitting_test()
 
+# takes a directory of DCMs, outputs a dictionary with region names as keys and sitk images as the values
+def DCMs_to_sitk_img_dict(directory):
+    image = data.get_3d_image(directory)
+
+    def generate_regions(): #this part of the function could be expanded to have more regions
+        region1 = [[x, y, z] for x in range(0, 51) for y in range(0, 51) for z in range(0, 51)]
+        region2 = [[x, y, z] for x in range(50, 101) for y in range(50, 101) for z in range(0, 50)]
+
+        region_dict = {
+            "Region1": region1,
+            "Region2": region2
+        }
+        return region_dict
+    
+    # Define your regions and their coordinates here
+    region_dict = generate_regions()
+    region_images = create_image_from_regions(image, region_dict)
+    return region_images
+
+#given a dictionary with region names as keys and sitk images as values, this funciton displays them
+def display_regions_from_dict(region_images):
+    for region_name, region_image in region_images.items():
+        print(region_name)
+        print(region_image.GetSize())
+
+        plt.figure(figsize=(6, 6))
+        array_from_image = sitk.GetArrayFromImage(region_image)
+            # Displaying the first slice of the 3D image
+        plt.imshow(array_from_image[0, :, :], cmap='gray')
+        plt.axis('off')
+        plt.title(f"Region: {region_name}")
+        plt.show()
+
+## the 2 statements below make use of the function defined above
+# region_images = DCMs_to_sitk_img_dict("scan1")
+# display_regions_from_dict(region_images)
 
 #extra pixel layer algo
 #takes the registered scan, a brain region scan
