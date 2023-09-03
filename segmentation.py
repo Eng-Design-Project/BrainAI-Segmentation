@@ -279,6 +279,7 @@ def initial_segment_test():
 #data.save_dcm_dir_to_png_dir("atlas", "atlas pngs")
 #data.save_dcm_dir_to_png_dir("registered", "reg pngs")
 
+#THIS FUNCTION WILL BE DEPRECATED SOON, AS THERE IS A FUNCTION IN THE DATA MODULE THAT DOES IT MORE SIMPLY
 #given a dictionary with region names as keys and sitk images as values, this funciton displays them
 def display_regions_from_dict(region_images):
     for region_name, region_image in region_images.items():
@@ -292,7 +293,6 @@ def display_regions_from_dict(region_images):
         plt.axis('off')
         plt.title(f"Region: {region_name}")
         plt.show()
-
 
 def create_image_from_regions(image, region_dict):
     output_images = {}
@@ -332,8 +332,9 @@ def DCMs_to_sitk_img_dict(directory):
     # Define your regions and their coordinates here
     region_dict = generate_regions()
     region_images = create_image_from_regions(image, region_dict)
-    display_regions_from_dict(region_images)
-# test_create_image_from_regions("scan1")
+    #display_regions_from_dict(region_images)
+    data.display_seg_images(region_images)
+#DCMs_to_sitk_img_dict("scan1")
 
 #extra pixel layer algo
 #takes the registered scan, a brain region scan
@@ -416,7 +417,7 @@ def test_encode_atlas_colors():
     #display_regions_from_dict(final_dict)
     data.display_seg_images(final_dict)
 
-test_encode_atlas_colors()
+#test_encode_atlas_colors()
 
 
 
