@@ -60,10 +60,25 @@ class ImageScoringPopup:
         self.submit_button.pack(pady=20)
 
     def submit_scores(self):
-        score1 = self.score_entry1.get()
-        score2 = self.score_entry2.get()
-        self.callback(score1, score2)
-        self.master.destroy()
+        try:
+            score1 = float(self.score_entry1.get())
+            score2 = float(self.score_entry2.get())
+        
+            # Ensure the scores are within the desired range (0-10 or 1-10 or 1-5)
+            min_score = min(score1, score2)
+            max_score = max(score1, score2)
+
+            # Normalize the scores between 0 and 1
+            normalized_score1 = (score1 - min_score) / (max_score - min_score)
+            normalized_score2 = (score2 - min_score) / (max_score - min_score)
+
+            # Save the normalized scores or pass them to your CNN
+            self.callback(normalized_score1, normalized_score2)
+
+            self.master.destroy()
+        except ValueError:
+            # Handle invalid input (e.g., non-numeric input)
+            print("Invalid input. Please enter numeric scores.")
 
 class Core:
     def __init__(self, master):
