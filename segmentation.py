@@ -294,7 +294,7 @@ def display_regions_from_dict(region_images):
         plt.title(f"Region: {region_name}")
         plt.show()
 
-def create_image_from_regions(image, region_dict):
+def create_seg_images(image, region_dict):
     output_images = {}
     for region_name, coordinates_list in region_dict.items():
         blank_image = create_black_copy(image)
@@ -331,7 +331,7 @@ def DCMs_to_sitk_img_dict(directory):
     
     # Define your regions and their coordinates here
     region_dict = generate_regions()
-    region_images = create_image_from_regions(image, region_dict)
+    region_images = create_seg_images(image, region_dict)
     #display_regions_from_dict(region_images)
     data.display_seg_images(region_images)
 #DCMs_to_sitk_img_dict("scan1")
@@ -412,12 +412,12 @@ def test_encode_atlas_colors():
     data.view_sitk_3d_image(sitk_image, 5, "redbluegreen")
 
     #create image dict from coords dict and sitk_image
-    final_dict = create_image_from_regions(sitk_image, region_to_coord_dict)
+    final_dict = create_seg_images(sitk_image, region_to_coord_dict)
 
     #display_regions_from_dict(final_dict)
     data.display_seg_images(final_dict)
 
-#test_encode_atlas_colors()
+test_encode_atlas_colors()
 
 
 
