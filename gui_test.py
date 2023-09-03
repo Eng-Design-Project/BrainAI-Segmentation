@@ -48,12 +48,12 @@ class ImageScoringPopup:
 
         self.score_label1 = tk.Label(self.master, text="Score Image 1:")
         self.score_label1.pack(pady=10)
-        self.score_entry1 = tk.Entry(self.master)
+        self.score_entry1 = tk.Scale(self.master, from_=1, to=10, orient="horizontal", sliderrelief='flat')
         self.score_entry1.pack()
 
         self.score_label2 = tk.Label(self.master, text="Score Image 2:")
         self.score_label2.pack(pady=10)
-        self.score_entry2 = tk.Entry(self.master)
+        self.score_entry2 = tk.Scale(self.master, from_=1, to=10, orient="horizontal", sliderrelief='flat')
         self.score_entry2.pack()
 
         self.submit_button = tk.Button(self.master, text="Submit", command=self.submit_scores)
@@ -132,6 +132,8 @@ class Core:
         self.advanced_segmentation_page.show_buttons()
 
     def open_image_scoring_popup(self):
+        # image1_path = "C:\\Users\\kevin\\Documents\\classes\\ED1\\BrainAI-Segmentation\\scan 1\\ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png"
+        # image2_path = "C:\\Users\\kevin\\Documents\\classes\\ED1\\BrainAI-Segmentation\\scan 1\\ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png"
         image1_path = "/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png"  # Replace with actual image paths
         image2_path = "/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png"
         
@@ -203,6 +205,6 @@ class DeepLearningPage:
 # Usage
 if __name__ == "__main__":
     root = tk.Tk()
-    root.geometry("600x400")
+    root.geometry("800x700")
     app = Core(root)
     root.mainloop()
