@@ -38,6 +38,10 @@ def view_sitk_3d_image(image, numSlices, displayText):
         axes[i].axis('off')
     plt.show()
 
+def display_seg_images(image_dict):
+    for region, sitk_image in image_dict.items():
+        view_sitk_3d_image(sitk_image, 15, region)
+
 #note: simple ITK does not get all metadata, only most useful metadata for registration
 def view_slice_metadata_from_directory(directory):
     scan_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")]

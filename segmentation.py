@@ -21,26 +21,6 @@ def create_black_copy(image: sitk.Image) -> sitk.Image:
     # All pixel values are already set to 0 (black) upon initialization
     return black_image
 
-def create_image_from_regions(image, region_dict):
-    output_images = {}
-    for region_name, coordinates_list in region_dict.items():
-        blank_image = create_black_copy(image)
-        
-        for coordinates in coordinates_list:
-            x, y, z = coordinates
-            if (0 <= x < image.GetSize()[0]) and \
-               (0 <= y < image.GetSize()[1]) and \
-               (0 <= z < image.GetSize()[2]):
-                pixel_value = image[x, y, z]
-                blank_image[x, y, z] = pixel_value
-                
-        # Append the finished blank_image to the output_images dictionary
-        output_images[region_name] = blank_image
-
-    print(f"Size of output images:  {len(output_images)}")
-
-    return output_images
-
 #for expand region of interest
 from scipy.ndimage import convolve
 
@@ -92,7 +72,7 @@ def test_scipy_register_images(atlas, image):
 
     #note: the problem may be with sitk registration where the dcm's have different values 
     # for metadata like spacing
-test_scipy_register_images("scan1", "scan2")
+#test_scipy_register_images("scan1", "scan2")
 
 # Example usage
 #target_image = np.random.rand(100, 100, 100)
@@ -299,63 +279,6 @@ def initial_segment_test():
 #data.save_dcm_dir_to_png_dir("atlas", "atlas pngs")
 #data.save_dcm_dir_to_png_dir("registered", "reg pngs")
 
-
-
-def image_splitting_test():
-
-    image = data.get_3d_image("scan1")
-
-    def generate_regions():
-        region1 = [[x, y, z] for x in range(0, 51) for y in range(0, 51) for z in range(0, 51)]
-        region2 = [[x, y, z] for x in range(50, 101) for y in range(50, 101) for z in range(0, 50)]
-
-        region_dict = {
-            "Region1": region1,
-            "Region2": region2
-        }
-
-        return region_dict
-
-
-    # Define your regions and their coordinates here
-    region_dict = generate_regions()
-
-    region_images = create_image_from_regions(image, region_dict)
-
-    # Display each region
-    for region_name, region_image in region_images.items():
-        print(region_name)
-        print(region_image.GetSize())
-
-        plt.figure(figsize=(6, 6))
-        array_from_image = sitk.GetArrayFromImage(region_image)
-            # Displaying the first slice of the 3D image
-        plt.imshow(array_from_image[0, :, :], cmap='gray')
-        plt.axis('off')
-        plt.title(f"Region: {region_name}")
-        plt.show()
-
-#image_splitting_test()
-
-# takes a directory of DCMs, outputs a dictionary with region names as keys and sitk images as the values
-def DCMs_to_sitk_img_dict(directory):
-    image = data.get_3d_image(directory)
-
-    def generate_regions(): #this part of the function could be expanded to have more regions
-        region1 = [[x, y, z] for x in range(0, 51) for y in range(0, 51) for z in range(0, 51)]
-        region2 = [[x, y, z] for x in range(50, 101) for y in range(50, 101) for z in range(0, 50)]
-
-        region_dict = {
-            "Region1": region1,
-            "Region2": region2
-        }
-        return region_dict
-    
-    # Define your regions and their coordinates here
-    region_dict = generate_regions()
-    region_images = create_image_from_regions(image, region_dict)
-    return region_images
-
 #given a dictionary with region names as keys and sitk images as values, this funciton displays them
 def display_regions_from_dict(region_images):
     for region_name, region_image in region_images.items():
@@ -370,9 +293,47 @@ def display_regions_from_dict(region_images):
         plt.title(f"Region: {region_name}")
         plt.show()
 
-## the 2 statements below make use of the function defined above
-# region_images = DCMs_to_sitk_img_dict("scan1")
-# display_regions_from_dict(region_images)
+
+def create_image_from_regions(image, region_dict):
+    output_images = {}
+    for region_name, coordinates_list in region_dict.items():
+        blank_image = create_black_copy(image)
+        
+        for coordinates in coordinates_list:
+            x, y, z = coordinates
+            if (0 <= x < image.GetSize()[0]) and \
+               (0 <= y < image.GetSize()[1]) and \
+               (0 <= z < image.GetSize()[2]):
+                pixel_value = image[x, y, z]
+                blank_image[x, y, z] = pixel_value
+                
+        # Append the finished blank_image to the output_images dictionary
+        output_images[region_name] = blank_image
+
+    print(f"Size of output images:  {len(output_images)}")
+
+    return output_images
+
+# takes a directory of DCMs, outputs a dictionary with region names as keys and sitk images as the values
+def DCMs_to_sitk_img_dict(directory):
+    image = data.get_3d_image(directory)
+
+    #this part of the function could be expanded to have more regions
+    def generate_regions(): 
+        region1 = [[x, y, z] for x in range(0, 51) for y in range(0, 51) for z in range(0, 51)]
+        region2 = [[x, y, z] for x in range(50, 101) for y in range(50, 101) for z in range(0, 50)]
+
+        region_dict = {
+            "Region1": region1,
+            "Region2": region2
+        }
+        return region_dict
+    
+    # Define your regions and their coordinates here
+    region_dict = generate_regions()
+    region_images = create_image_from_regions(image, region_dict)
+    display_regions_from_dict(region_images)
+# test_create_image_from_regions("scan1")
 
 #extra pixel layer algo
 #takes the registered scan, a brain region scan
@@ -400,6 +361,62 @@ def display_regions_from_dict(region_images):
 #interpolator
 #sitk.sitkLinear
 
+def encode_atlas_colors(image_3d: np.ndarray) -> dict:
+    #hard coded colors to region
+    color_to_region_dict = {
+        (255, 0, 0): 'Region1',   # Red
+        (0, 0, 255): 'Region2',   # Blue
+        (0, 255, 0): 'Region3',   # Green
+        #... add other colors and regions as required
+    }
+    # Initialize the output dictionary with region names as keys and empty lists as values
+    region_coords_dict = {region: [] for region in color_to_region_dict.values()}
+
+    # Iterate through the 3D array to get the coordinates and pixel values
+    for x in range(image_3d.shape[0]):
+        for y in range(image_3d.shape[1]):
+            for z in range(image_3d.shape[2]):
+                pixel_color = tuple(image_3d[x, y, z])#note, xyz from 3d arrays
+                # If the pixel color exists in the dictionary, add its coordinate to the respective list
+                if pixel_color in color_to_region_dict:
+                    region = color_to_region_dict[pixel_color]
+                    region_coords_dict[region].append([z, y, x])#note zyx for comparison to sitk images
+
+    return region_coords_dict
+
+def test_encode_atlas_colors():
+    # Define image dimensions
+    width = 40
+    height = 40
+    depth = 40
+
+    # Create an empty RGB 3D image
+    image_3d = np.zeros((depth, height, width, 3), dtype=np.uint8)
+    
+    # Fill the left with red
+    image_3d[:, :, :width//3] = [255, 0, 0]
+
+    # Fill the middle with blue
+    image_3d[:, :, width//3:2*width//3] = [0, 0, 255]
+
+    # Fill the right with green
+    image_3d[:, :, 2*width//3:] = [0, 255, 0]
+
+    #get a dict of regions and coords
+    region_to_coord_dict = encode_atlas_colors(image_3d)
+    print(region_to_coord_dict)
+
+    #convert 3d array image to sitk image
+    sitk_image = sitk.GetImageFromArray(image_3d)
+    data.view_sitk_3d_image(sitk_image, 5, "redbluegreen")
+
+    #create image dict from coords dict and sitk_image
+    final_dict = create_image_from_regions(sitk_image, region_to_coord_dict)
+
+    #display_regions_from_dict(final_dict)
+    data.display_seg_images(final_dict)
+
+test_encode_atlas_colors()
 
 
 
