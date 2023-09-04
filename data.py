@@ -228,7 +228,7 @@ def store_seg_img_on_file(dict, new_dir):
         save_sitk_3d_img_to_dcm(dict[key], sub_dir)
         #print("key:", key)
 
-## the following code tests the "store_sec_img_on_file() functions"
+## the following code tests the "store_sec_img_on_file()"" functions
 # directory1 = "scan1"
 # directory2 = "scan2"
 # image1 = get_3d_image(directory1)
@@ -237,9 +237,27 @@ def store_seg_img_on_file(dict, new_dir):
 # store_seg_img_on_file(dictionary, "brain1")
 
 
-#open_folder_dialog()    
+# first argument should be a higher level folder with brain region subfolders containing DCM files.
+# the output is a dictionary with brain region names as keys and sitk images as values
+def subfolders_to_dictionary(directory):
+    #print(os.listdir(directory))
+    region_dict = {}
+    for i in os.listdir(directory):
+        # print(i)
+        region_dict[i] = get_3d_image(os.path.join(directory, i))
+
+    return region_dict
 
 
+# the following code tests the "subfolders_to_dictionary()" function
+def test_subfolders_to_dictionary(directory):
+    regions = subfolders_to_dictionary(directory)
+    for key, value in regions.items():
+        view_sitk_3d_image(value, 15, key)
+
+# test_subfolders_to_dictionary("brain1")
+
+   
 # Path to the directory that contains the DICOM files
 #directory1 = "scan1"
 #directory2 = "scan2"
