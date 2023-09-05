@@ -40,7 +40,7 @@ def view_sitk_3d_image(image, numSlices, displayText):
 
 def display_seg_images(image_dict):
     for region, sitk_image in image_dict.items():
-        view_sitk_3d_image(sitk_image, 15, region)
+        view_sitk_3d_image(sitk_image, 5, region)
 
 #note: simple ITK does not get all metadata, only most useful metadata for registration
 def view_slice_metadata_from_directory(directory):

@@ -87,7 +87,7 @@ def test_scipy_register_images(atlas, image):
 def expand_roi(original, segment):
     # Define a kernel for 3D convolution that checks for 26 neighbors in 3D
     kernel = np.ones((3, 3, 3))
-    kernel[1, 1, 1] = 0  # We don't want the center pixel
+    kernel[1, 1, 1] = 0
     
     # Convolve with the segment to find the boundary of ROI
     boundary = convolve(segment > 0, kernel) > 0
@@ -334,6 +334,7 @@ def DCMs_to_sitk_img_dict(directory):
     region_images = create_seg_images(image, region_dict)
     #display_regions_from_dict(region_images)
     data.display_seg_images(region_images)
+    
 #DCMs_to_sitk_img_dict("scan1")
 
 #extra pixel layer algo
@@ -390,23 +391,17 @@ def test_encode_atlas_colors():
     width = 40
     height = 40
     depth = 40
-
     # Create an empty RGB 3D image
     image_3d = np.zeros((depth, height, width, 3), dtype=np.uint8)
-    
     # Fill the left with red
     image_3d[:, :, :width//3] = [255, 0, 0]
-
     # Fill the middle with blue
     image_3d[:, :, width//3:2*width//3] = [0, 0, 255]
-
     # Fill the right with green
     image_3d[:, :, 2*width//3:] = [0, 255, 0]
-
     #get a dict of regions and coords
     region_to_coord_dict = encode_atlas_colors(image_3d)
-    print(region_to_coord_dict)
-
+    #print(region_to_coord_dict)
     #convert 3d array image to sitk image
     sitk_image = sitk.GetImageFromArray(image_3d)
     data.view_sitk_3d_image(sitk_image, 5, "redbluegreen")
@@ -414,10 +409,24 @@ def test_encode_atlas_colors():
     #create image dict from coords dict and sitk_image
     final_dict = create_seg_images(sitk_image, region_to_coord_dict)
 
-    #display_regions_from_dict(final_dict)
-    data.display_seg_images(final_dict)
-
-test_encode_atlas_colors()
+    #test expand_roi()
+    np_original = sitk.GetArrayFromImage(sitk_image)
+    #following is code to test expand ROI, but it doesn't work on RGB images
+    # this is fine, we only need it to work on grayscale
+    # for region, image in final_dict.items():
+    #     np_image = sitk.GetArrayFromImage(image)
+    #     for x in range(10):
+    #         #RuntimeError: filter weights array has incorrect shape.
+    #         np_image = expand_roi(np_original, np_image)
+    #     final_dict[region] = sitk.GetImageFromArray(np_image)
+    #data.display_seg_images(final_dict)
+    print(image_3d.shape)
+    print(sitk_image.GetSize())
+    print(np_original.shape)
+    np_image = sitk.GetArrayFromImage(final_dict["Region1"])
+    print(np_image.shape)
+#RuntimeError: filter weights array has incorrect shape.
+#test_encode_atlas_colors()
 
 
 
