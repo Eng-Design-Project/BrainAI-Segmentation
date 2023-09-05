@@ -255,8 +255,8 @@ def test_subfolders_to_dictionary(directory):
     regions = subfolders_to_dictionary(directory)
     for key, value in regions.items():
         view_sitk_3d_image(value, 15, key)
-test_store_seg_img_on_file("brain1")
-test_subfolders_to_dictionary("brain1")
+#test_store_seg_img_on_file("brain1")
+#test_subfolders_to_dictionary("brain1")
 
    
 # Path to the directory that contains the DICOM files
