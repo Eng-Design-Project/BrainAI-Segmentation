@@ -83,6 +83,7 @@ class ImageScoringPopup:
 class Core:
     def __init__(self, master):
         self.master = master
+        self.current_page = None  # Track the current page being displayed
 
         self.master.title("Image Analysis Tool")
 
@@ -144,7 +145,14 @@ class Core:
         # Implement your atlas segmentation logic here
 
     def show_advanced_segmentation_buttons(self):
+        if self.current_page:
+            self.current_page.hide_buttons()
+
+        # Show the buttons of the new page
         self.advanced_segmentation_page.show_buttons()
+
+        # Update the current page
+        self.current_page = self.advanced_segmentation_page
 
     def open_image_scoring_popup(self):
         # image1_path = "C:\\Users\\kevin\\Documents\\classes\\ED1\\BrainAI-Segmentation\\scan 1\\ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png"
