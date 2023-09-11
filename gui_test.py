@@ -108,13 +108,16 @@ class Core:
 
         self.clustering_button = tk.Button(self.master, text="Clustering", command=lambda:self.change_buttons([self.clustering_back_button],[self.deep_learning_button, self.advanced_back_button, self.clustering_button]))
 
-        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:self.change_buttons([self.deeplearning_back_button],[self.deep_learning_button, self.advanced_back_button, self.clustering_button]))
+        # Define the Deep Learning button here with the correct command
+        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=self.start_deep_learning)
+        self.deep_learning_button.pack(pady=20)
 
         self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button],[self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
 
         self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.advanced_segmentation_button, self.clustering_back_button]))
 
         self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.advanced_segmentation_button,self.deeplearning_back_button]))
+
 
         """self.image_file_path = 'mytest.png'
         self.image_button = tk.Button(self.master, text="Display Image", command=self.display_file_png)
@@ -141,6 +144,7 @@ class Core:
             print("Selected folder:", folder_path)
             self.selected_folder = folder_path
             self.update_folder_label()
+
 
     def update_folder_label(self):
         self.folder_label.config(text="Selected Folder: " + self.selected_folder)
@@ -178,6 +182,10 @@ class Core:
         # Implement your logic to save the scores here
         print("Score for Image 1:", score1)
         print("Score for Image 2:", score2)
+
+    def start_deep_learning(self):
+        # Implement your deep learning logic here
+        print("Initiating Deep Learning tasks")    
     
 
     """def show_clustering_buttons(self):

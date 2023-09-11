@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import SimpleITK as sitk
 import data
+import segmentation
 
 # Define the patch size
 def create_black_copy(image: sitk.Image) -> sitk.Image:
