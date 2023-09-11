@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import filedialog
 from tkinter import ttk
 
-class AdvancedSegmentationPage:
+"""class AdvancedSegmentationPage:
     def __init__(self, master, core_instance):
         self.master = master
         self.core_instance = core_instance
@@ -27,7 +27,7 @@ class AdvancedSegmentationPage:
 
     def show_buttons(self):
         for button in [self.image_scoring_button, self.clustering_button, self.deep_learning_button, self.back_button]:
-            button.pack(pady=20)
+            button.pack(pady=20)"""
 
 
 class ImageScoringPopup:
@@ -90,14 +90,6 @@ class Core:
         self.style = ttk.Style()
         self.style.configure("TButton", font=("Helvetica", 12))
 
-        self.advanced_segmentation_button = tk.Button(self.master, text="Advanced Segmentation", command=self.show_advanced_segmentation_buttons)
-        self.advanced_segmentation_button.pack(pady=20)
-
-        self.advanced_segmentation_page = AdvancedSegmentationPage(self.master, self)
-        self.clustering_page = ClusteringPage(self.master, self)
-        self.deep_learning_page = DeepLearningPage(self.master, self)
-
-
         self.select_folder_button = tk.Button(self.master, text="Select Folder", command=self.select_folder)
         self.select_folder_button.pack(pady=20)
         self.selected_folder = ""
@@ -108,9 +100,25 @@ class Core:
         self.atlas_segment_button = tk.Button(self.master, text="Atlas Segment", command=self.atlas_segment)
         self.atlas_segment_button.pack(pady=20)
 
-        self.image_file_path = 'mytest.png'
+        self.image_scoring_button = tk.Button(self.master, text="Score Images", command=self.open_image_scoring_popup)
+        self.image_scoring_button.pack(pady=20)
+
+        self.advanced_segmentation_button = tk.Button(self.master, text="Advanced Segmentation", command=lambda: self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button], [self.advanced_segmentation_button, self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button,self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button]))
+        self.advanced_segmentation_button.pack(pady=20)
+
+        self.clustering_button = tk.Button(self.master, text="Clustering", command=lambda:self.change_buttons([self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button, self.clustering_back_button],[self.advanced_segmentation_button, self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
+
+        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:self.change_buttons([self.deeplearning_back_button],[self.deep_learning_button, self.clustering_button,self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button, self.advanced_back_button]))
+
+        self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.advanced_segmentation_button, self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button],[self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
+
+        self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button, self.clustering_back_button]))
+
+        self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.deeplearning_back_button]))
+
+        """self.image_file_path = 'mytest.png'
         self.image_button = tk.Button(self.master, text="Display Image", command=self.display_file_png)
-        self.image_button.pack(pady=20)
+        self.image_button.pack(pady=20)"""
 
         # Button for showing segmentation results for an image
         self.show_image_results_button = tk.Button(self.master, text="Show Image Results", command=self.show_image_results)
@@ -120,7 +128,26 @@ class Core:
         self.show_folder_results_button = tk.Button(self.master, text="Show Folder Results", command=self.show_folder_results)
         self.show_folder_results_button.pack(pady=20)
 
+        #self.advanced_segmentation_button = tk.Button(self.master, text="Advanced Segmentation", command=lambda: self.change_buttons([], [self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button]))
+        #self.advanced_segmentation_button.pack(pady=20)
 
+        self.clustering_algorithm_label = tk.Label(self.master, text="Select Clustering Algorithm:")
+        #self.clustering_algorithm_label.pack(pady=10)
+        self.clustering_algorithm_combobox = ttk.Combobox(self.master, values=["K-Means", "DBSCAN", "Hierarchical", "Other"])
+        #self.clustering_algorithm_combobox.pack()
+
+        # Add a button to execute clustering
+        self.execute_clustering_button = tk.Button(self.master, text="Execute Clustering", command=self.execute_clustering)
+        #self.execute_clustering_button.pack(pady=20)
+        
+    def execute_clustering(self):
+        # Get the selected clustering algorithm
+        selected_algorithm = self.clustering_algorithm_combobox.get()
+
+        # Implement clustering logic based on the selected algorithm
+        # Display clustering results within the GUI or perform any desired actions
+    
+        
     def show_main_window(self):
         self.master.deiconify()  # Show the main window
 
@@ -144,7 +171,7 @@ class Core:
         print("Atlas Segmentation called")
         # Implement your atlas segmentation logic here
 
-    def show_advanced_segmentation_buttons(self):
+    """def show_advanced_segmentation_buttons(self):
         if self.current_page:
             self.current_page.hide_buttons()
 
@@ -152,7 +179,7 @@ class Core:
         self.advanced_segmentation_page.show_buttons()
 
         # Update the current page
-        self.current_page = self.advanced_segmentation_page
+        self.current_page = self.advanced_segmentation_page"""
 
     def open_image_scoring_popup(self):
         # image1_path = "C:\\Users\\kevin\\Documents\\classes\\ED1\\BrainAI-Segmentation\\scan 1\\ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png"
@@ -162,6 +189,7 @@ class Core:
         
         popup_window = tk.Toplevel(self.master)
         image_scoring_popup = ImageScoringPopup(popup_window, image1_path, image2_path, self.save_scores)
+        
 
     def save_scores(self, score1, score2):
         # Implement your logic to save the scores here
@@ -169,11 +197,11 @@ class Core:
         print("Score for Image 2:", score2)
     
 
-    def show_clustering_buttons(self):
+    """def show_clustering_buttons(self):
         self.clustering_page.show_buttons()
 
     def show_deep_learning_buttons(self):
-        self.deep_learning_page.show_buttons()
+        self.deep_learning_page.show_buttons()"""
 
     def show_image_results(self):
         # This function will eventually display segmentation results for an image
@@ -183,9 +211,15 @@ class Core:
     def show_folder_results(self):
         # This function will eventually display segmentation results for images in a folder
         # You can add your image processing and display logic here
-        print("Displaying segmentation results for images in a folder")    
+        print("Displaying segmentation results for images in a folder") 
 
-class ClusteringPage:
+    def change_buttons(self, show_list, hide_list):
+        for button in hide_list:
+            button.pack_forget()
+        for button in show_list:
+            button.pack(pady=20) 
+
+"""class ClusteringPage:
     def __init__(self, master, core_instance):
         self.master = master
         self.core_instance = core_instance
@@ -223,7 +257,7 @@ class DeepLearningPage:
 
     def go_back(self):
         self.hide_buttons()
-        self.core_instance.advanced_segmentation_page.show_buttons()
+        self.core_instance.advanced_segmentation_page.show_buttons()"""
 
 # Usage
 if __name__ == "__main__":
