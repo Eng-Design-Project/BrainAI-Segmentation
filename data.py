@@ -151,9 +151,12 @@ def save_sitk_3d_img_to_dcm(image, new_dir):
 
     print("Saved 3D image to {}".format(new_dir))
 
+#temporarily "scan1" until atlas is complete
+#hard coded, we only have 1 atlas
 def get_atlas_path():
     atlas_dir = "scan1"
     return atlas_dir
+
 def get_file_path():
     
     initial_dir = os.getcwd()  # Get the current working directory
