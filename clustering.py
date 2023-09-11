@@ -1,3 +1,5 @@
+#It's not linked to other modules cause i was testing specific aspects that were easier to pin point as a standalone file
+
 import SimpleITK as sitk
 import numpy as np
 import matplotlib.pyplot as plt
