@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import filedialog
 from tkinter import ttk
 import deep_learning
+import segmentation
+import data
 
 """class AdvancedSegmentationPage:
     def __init__(self, master, core_instance):
@@ -171,10 +173,10 @@ class Core:
         self.current_page = self.advanced_segmentation_page"""
 
     def open_image_scoring_popup(self):
-        image1_path = "C:\\Users\\kevin\\Documents\\classes\\ED1\\BrainAI-Segmentation\\scan 1\\ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png"
-        image2_path = "C:\\Users\\kevin\\Documents\\classes\\ED1\\BrainAI-Segmentation\\scan 1\\ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png"
-        # image1_path = "/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png"  # Replace with actual image paths
-        # image2_path = "/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png"
+        # image1_path = "C:\\Users\\kevin\\Documents\\classes\\ED1\\BrainAI-Segmentation\\scan 1\\ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png"
+        # image2_path = "C:\\Users\\kevin\\Documents\\classes\\ED1\\BrainAI-Segmentation\\scan 1\\ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png"
+        image1_path = "/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png"  # Replace with actual image paths
+        image2_path = "/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png"
         
         popup_window = tk.Toplevel(self.master)
         image_scoring_popup = ImageScoringPopup(popup_window, image1_path, image2_path, self.save_scores)
@@ -252,6 +254,14 @@ class DeepLearningPage:
     def go_back(self):
         self.hide_buttons()
         self.core_instance.advanced_segmentation_page.show_buttons()"""
+
+# a function that will take a dictionary with regions (keys) and coordinates (values) as input,
+# it will call create_seg_img() from the segmenation module; it's gonna spit out images 
+# then we're calling the function in data that's saving the segmented image on file
+# this is not yet complete, needs testing
+def save_segmentation(image, region_dict, new_dir):
+    region_images = segmentation.create_seg_img(image, region_dict)
+    data.store_seg_img_onf_file(region_images, new_dir)
 
 # Usage
 if __name__ == "__main__":
