@@ -1,4 +1,5 @@
 import SimpleITK as sitk
+import gui_test
 
 class DeepLearningModule:
     def __init__(self):
@@ -26,3 +27,16 @@ class DeepLearningModule:
 # Create an instance of the DeepLearningModule
 deep_learning_module = DeepLearningModule()
 
+
+# global variables which correspond to the user scores
+user_score1 = -1 # dummy value
+user_score2 = -2 # dummy value
+
+# when this function is called in gui_test.py, the global variables are updated and printed to the terminal
+def get_user_score(x1, x2):
+    global user_score1
+    global user_score2
+    user_score1 = x1
+    user_score2 = x2
+    print("score 1 is: ", user_score1)
+    print("score 2 is: ", user_score2)
