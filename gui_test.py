@@ -1,10 +1,17 @@
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import ttk
+<<<<<<< Updated upstream
+=======
+<<<<<<< HEAD
+from deep_learning import DeepLearningModule
+=======
+>>>>>>> Stashed changes
 import deep_learning
 import segmentation
 import data
 
+>>>>>>> 6bd69edcc7bf9384f59c479410ef0d660af5351c
 """class AdvancedSegmentationPage:
     def __init__(self, master, core_instance):
         self.master = master
@@ -190,7 +197,14 @@ class Core:
 
     def start_deep_learning(self):
         # Implement your deep learning logic here
-        print("Initiating Deep Learning tasks")    
+        print("Initiating Deep Learning tasks")  
+        region_data = {
+            "Region1": "scan2/ADNI_003_S_1059_PT_adni2__br_raw_20071211125948781_11_S43552_I84553.dcm",
+            "Region2": "scan2/ADNI_003_S_1059_PT_adni2__br_raw_20071211125949312_18_S43552_I84553.dcm",
+            # Add more regions as needed
+        }  
+                # Call the load_regions function from the Deep Learning module
+        deep_learning.load_regions(region_data)
     
 
     """def show_clustering_buttons(self):
