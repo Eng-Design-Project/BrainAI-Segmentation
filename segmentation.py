@@ -72,7 +72,7 @@ def test_scipy_register_images(atlas, image):
 
     #note: the problem may be with sitk registration where the dcm's have different values 
     # for metadata like spacing
-#test_scipy_register_images("scan1", "scan2")
+#test_scipy_register_images("atlas", "scan2")
 
 # Example usage
 #target_image = np.random.rand(100, 100, 100)
@@ -132,14 +132,14 @@ def atlas_segment(atlas, image,
         registration_method.SetOptimizerScalesFromPhysicalShift()
 
     #initial transform
-    initial_transform = sitk.TranslationTransform(atlas.GetDimension())
+    #initial_transform = sitk.TranslationTransform(atlas.GetDimension())
         #transforms only translation? affline instead?
     #Rigid Transform (Rotation + Translation):
     #initial_transform = sitk.Euler3DTransform()
     #Similarity Transform (Rigid + isotropic scaling):
     #initial_transform = sitk.Similarity3DTransform()
     #Affine Transform (includes rotations, translations, scaling, and shearing):
-    #initial_transform = sitk.AffineTransform(atlas.GetDimension())
+    initial_transform = sitk.AffineTransform(atlas.GetDimension())
     #BSpline Transform (a non-rigid, deformable transform): *DOES NOT CURRENTLY WORK*
     #order_x, order_y, order_z = 5, 5, 5
     #initial_transform = sitk.BSplineTransformInitializer(atlas, [order_x, order_y, order_z])

@@ -1,6 +1,9 @@
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import ttk
+import deep_learning
+import segmentation
+import data
 
 """class AdvancedSegmentationPage:
     def __init__(self, master, core_instance):
@@ -108,13 +111,16 @@ class Core:
 
         self.clustering_button = tk.Button(self.master, text="Clustering", command=lambda:self.change_buttons([self.clustering_back_button],[self.deep_learning_button, self.advanced_back_button, self.clustering_button]))
 
-        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:self.change_buttons([self.deeplearning_back_button],[self.deep_learning_button, self.advanced_back_button, self.clustering_button]))
+        # Define the Deep Learning button here with the correct command
+        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=self.start_deep_learning)
+        self.deep_learning_button.pack(pady=20)
 
         self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button],[self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
 
         self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.advanced_segmentation_button, self.clustering_back_button]))
 
         self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.advanced_segmentation_button,self.deeplearning_back_button]))
+
 
         """self.image_file_path = 'mytest.png'
         self.image_button = tk.Button(self.master, text="Display Image", command=self.display_file_png)
@@ -141,6 +147,7 @@ class Core:
             print("Selected folder:", folder_path)
             self.selected_folder = folder_path
             self.update_folder_label()
+
 
     def update_folder_label(self):
         self.folder_label.config(text="Selected Folder: " + self.selected_folder)
@@ -178,6 +185,12 @@ class Core:
         # Implement your logic to save the scores here
         print("Score for Image 1:", score1)
         print("Score for Image 2:", score2)
+        # update the global vars in the deep learning module
+        deep_learning.get_user_score(score1, score2)
+
+    def start_deep_learning(self):
+        # Implement your deep learning logic here
+        print("Initiating Deep Learning tasks")    
     
 
     """def show_clustering_buttons(self):
@@ -201,6 +214,16 @@ class Core:
             button.pack(pady=20)
         for button in hide_list:
             button.pack_forget()   
+    
+    # a function that will take a dictionary with regions (keys) and coordinates (values) as input,
+    # it will call create_seg_img() from the segmenation module; it's gonna spit out images 
+    # then we're calling the function in data that's saving the segmented image on file
+    # this is not yet complete, needs testing
+    def save_segmentation(image, region_dict, new_dir):
+        region_images = segmentation.create_seg_images(image, region_dict)
+        data.store_seg_img_on_file(region_images, new_dir)
+        print("save_segmentation() has been called")
+
 
 """class ClusteringPage:
     def __init__(self, master, core_instance):
@@ -241,6 +264,7 @@ class DeepLearningPage:
     def go_back(self):
         self.hide_buttons()
         self.core_instance.advanced_segmentation_page.show_buttons()"""
+
 
 # Usage
 if __name__ == "__main__":
