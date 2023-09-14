@@ -214,6 +214,16 @@ class Core:
             button.pack(pady=20)
         for button in hide_list:
             button.pack_forget()   
+    
+    # a function that will take a dictionary with regions (keys) and coordinates (values) as input,
+    # it will call create_seg_img() from the segmenation module; it's gonna spit out images 
+    # then we're calling the function in data that's saving the segmented image on file
+    # this is not yet complete, needs testing
+    def save_segmentation(image, region_dict, new_dir):
+        region_images = segmentation.create_seg_images(image, region_dict)
+        data.store_seg_img_on_file(region_images, new_dir)
+        print("save_segmentation() has been called")
+
 
 """class ClusteringPage:
     def __init__(self, master, core_instance):
@@ -255,13 +265,6 @@ class DeepLearningPage:
         self.hide_buttons()
         self.core_instance.advanced_segmentation_page.show_buttons()"""
 
-# a function that will take a dictionary with regions (keys) and coordinates (values) as input,
-# it will call create_seg_img() from the segmenation module; it's gonna spit out images 
-# then we're calling the function in data that's saving the segmented image on file
-# this is not yet complete, needs testing
-def save_segmentation(image, region_dict, new_dir):
-    region_images = segmentation.create_seg_img(image, region_dict)
-    data.store_seg_img_onf_file(region_images, new_dir)
 
 # Usage
 if __name__ == "__main__":
