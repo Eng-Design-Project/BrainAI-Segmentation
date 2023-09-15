@@ -258,6 +258,14 @@ def test_subfolders_to_dictionary(directory):
     regions = subfolders_to_dictionary(directory)
     for key, value in regions.items():
         view_sitk_3d_image(value, 15, key)
+
+
+# Example variable to hold atlas segmentation data
+atlas_segmentation_data = None
+
+def get_atlas_segmentation_data():
+    global atlas_segmentation_data
+    return atlas_segmentation_data
 #test_store_seg_img_on_file("brain1")
 #test_subfolders_to_dictionary("brain1")
 

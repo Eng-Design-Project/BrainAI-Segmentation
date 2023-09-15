@@ -1,6 +1,12 @@
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import ttk
+<<<<<<< Updated upstream
+=======
+from tkinter import Canvas, Scrollbar, Frame
+from data import get_atlas_segmentation_data  # Make sure to import the function
+
+>>>>>>> Stashed changes
 
 """class AdvancedSegmentationPage:
     def __init__(self, master, core_instance):
@@ -119,10 +125,6 @@ class Core:
         self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.advanced_segmentation_button,self.deeplearning_back_button]))
 
 
-        """self.image_file_path = 'mytest.png'
-        self.image_button = tk.Button(self.master, text="Display Image", command=self.display_file_png)
-        self.image_button.pack(pady=20)"""
-
         # Button for showing segmentation results for an image
         self.show_image_results_button = tk.Button(self.master, text="Show Image Results", command=self.show_image_results)
         self.show_image_results_button.pack(pady=20)
@@ -131,9 +133,75 @@ class Core:
         self.show_folder_results_button = tk.Button(self.master, text="Show Folder Results", command=self.show_folder_results)
         self.show_folder_results_button.pack(pady=20)
 
+<<<<<<< Updated upstream
         #self.advanced_segmentation_button = tk.Button(self.master, text="Advanced Segmentation", command=lambda: self.change_buttons([], [self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button]))
         #self.advanced_segmentation_button.pack(pady=20)
     
+=======
+        self.clustering_algorithm_label = tk.Label(self.master, text="Select Clustering Algorithm:")
+        #self.clustering_algorithm_label.pack(pady=10)
+        self.clustering_algorithm_combobox = ttk.Combobox(self.master, values=["K-Means", "DBSCAN", "Hierarchical", "Other"])
+        #self.clustering_algorithm_combobox.pack()
+
+        # Add a button to execute clustering
+        self.execute_clustering_button = tk.Button(self.master, text="Execute Clustering", command=self.execute_clustering)
+        #self.execute_clustering_button.pack(pady=20)
+
+    def deep_learning_handler(self):
+        from deep_learning import deep_learning_module
+        region_dict = {'Region1': 'sitk1', 'Region2': 'sitk2'}
+        
+        atlas_data = get_atlas_segmentation_data()  # This function comes from data.py
+        
+        if atlas_data is None:
+            atlas_data = self.load_atlas_from_file()
+        
+        # Now we pass both the region and atlas data to the deep learning module
+        deep_learning_module.load_regions(region_dict)
+        deep_learning_module.load_atlas_data(atlas_data)
+
+    def load_atlas_from_file(self):
+        # Implement this method to load atlas data from file
+        pass
+
+
+    def load_atlas_from_file(self):
+        # Implement this method to load atlas data from file
+        pass
+        
+    def execute_clustering(self):
+        # Get the selected clustering algorithm
+        selected_algorithm = self.clustering_algorithm_combobox.get()
+
+        clustering_results = ""
+        # Implement clustering logic based on the selected algorithm
+        if selected_algorithm == "K-Means":
+        # Implement K-Means clustering logic here
+            clustering_results = "K-Means clustering results..."
+        elif selected_algorithm == "DBSCAN":
+        # Implement DBSCAN clustering logic here
+            clustering_results = "DBSCAN clustering results..."
+        elif selected_algorithm == "Hierarchical":
+        # Implement Hierarchical clustering logic here
+            clustering_results = "Hierarchical clustering results..."
+        elif selected_algorithm == "Other":
+        # Implement your custom clustering algorithm logic here
+            clustering_results = "Other clustering results..."
+
+    # Display clustering results within the GUI or perform any desired actions
+    # Display clustering results within the GUI
+        self.display_clustering_results(clustering_results)
+    # You can use labels or other widgets to display the clustering results.
+    def display_clustering_results(self, clustering_results):
+        # Create a label or canvas to display the clustering results
+        self.results_label = tk.Label(self.master, text="Clustering Results:")
+        self.results_label.pack()
+
+        # Create a text widget to show the clustering results
+        self.clustering_text = tk.Text(self.master, height=10, width=50)
+        self.clustering_text.insert(tk.END, clustering_results)
+        self.clustering_text.pack()
+>>>>>>> Stashed changes
         
     def show_main_window(self):
         self.master.deiconify()  # Show the main window
