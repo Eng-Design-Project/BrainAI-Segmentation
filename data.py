@@ -9,7 +9,7 @@ import subprocess
 import sys
 #from pydicom import dcmread
 
-
+programMemory = {}
 
 def get_3d_image(directory):
     # Get a list of all DICOM files in the directory

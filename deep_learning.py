@@ -1,7 +1,61 @@
 import SimpleITK as sitk
 import os
+import tensorflow as tf
+import numpy as np
+import data
 
+<<<<<<< Updated upstream
 print(" Entered deep learning ")
+=======
+
+def print_hello():
+    print(" Entered deep learning ")
+
+
+
+sitk_images_dict = {
+    "image1": data.get_3d_image("scan1"),
+    "image2": data.get_3d_image("scan2"),   
+    # Add other images...
+}
+
+
+numpy_images_dict = {key: sitk.GetArrayFromImage(img) for key, img in sitk_images_dict.items()}
+
+
+def normalize_tf(volume_3d):
+    tensor = tf.convert_to_tensor(volume_3d, dtype=tf.float32)
+    min_val = tf.reduce_min(tensor)
+    max_val = tf.reduce_max(tensor)
+    normalized_tensor = (tensor - min_val) / (max_val - min_val)
+    return normalized_tensor.numpy()
+
+normalized_image = normalize_tf(numpy_images_dict["image1"])
+
+print(normalized_image.min())
+print(normalized_image.max())
+
+"""
+def build_model(input_shape):
+    model = tf.keras.Sequential([
+        tf.keras.layers.InputLayer(input_shape=input_shape),
+        tf.keras.layers.Conv2D(32, (3, 3), activation='relu'),
+        tf.keras.layers.MaxPooling2D(2, 2),
+        tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
+        tf.keras.layers.MaxPooling2D(2, 2),
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(128, activation='relu'),
+        tf.keras.layers.Dense(2, activation='softmax')  # Assumes binary classification
+    ])
+
+    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    return model
+
+"""
+
+
+
+>>>>>>> Stashed changes
 class DeepLearningModule:
     def __init__(self):
         pass
