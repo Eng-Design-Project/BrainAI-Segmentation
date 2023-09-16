@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import filedialog
 from tkinter import ttk
 from tkinter import Canvas, Scrollbar, Frame
-
+import deep_learning
 
 """class AdvancedSegmentationPage:
     def __init__(self, master, core_instance):
@@ -135,13 +135,15 @@ class Core:
 
         self.clustering_button = tk.Button(self.master, text="Clustering", command=lambda:self.change_buttons([self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button, self.clustering_back_button],[self.advanced_segmentation_button, self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
 
-        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:self.change_buttons([self.deeplearning_back_button],[self.deep_learning_button, self.clustering_button,self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button, self.advanced_back_button]))
+        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:self.change_buttons([self.execute_deep_learning, self.deeplearning_back_button],[self.deep_learning_button, self.clustering_button,self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button, self.advanced_back_button]))
+
+        self.execute_deep_learning = tk.Button(self.master, text="Execute Deep Learning", command=self.execute_deep_learning_click)
 
         self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.advanced_segmentation_button, self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button],[self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
 
         self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button,self.clustering_text, self.results_label, self.clustering_back_button]))
 
-        self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.deeplearning_back_button]))
+        self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.deeplearning_back_button]))
 
         """self.image_file_path = 'mytest.png'
         self.image_button = tk.Button(self.master, text="Display Image", command=self.display_file_png)
@@ -199,6 +201,11 @@ class Core:
         self.clustering_text = tk.Text(self.master, height=10, width=50)
         self.clustering_text.insert(tk.END, clustering_results)
         self.clustering_text.pack()
+
+    def execute_deep_learning_click(self):
+        # Call the print_hello function from the deep_learning module
+        deep_learning.print_hello()
+        # You can add more logic here if needed
         
     def show_main_window(self):
         self.master.deiconify()  # Show the main window
