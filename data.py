@@ -80,7 +80,7 @@ def save_dcm_dir_to_png_dir(directory, new_dir):
 #currently only copies single files
 #a rework would involve getting the whole block of files, 
 #then sorting them by meta data
-def copy_meta_data(metadata_dcm_file, target_dcm_file):
+def copy_metadata(metadata_dcm_file, target_dcm_file):
     # Read the original DICOM file
     metadata_dcm = pydicom.dcmread(metadata_dcm_file)
 
@@ -99,6 +99,19 @@ def copy_meta_data(metadata_dcm_file, target_dcm_file):
     # Save the target DICOM file with the updated metadata
     metadata_dcm.save_as(target_dcm_file)
 #copy_meta_data('scan1', 'registered')
+
+def full_copy_metadata(metadata_dcm_dir, target_dcm_dir, new_dir):
+    metadata_files = [os.path.join(metadata_dcm_dir, f) for f in os.listdir(metadata_dcm_dir) if f.endswith(".dcm")]
+    target_files = [os.path.join(target_dcm_dir, f) for f in os.listdir(target_dcm_dir) if f.endswith(".dcm")]
+    
+    #cuurent issue: its ok for target files to be smaller than metadata, 
+    # but this would throw an error if metadata was smaller
+    for i in range(0, len(target_files)):
+        metadata_img = pydicom.dcmread(metadata_files[i])
+        target_img = pydicom.dcmread(target_files[i])
+        metadata_img.PixelData = target_img.PixelData
+        metadata_img.save_as(new_dir)
+#full_copy_metadata("scan1", "registered", "copy_test")
 
 #takes a directory and index, spits out filepath
 def get_filepath(directory, index):
