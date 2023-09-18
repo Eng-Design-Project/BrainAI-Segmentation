@@ -67,8 +67,8 @@ def test_scipy_register_images(atlas, image):
     #convert registered array to sitk image
     reg_image = array_to_image_with_ref(reg_image, sitk_moving_image)
     #save registered image as dcm first, then as png
-    data.save_sitk_3d_img_to_dcm(reg_image, "scipy reg image dcm")
-    data.save_dcm_dir_to_png_dir("scipy reg image dcm", "scipy reg png")
+    data.save_sitk_3d_img_to_dcm(reg_image, "scipy_reg_image_dcm")
+    data.save_dcm_dir_to_png_dir("scipy_reg_image_dcm", "scipy_reg_png")
 
     #note: the problem may be with sitk registration where the dcm's have different values 
     # for metadata like spacing
