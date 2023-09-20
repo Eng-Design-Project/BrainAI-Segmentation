@@ -162,7 +162,7 @@ class Core:
 
         self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.advanced_segmentation_button, self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button],[self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
 
-        self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button,self.clustering_text, self.results_label, self.clustering_back_button]))
+        self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button, self.results_label,self.previous_button,self.next_button, self.clustering_back_button]))
 
         self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.deeplearning_back_button]))
 
@@ -297,6 +297,7 @@ class Core:
             # You can use file dialogs to allow the user to choose a file
             segmentation_results = {}  # Implement file selection logic here
         elif selection == "memory":
+            data.set_seg_results()
             # Logic to select segmentation results from memory and set the variable
             # You can populate segmentation_results with data from memory
             segmentation_results = {}  # Implement memory selection logic here
