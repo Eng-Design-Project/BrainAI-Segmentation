@@ -6,6 +6,7 @@ from PIL import Image, ImageTk  # Import PIL for image manipulation
 
 import deep_learning
 import clustering
+import data
 
 """class AdvancedSegmentationPage:
     def __init__(self, master, core_instance):
@@ -282,11 +283,16 @@ class Core:
         confirm_button = tk.Button(popup_window, text="Confirm", command=lambda: self.handle_segmentation_selection(popup_window, selection_var.get()))
         confirm_button.pack(pady=20)
 
+
     def handle_segmentation_selection(self, popup_window, selection):
         # Close the popup window
         popup_window.destroy()
 
         if selection == "file":
+            # Add code to get the selected folder here and store it
+            selected_folder = self.get_selected_folder()
+            data.set_seg_results(selected_folder)
+            print("Selected folder:", selected_folder)
             # Logic to select segmentation results from a file and set the variable
             # You can use file dialogs to allow the user to choose a file
             segmentation_results = {}  # Implement file selection logic here
@@ -308,6 +314,10 @@ class Core:
             print("Selected folder:", folder_path)
             self.selected_folder = folder_path
             self.update_folder_label()
+
+    def get_selected_folder(self):
+        folder_path = filedialog.askdirectory()
+        return folder_path
 
     def update_folder_label(self):
         self.folder_label.config(text="Selected Folder: " + self.selected_folder)
