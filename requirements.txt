@@ -2,10 +2,12 @@ run powershell as admin
 navigate to the project folder
 make sure there is a myenv file in your project folder
 if not, run: python -m venv myenv
-activate the virtual environment: myenv\Scripts\activate
+activate the virtual environment: windows: myenv\Scripts\activate
+    mac: source myenv/bin/activate
 
 pip install SimpleITK
 pip install numpy
 pip install matplotlib
 pip install pydicom
 pip install scikit.image
+pip install scikit-learn

@@ -75,30 +75,9 @@ def save_dcm_dir_to_png_dir(directory, new_dir):
         output_file = os.path.basename(scan_files[i]).split(".")[0] + ".png"
         output_file_path = os.path.join(new_dir, output_file)
         plt.imsave(output_file_path, png_file, cmap='gray')
+#save_dcm_dir_to_png_dir("scan4", "scan4_pngs")
 
 
-#currently only copies single files
-#a rework would involve getting the whole block of files, 
-#then sorting them by meta data
-def copy_meta_data(metadata_dcm_file, target_dcm_file):
-    # Read the original DICOM file
-    metadata_dcm = pydicom.dcmread(metadata_dcm_file)
-
-    # Read the target DICOM file (the one you want to copy the metadata to)
-    target_dcm = pydicom.dcmread(target_dcm_file)
-
-    pixel_data = target_dcm.PixelData
-
-    metadata_dcm.PixelData = pixel_data
-
-    # Copy metadata from original to target
-    # for elem in original_dcm.iterall():
-    #     if elem.tag != (0x7FE0, 0x0010) and elem.tag.group not in (0x0002, 0x0004):
-    #         target_dcm.add(elem)
-
-    # Save the target DICOM file with the updated metadata
-    metadata_dcm.save_as(target_dcm_file)
-#copy_meta_data('scan1', 'registered')
 
 #takes a directory and index, spits out filepath
 def get_filepath(directory, index):
@@ -342,3 +321,44 @@ def p_arrays(*files):
 # below is an example of accessing a pixel array from the list, and displaying it with plt
 #plt.imshow(p_array_list[2], 'gray', origin='lower')
 #plt.show()
+
+'''
+#won't work can't apply pixeldata from one dcm to another
+#pixeldata is dependent on metadata
+def copy_metadata(metadata_dcm_file, target_dcm_file):
+    # Read the original DICOM file
+    metadata_dcm = pydicom.dcmread(metadata_dcm_file)
+
+    # Read the target DICOM file (the one you want to copy the metadata to)
+    target_dcm = pydicom.dcmread(target_dcm_file)
+
+    pixel_data = target_dcm.PixelData
+
+    metadata_dcm.PixelData = pixel_data
+
+    # Copy metadata from original to target
+    # for elem in original_dcm.iterall():
+    #     if elem.tag != (0x7FE0, 0x0010) and elem.tag.group not in (0x0002, 0x0004):
+    #         target_dcm.add(elem)
+
+    # Save the target DICOM file with the updated metadata
+    metadata_dcm.save_as(target_dcm_file)
+#copy_meta_data('scan1', 'registered')
+
+#doesn't work because pixel data is dependent on metadata
+# can't apply pixel data from one dcm to another, it just doesn't work 
+def full_copy_metadata(metadata_dcm_dir, target_dcm_dir):
+    
+    metadata_files = [os.path.join(metadata_dcm_dir, f) for f in os.listdir(metadata_dcm_dir) if f.endswith(".dcm")]
+    target_files = [os.path.join(target_dcm_dir, f) for f in os.listdir(target_dcm_dir) if f.endswith(".dcm")]
+    #final_files = [os.path.join(target_dcm_dir, f) for f in os.listdir(metadata_dcm_dir) if f.endswith(".dcm")]
+
+    
+    for i in range(min(len(metadata_files), len(target_files))):
+        metadata_img = pydicom.dcmread(metadata_files[i])
+        target_img = pydicom.dcmread(target_files[i])
+        metadata_img.PixelData = target_img.PixelData
+        
+        metadata_img.save_as(target_files[i])
+#full_copy_metadata("scipy_reg_image_dcm", "scipy_reg_image_dcm")
+'''
