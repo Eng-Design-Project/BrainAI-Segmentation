@@ -2,7 +2,10 @@ import tkinter as tk
 from tkinter import filedialog
 from tkinter import ttk
 from tkinter import Canvas, Scrollbar, Frame
+from PIL import Image, ImageTk  # Import PIL for image manipulation
 
+import deep_learning
+import clustering
 
 """class AdvancedSegmentationPage:
     def __init__(self, master, core_instance):
@@ -33,11 +36,11 @@ from tkinter import Canvas, Scrollbar, Frame
 
 
 class ImageScoringPopup:
-    def __init__(self, master, image1_path, image2_path, callback):
+    def __init__(self, master,image_paths, callback):
         self.master = master
         self.callback = callback
-        self.image1_path = image1_path
-        self.image2_path = image2_path
+        self.image_paths = image_paths
+        self.current_image_index = 0
 
         self.popup_frame = Frame(master)
         self.popup_frame.pack(fill='both', expand=True)
@@ -53,14 +56,17 @@ class ImageScoringPopup:
         self.inner_frame = Frame(self.canvas)
         self.inner_frame_canvas = self.canvas.create_window((0, 0), window=self.inner_frame, anchor="nw")
 
-        self.image1 = tk.PhotoImage(file=image1_path)
-        self.image2 = tk.PhotoImage(file=image2_path)
+        self.images = [Image.open(path) for path in image_paths]
+        self.photo_images = [ImageTk.PhotoImage(image) for image in self.images]
 
-        self.image_label1 = tk.Label(self.inner_frame, image=self.image1)
-        self.image_label1.pack(pady=(20, 10), anchor="center")
+        self.image_label = tk.Label(self.inner_frame, image=self.photo_images[self.current_image_index])
+        self.image_label.pack(pady=(20, 10), anchor="center")
 
-        self.image_label2 = tk.Label(self.inner_frame, image=self.image2)
-        self.image_label2.pack(pady=(20, 10), anchor="center")
+        self.prev_button = tk.Button(self.inner_frame, text="Previous", command=self.show_previous_image)
+        self.prev_button.pack(side="left", padx=10)
+        
+        self.next_button = tk.Button(self.inner_frame, text="Next", command=self.show_next_image)
+        self.next_button.pack(side="right", padx=10)
 
         self.score_label1 = tk.Label(self.inner_frame, text="Score Image 1:")
         self.score_label1.pack(pady=10, anchor="center")
@@ -85,6 +91,17 @@ class ImageScoringPopup:
 
     def on_canvas_configure(self, event):
         self.canvas.itemconfig(self.inner_frame_canvas, width=event.width)
+
+    def show_previous_image(self):
+        if self.current_image_index > 0:
+            self.current_image_index -= 1
+            self.image_label.config(image=self.photo_images[self.current_image_index])
+
+    def show_next_image(self):
+        if self.current_image_index < len(self.photo_images) - 1:
+            self.current_image_index += 1
+            self.image_label.config(image=self.photo_images[self.current_image_index])
+
 
     def submit_scores(self):
         try:
@@ -111,9 +128,10 @@ class Core:
     def __init__(self, master):
         self.master = master
         self.current_page = None  # Track the current page being displayed
+        self.segmentation_results = {}  # Initialize the segmentation_results variable as an empty dictionary
+
 
         self.master.title("Image Analysis Tool")
-
         self.style = ttk.Style()
         self.style.configure("TButton", font=("Helvetica", 12))
 
@@ -135,13 +153,15 @@ class Core:
 
         self.clustering_button = tk.Button(self.master, text="Clustering", command=lambda:self.change_buttons([self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button, self.clustering_back_button],[self.advanced_segmentation_button, self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
 
-        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:self.change_buttons([self.deeplearning_back_button],[self.deep_learning_button, self.clustering_button,self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button, self.advanced_back_button]))
+        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:self.change_buttons([self.execute_deep_learning, self.deeplearning_back_button],[self.deep_learning_button, self.clustering_button,self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button, self.advanced_back_button]))
+
+        self.execute_deep_learning = tk.Button(self.master, text="Execute Deep Learning", command=self.execute_deep_learning_click)
 
         self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.advanced_segmentation_button, self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button],[self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
 
         self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button,self.clustering_text, self.results_label, self.clustering_back_button]))
 
-        self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.deeplearning_back_button]))
+        self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.deeplearning_back_button]))
 
         """self.image_file_path = 'mytest.png'
         self.image_button = tk.Button(self.master, text="Display Image", command=self.display_file_png)
@@ -166,6 +186,16 @@ class Core:
         # Add a button to execute clustering
         self.execute_clustering_button = tk.Button(self.master, text="Execute Clustering", command=self.execute_clustering)
         #self.execute_clustering_button.pack(pady=20)
+
+        self.image_paths = []  # List to store image file paths
+        self.current_image_index = 0  # Index of the currently displayed image
+
+        # Create "Previous" and "Next" buttons for image navigation
+        self.previous_button = tk.Button(self.master, text="Previous", command=self.show_previous_image)
+        self.next_button = tk.Button(self.master, text="Next", command=self.show_next_image)
+
+        self.image_label = tk.Label(self.master)
+
         
     def execute_clustering(self):
         # Get the selected clustering algorithm
@@ -188,17 +218,84 @@ class Core:
 
     # Display clustering results within the GUI or perform any desired actions
     # Display clustering results within the GUI
-        self.display_clustering_results(clustering_results)
+        self.display_clustering_results(selected_algorithm,clustering_results)
     # You can use labels or other widgets to display the clustering results.
-    def display_clustering_results(self, clustering_results):
-        # Create a label or canvas to display the clustering results
-        self.results_label = tk.Label(self.master, text="Clustering Results:")
+
+        self.image_paths = ["/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png", "/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png", "/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011546_3_S32031_I54071.png"]
+        self.current_image_index = 0
+
+        # Show or hide "Previous" and "Next" buttons based on whether images are available
+        if self.image_paths:
+            self.show_current_image()
+            self.previous_button.pack(pady=10, anchor="center")
+            self.next_button.pack(pady=10, anchor="center")
+        else:
+            self.previous_button.pack_forget()
+            self.next_button.pack_forget()
+
+
+    def display_clustering_results(self, selected_algorithm, clustering_results):
+         # Create a label or canvas to display the clustering results
+        self.results_label = tk.Label(self.master, text="Clustering Results for " + selected_algorithm + ":")
         self.results_label.pack()
 
-        # Create a text widget to show the clustering results
-        self.clustering_text = tk.Text(self.master, height=10, width=50)
-        self.clustering_text.insert(tk.END, clustering_results)
-        self.clustering_text.pack()
+    def show_current_image(self):
+        if self.image_paths:
+            current_image_path = self.image_paths[self.current_image_index]
+            image = Image.open(current_image_path)
+            photo = ImageTk.PhotoImage(image)
+
+            # Update the image label with the current image
+            self.image_label.config(image=photo)
+            self.image_label.photo = photo
+            self.image_label.pack()
+
+    def show_previous_image(self):
+        if self.image_paths:
+            self.current_image_index = (self.current_image_index - 1) % len(self.image_paths)
+            self.show_current_image()
+
+    def show_next_image(self):
+        if self.image_paths:
+            self.current_image_index = (self.current_image_index + 1) % len(self.image_paths)
+            self.show_current_image()
+
+    def execute_deep_learning_click(self):
+        # Create a popup window for selecting segmentation results
+        popup_window = tk.Toplevel(self.master)
+        popup_window.title("Select Segmentation Results")
+
+        # Create a label to instruct the user
+        label = tk.Label(popup_window, text="Select segmentation results source:")
+        label.pack(pady=10)
+
+        # Create radio buttons for file and memory options
+        selection_var = tk.StringVar()
+        file_option = tk.Radiobutton(popup_window, text="From File", variable=selection_var, value="file")
+        file_option.pack()
+        memory_option = tk.Radiobutton(popup_window, text="From Memory", variable=selection_var, value="memory")
+        memory_option.pack()
+
+        # Create a button to confirm the selection
+        confirm_button = tk.Button(popup_window, text="Confirm", command=lambda: self.handle_segmentation_selection(popup_window, selection_var.get()))
+        confirm_button.pack(pady=20)
+
+    def handle_segmentation_selection(self, popup_window, selection):
+        # Close the popup window
+        popup_window.destroy()
+
+        if selection == "file":
+            # Logic to select segmentation results from a file and set the variable
+            # You can use file dialogs to allow the user to choose a file
+            segmentation_results = {}  # Implement file selection logic here
+        elif selection == "memory":
+            # Logic to select segmentation results from memory and set the variable
+            # You can populate segmentation_results with data from memory
+            segmentation_results = {}  # Implement memory selection logic here
+
+        # Now you have the segmentation_results variable with the selected data
+        # You can use it for deep learning or any other processing
+        print("Selected segmentation results:", segmentation_results)
         
     def show_main_window(self):
         self.master.deiconify()  # Show the main window
@@ -234,13 +331,12 @@ class Core:
         self.current_page = self.advanced_segmentation_page"""
 
     def open_image_scoring_popup(self):
-        # image1_path = "C:\\Users\\kevin\\Documents\\classes\\ED1\\BrainAI-Segmentation\\scan 1\\ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png"
-        # image2_path = "C:\\Users\\kevin\\Documents\\classes\\ED1\\BrainAI-Segmentation\\scan 1\\ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png"
-        image1_path = "/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png"  # Replace with actual image paths
-        image2_path = "/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png"
+        image_paths = [
+        "/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png",  # Replace with actual image paths
+        "/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png"]
 
         popup_window = tk.Toplevel(self.master)
-        image_scoring_popup = ImageScoringPopup(popup_window, image1_path, image2_path, self.save_scores)
+        image_scoring_popup = ImageScoringPopup(popup_window, image_paths, self.save_scores)
         
 
     def save_scores(self, score1, score2):
