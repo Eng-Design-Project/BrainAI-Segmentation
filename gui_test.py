@@ -263,23 +263,30 @@ class Core:
 
     def execute_deep_learning_click(self):
         # Create a popup window for selecting segmentation results
-        popup_window = tk.Toplevel(self.master)
-        popup_window.title("Select Segmentation Results")
 
-        # Create a label to instruct the user
-        label = tk.Label(popup_window, text="Select segmentation results source:")
-        label.pack(pady=10)
+        #wrap all of this in an if statement that checks if data.segmentation results is empty ( and run the logic)
+        #then we call the deep learning function with the segmentation results passed as a parameter
+        if (data.segmentation_results=={}):
+            popup_window = tk.Toplevel(self.master)
+            popup_window.title("Select Segmentation Results")
 
-        # Create radio buttons for file and memory options
-        selection_var = tk.StringVar()
-        file_option = tk.Radiobutton(popup_window, text="From File", variable=selection_var, value="file")
-        file_option.pack()
-        memory_option = tk.Radiobutton(popup_window, text="From Memory", variable=selection_var, value="memory")
-        memory_option.pack()
+            # Create a label to instruct the user
+            label = tk.Label(popup_window, text="Select segmentation results source:")
+            label.pack(pady=10)
 
-        # Create a button to confirm the selection
-        confirm_button = tk.Button(popup_window, text="Confirm", command=lambda: self.handle_segmentation_selection(popup_window, selection_var.get()))
-        confirm_button.pack(pady=20)
+            # Create radio buttons for file and memory options
+            selection_var = tk.StringVar()
+            file_option = tk.Radiobutton(popup_window, text="From File", variable=selection_var, value="file")
+            file_option.pack()
+            memory_option = tk.Radiobutton(popup_window, text="From Memory", variable=selection_var, value="memory")
+            memory_option.pack()
+
+            # Create a button to confirm the selection
+            confirm_button = tk.Button(popup_window, text="Confirm", command=lambda: self.handle_segmentation_selection(popup_window, selection_var.get()))
+            confirm_button.pack(pady=20)
+        
+        ## call the deep learning function with data.segmentation_results in the parameter
+        
 
 
     def handle_segmentation_selection(self, popup_window, selection):
