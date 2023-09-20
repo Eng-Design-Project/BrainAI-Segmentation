@@ -31,6 +31,8 @@ import deep_learning
         for button in [self.image_scoring_button, self.clustering_button, self.deep_learning_button, self.back_button]:
             button.pack(pady=20)"""
 
+# global variable
+segmentation_results = None
 
 class ImageScoringPopup:
     def __init__(self, master, image1_path, image2_path, callback):

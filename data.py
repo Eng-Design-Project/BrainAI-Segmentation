@@ -7,6 +7,7 @@ import pydicom
 from skimage.transform import resize
 import subprocess
 import sys
+import segmentation
 #from pydicom import dcmread
 
 
@@ -240,6 +241,66 @@ def test_subfolders_to_dictionary(directory):
 #test_store_seg_img_on_file("brain1")
 #test_subfolders_to_dictionary("brain1")
 
+
+# function copied from segmentation 
+def create_seg_images(image, region_dict):
+    output_images = {}
+    for region_name, coordinates_list in region_dict.items():
+        blank_image = create_black_copy(image)
+        
+        for coordinates in coordinates_list:
+            x, y, z = coordinates
+            if (0 <= x < image.GetSize()[0]) and \
+               (0 <= y < image.GetSize()[1]) and \
+               (0 <= z < image.GetSize()[2]):
+                pixel_value = image[x, y, z]
+                blank_image[x, y, z] = pixel_value
+                
+        # Append the finished blank_image to the output_images dictionary
+        output_images[region_name] = blank_image
+    #print(f"Size of output images:  {len(output_images)}")
+    return output_images
+
+# function copied from segmentation
+def DCMs_to_sitk_img_dict(directory):
+    image = get_3d_image(directory)
+    def generate_regions(): 
+        region1 = [[x, y, z] for x in range(0, 51) for y in range(0, 51) for z in range(0, 51)]
+        region2 = [[x, y, z] for x in range(50, 101) for y in range(50, 101) for z in range(0, 50)]
+
+        region_dict = {
+            "Region1": region1,
+            "Region2": region2
+        }
+        return region_dict
+    region_dict = generate_regions()
+    region_images = create_seg_images(image, region_dict)
+    #display_regions_from_dict(region_images)
+    display_seg_images(region_images)
+    return region_images
+
+# function copied from segmentation
+def create_black_copy(image: sitk.Image) -> sitk.Image:
+    # Create a copy of the input image
+    black_image = sitk.Image(image.GetSize(), image.GetPixelID())
+    black_image.SetOrigin(image.GetOrigin())
+    black_image.SetSpacing(image.GetSpacing())
+    black_image.SetDirection(image.GetDirection())
+
+    # All pixel values are already set to 0 (black) upon initialization
+    return black_image
+
+#global variable
+segmentation_results= None
+
+# this function sets the global variable segmentation_results to a dictionary of regions:sitk images
+# It takes an optional argument of a directory of DCMS. If no directory is passed, it uses "scan1"
+def set_seg_results(directory = "scan1"):
+    global segmentation_results
+    segmentation_results = DCMs_to_sitk_img_dict(directory)
+    print("segmentation results: ",segmentation_results.keys())
+
+#set_seg_results()
    
 # Path to the directory that contains the DICOM files
 #directory1 = "scan1"
