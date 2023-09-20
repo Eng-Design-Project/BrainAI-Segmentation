@@ -35,8 +35,6 @@ import data
         for button in [self.image_scoring_button, self.clustering_button, self.deep_learning_button, self.back_button]:
             button.pack(pady=20)"""
 
-#global variable
-segmentation_results= None
 
 class ImageScoringPopup:
     def __init__(self, master,image_paths, callback):
@@ -292,19 +290,19 @@ class Core:
             # Add code to get the selected folder here and store it
             selected_folder = self.get_selected_folder()
             data.set_seg_results(selected_folder)
+            self.segmentation_results = data.segmentation_results
             print("Selected folder:", selected_folder)
             # Logic to select segmentation results from a file and set the variable
             # You can use file dialogs to allow the user to choose a file
-            segmentation_results = {}  # Implement file selection logic here
         elif selection == "memory":
             data.set_seg_results()
+            self.segmentation_results = data.segmentation_results
             # Logic to select segmentation results from memory and set the variable
             # You can populate segmentation_results with data from memory
-            segmentation_results = {}  # Implement memory selection logic here
 
         # Now you have the segmentation_results variable with the selected data
         # You can use it for deep learning or any other processing
-        print("Selected segmentation results:", segmentation_results)
+        print("Selected segmentation results:", self.segmentation_results)
         
     def show_main_window(self):
         self.master.deiconify()  # Show the main window
