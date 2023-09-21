@@ -4,9 +4,6 @@ import tensorflow as tf
 import numpy as np
 import data
 
-<<<<<<< Updated upstream
-print(" Entered deep learning ")
-=======
 
 def print_hello():
     print(" Entered deep learning ")
@@ -20,25 +17,30 @@ sitk_images_dict = {
 }
 
 
-numpy_images_dict = {key: sitk.GetArrayFromImage(img) for key, img in sitk_images_dict.items()}
+def normalizeTF(volume3dDict):
+    normalizedDict = {}
+    
+    for key, value in volume3dDict.items():
+        # Convert the value to a tensor
+        tensor = tf.convert_to_tensor(value, dtype=tf.float32)
+        
+        # Find min and max values for the current tensor
+        minVal = tf.reduce_min(tensor)
+        maxVal = tf.reduce_max(tensor)
+        
+        # Normalize the tensor
+        normalizedTensor = (tensor - minVal) / (maxVal - minVal)
+        
+        # Convert back to numpy and store it in the dictionary
+        normalizedDict[key] = normalizedTensor.numpy()
+        """normalizedDict[key] = normalizedTensor"""
+    return normalizedDict
 
 
-def normalize_tf(volume_3d):
-    tensor = tf.convert_to_tensor(volume_3d, dtype=tf.float32)
-    min_val = tf.reduce_min(tensor)
-    max_val = tf.reduce_max(tensor)
-    normalized_tensor = (tensor - min_val) / (max_val - min_val)
-    return normalized_tensor.numpy()
 
-normalized_image = normalize_tf(numpy_images_dict["image1"])
-
-print(normalized_image.min())
-print(normalized_image.max())
-
-"""
-def build_model(input_shape):
+def buildModel(inputShape):
     model = tf.keras.Sequential([
-        tf.keras.layers.InputLayer(input_shape=input_shape),
+        tf.keras.layers.InputLayer(inputShape=inputShape),
         tf.keras.layers.Conv2D(32, (3, 3), activation='relu'),
         tf.keras.layers.MaxPooling2D(2, 2),
         tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
@@ -51,12 +53,33 @@ def build_model(input_shape):
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     return model
 
-"""
+def buildPixelModel(input_shape, window_size=3):
+    # Assumes input is a 3D patch of size [window_size, window_size, depth]
+    model = tf.keras.Sequential([
+        tf.keras.layers.InputLayer(input_shape=input_shape),
+        tf.keras.layers.Conv2D(32, (window_size, window_size), activation='relu', padding='valid'),
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(128, activation='relu'),
+        tf.keras.layers.Dense(2, activation='softmax')  # Assumes binary classification
+    ])
+
+    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    return model        
+
+def dlAlgorithm(segmentDict):
+    numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()}
+    normalizedDict = normalizeTF(numpyImagesDict)
+
+    """Currently using 3D arrays, might switch to tensors. In such case, the shape might change."""
+    sampleShape = numpyImagesDict[list(numpyImagesDict.keys())[0]].shape
+    model = buildModel((sampleShape[1], sampleShape[2], sampleShape[0]))  # (height, width, channels)
 
 
 
->>>>>>> Stashed changes
+
+
 class DeepLearningModule:
+
     def __init__(self):
         pass
 

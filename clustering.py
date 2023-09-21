@@ -1,5 +1,3 @@
-<<<<<<< Updated upstream
-=======
 import SimpleITK as sitk
 import numpy as np
 import matplotlib.pyplot as plt
@@ -74,4 +72,3 @@ def load_sitk_folder(folder_path):  #load a dictionary of sitk images (this load
 folder_path = input("Enter folder path: ")
 image_dict = load_sitk_folder(folder_path)
 processed_images = process_images(image_dict)
->>>>>>> Stashed changes
