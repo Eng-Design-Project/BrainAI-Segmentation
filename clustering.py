@@ -1,3 +1,4 @@
+#All necessary libraries are in requirements.txt
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -34,6 +35,9 @@ def adaptive_thresholding(clahe_roi_volume):
     return clahe_roi_volume > adaptive_thresh
 
 #using density-based clustering
+#eps and min are not 100% accurate yet.
+#I'm still learning how to accurately do the necessary histogram and k-distance graph to accurately predict the epsilon.
+#min samples are heavily dependent on noise, so as more smoothing, regularization, and filtering functions are used, the lower the number will get.
 def dbscan_clustering(X):
     return DBSCAN(eps=2, min_samples=4).fit_predict(X)
 
