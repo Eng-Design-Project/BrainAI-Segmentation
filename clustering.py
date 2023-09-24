@@ -41,7 +41,7 @@ def adaptive_thresholding(clahe_roi_volume):
 def dbscan_clustering(X):
     return DBSCAN(eps=2, min_samples=4).fit_predict(X)
 
-def preprocess_3d(volume):
+def dbscan_3d(volume):
    
     # Set an ROI (region of interest) to have parameters for the brain's position in each slice. 
     # Focusing on a smaller area gives the function a chance to be more thorough/accurate.
@@ -179,13 +179,23 @@ def display_slices(volume, labels, cluster_coords, brain_mask, skull_mask):
 
         display_rgb_image(rgb_img, z)
 
+def execute_db_clustering(sitk_dict):
+    output_coords = {}
+    for key in sitk_dict:
+        labeled_volume, cluster_coords, brain_mask, skull_mask = dbscan_3d(sitk_dict.key)
+        brain_coordinates, skull_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
+        output_coords[key] = brain_coordinates
+        #display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
+    #dbscan optimized for entire brain, not atlas segments, currently outputs brain coords as opposed to "skull coords"
+    return output_coords
+
 #Used as main sript, this helps a lot with testing and pinpointing errors.
 #I'm already working on creating function shortcuts and combining factors for easy use as a sub-module instead.
 if __name__ == "__main__":
     folder_path = input("Enter folder path: ")
     volume = input_dcm_dict(folder_path)
 
-    labeled_volume, cluster_coords, brain_mask, skull_mask = preprocess_3d(volume)
+    labeled_volume, cluster_coords, brain_mask, skull_mask = dbscan_3d(volume)
     brain_coordinates, skull_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
     display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
 
