@@ -83,6 +83,14 @@ def find_boundary(segment):
     boundary = boundary & (segment > 0)
     
     return boundary
+      
+
+#wrapper for getting the np arrays from sitkimages, normalizing, getting shape,
+# and plugging shape into basic classifier
+def dlAlgorithm(segmentDict):
+    numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()}
+    normalizedDict = normalizeTF(numpyImagesDict)
+
 
 # Existing user score global variables and function
 #will prob be removed, user score will be supplied to dl algo as argument from core
