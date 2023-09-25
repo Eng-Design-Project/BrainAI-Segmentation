@@ -114,101 +114,125 @@ def adjust_masks_to_whole_volume(brain_mask, skull_mask, volume, x_min, x_max, y
     whole_skull_mask[:, y_min:y_max, x_min:x_max] = skull_mask
     return whole_brain_mask, whole_skull_mask
 
-#display coordinates of brain and skull clusters in output
+# display coordinates of brain and skull clusters in output
 def cluster_coordinates(cluster_coords, brain_mask, skull_mask):
-    x_min, y_min = 25, 20
+    x_min, y_min = 25, 20 # ADJUSTABLE: as long as it matches the initial roi values
 
+    # initializing empty dictionaries
     brain_cluster_coordinates = {}
     skull_cluster_coordinates = {}
 
+    # adjusting x and y coordinates to represent the full image, not just the roi
     for label, coords in cluster_coords.items():
         coords[:, 1] += y_min
         coords[:, 2] += x_min
 
+        # iterate through each coordinate
         for coord in coords:
+            
+            # if a coordinate is in the brain mask, append to brain cluster coordinates
             if brain_mask[tuple(coord)]:
                 if label not in brain_cluster_coordinates:
                     brain_cluster_coordinates[label] = []
                 brain_cluster_coordinates[label].append(coord)
+
+            # if a coordinate is in the skull mask, append to skull cluster coordinates
             elif skull_mask[tuple(coord)]:
-                if label not in skull_cluster_coordinates:
+                if label not in skull_cluster_coordinates: # create new list for new/unknown label
                     skull_cluster_coordinates[label] = []
                 skull_cluster_coordinates[label].append(coord)
 
+    # convert both sets of coordinates into np arrays
     brain_cluster_coordinates = {k: np.array(v) for k, v in brain_cluster_coordinates.items()}
     skull_cluster_coordinates = {k: np.array(v) for k, v in skull_cluster_coordinates.items()}
 
     return brain_cluster_coordinates, skull_cluster_coordinates
 
-#normalization on each of the individual 2d slices
-#this helps ensure more accuracy compared to just tesing the 3d image once
+# normalization on each of the individual 2d slices
+# this helps ensure more accuracy compared to just testing the 3d image once
 def normalize_slice_image(slice_image):
     rgb_img = np.stack([slice_image] * 3, axis=-1)
     rgb_img = (rgb_img - np.min(rgb_img)) / (np.max(rgb_img) - np.min(rgb_img))
     return rgb_img
 
 def apply_colors_to_labels(slice_labels, rgb_img):
-    unique_labels = np.unique(slice_labels)
+    unique_labels = np.unique(slice_labels) # find unique labels
     colors = plt.cm.viridis(np.linspace(0, 1, len(unique_labels)))
     for label in unique_labels:
-        if label != -1:
-            mask = slice_labels == label
-            rgb_img[mask, :] = colors[label, :3]
+        if label != -1:  # ignore background (== -1)
+            mask = slice_labels == label    # create a mask for the label
+            rgb_img[mask, :] = colors[label, :3]    # apply color to corresponding mask
     return rgb_img
 
 # setting different colors with the parameters of the brain and skull masks/regions
 def apply_roi_masks(rgb_img, roi_brain_mask, roi_skull_mask):
+
+    # ADJUSTABLE: can use different colors
     rgb_img[roi_brain_mask] = [1, 0, 0]  # Brain = Red
     rgb_img[roi_skull_mask] = [0, 1, 0]  # Skull = Green
     return rgb_img
 
-#helps keep original image visible under highlighted clusters. 
-#function called and expanded in display_slices()
 def display_rgb_image(rgb_img, z):
-    plt.figure()
-    plt.title(f"Slice {z}")
+    plt.figure()    
+    plt.title(f"Slice {z}")  # set title to slice number
     plt.imshow(rgb_img)
     plt.show()
 
-#showing the slices in the output after being converted back into original 2d form, and making sure the clusters are highlighted accordingly.
+# display 2d slices in output
 def display_slices(volume, labels, cluster_coords, brain_mask, skull_mask):
     x_min, x_max = 25, 105
     y_min, y_max = 20, 110
 
+    # iterate through slices in 3d volume
     for z in range(volume.shape[0]):
-        slice_image = volume[z]
-        slice_labels = labels[z]
+        slice_image = volume[z]  # extract slice
+        slice_labels = labels[z]  # extract label
 
-        rgb_img = normalize_slice_image(slice_image)
-        rgb_img = apply_colors_to_labels(slice_labels, rgb_img)
+        rgb_img = normalize_slice_image(slice_image)  # normalize slice   
+        rgb_img = apply_colors_to_labels(slice_labels, rgb_img)  # color code slice
 
+        # initialize roi masks for extracted slice
         roi_brain_mask = np.zeros_like(slice_image, dtype=bool)
         roi_skull_mask = np.zeros_like(slice_image, dtype=bool)
+
+        # apply corresponding roi masks to initialized masks
         roi_brain_mask[y_min:y_max, x_min:x_max] = brain_mask[z, y_min:y_max, x_min:x_max]
         roi_skull_mask[y_min:y_max, x_min:x_max] = skull_mask[z, y_min:y_max, x_min:x_max]
 
+        # apply masks to the image
         rgb_img = apply_roi_masks(rgb_img, roi_brain_mask, roi_skull_mask)
 
+        # display full processed image
         display_rgb_image(rgb_img, z)
 
 def execute_db_clustering(sitk_dict):
-    output_coords = {}
+    output_coords = {} # initialize sitk dictionary to store output
     for key in sitk_dict:
+
+        # perform dbscan and get labeled volume, coordinates, and binary masks for each slice in the output dictionary
         labeled_volume, cluster_coords, brain_mask, skull_mask = dbscan_3d(sitk_dict.key)
+
+        # determine coordinates
         brain_cluster_coordinates, skull_cluster_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
+        
+        # dictionary to store output coordinates
         output_coords[key] = brain_cluster_coordinates
         #display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
     #dbscan optimized for entire brain, not atlas segments, currently outputs brain coords as opposed to "skull coords"
     return output_coords
 
-#Used as main sript, this helps a lot with testing and pinpointing errors.
+# used as main sript, this helps a lot with testing and pinpointing errors.
 #I'm already working on creating function shortcuts and combining factors for easy use as a sub-module instead.
 if __name__ == "__main__":
-    folder_path = input("Enter folder path: ")
-    volume = input_dcm_dict(folder_path)
+    folder_path = input("Enter folder path: ") # get folder
+    volume = input_dcm_dict(folder_path) # create 3d volume
 
+    # apply dbscan to 3d and get labels, overall coordinates, and binary masks
     labeled_volume, cluster_coords, brain_mask, skull_mask = dbscan_3d(volume)
+
+    # find brain and skull coordinates
     brain_cluster_coordinates, skull_cluster_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
+
     display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
 
     print("3D Brain Cluster Coordinates:")
