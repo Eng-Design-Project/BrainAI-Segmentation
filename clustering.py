@@ -41,67 +41,72 @@ def adaptive_thresholding(clahe_roi_volume):
     # ADJUSTABLE: block_size is the size of the pixel's local region. offset is subtracted from the mean of the local area
     # higher block size = larger area; higher offset = more lenient aka lowers brightness requirements
 
-#using density-based clustering
-#eps and min are not 100% accurate yet.
-#I'm still learning how to accurately do the necessary histogram and k-distance graph to accurately predict the epsilon.
-#min samples are heavily dependent on noise, so as more smoothing, regularization, and filtering functions are used, the lower the number will get.
+# DBSCAN: density-based spatial clustering of applications with noise
+# works really well with handling noise, outliers, and finding arbitrary-shaped clusters
 def dbscan_clustering(X):
     return DBSCAN(eps=2, min_samples=4).fit_predict(X)
+    # ADJUSTABLE: the epsilon is a parameter that determines the radius of the area around a voxel (volume pixel)
+    # ADJUSTABLE: min_samples are the minimum number of voxels that are within the radius (eps) of the core point for it to be considered a cluster
+    # higher eps = larger radius aka larger/fewer clusters (more lenient); higher min_samples = fewer/denser (more strict)
+    # ex: eps=2, min_samples=4. it tests a voxel as a core point, if at least 3 other voxels are in the radius of 2 from it, then it's a cluster.
+        # then if at least 3 voxels are within a radius of 2 from any of the points within the original cluster, they're also added.
 
 def dbscan_3d(volume):
    
-    # Set an ROI (region of interest) to have parameters for the brain's position in each slice. 
     # Focusing on a smaller area gives the function a chance to be more thorough/accurate.
     x_min, x_max = 25, 105
     y_min, y_max = 20, 110
     roi_volume = volume[:, y_min:y_max, x_min:x_max]
+    # ADJUSTABLE: these are the values of the parameter that determine that area to be tested and ignores the rest of the background
 
-    smoothed_roi_volume = apply_gaussian_filter(roi_volume)
+    # call the previous 3 functions
+    smoothed_roi_volume = apply_gaussian_filter(roi_volume) 
     clahe_roi_volume = apply_clahe(smoothed_roi_volume)
-
-    #The binary masks helps identify the lighter segments. 
-    #This way the black background wouldn't be a part of the mask
     binary_mask = adaptive_thresholding(clahe_roi_volume)
 
-    # Performing clustering only on the masked region of ROI
+    # performing dbscan clustering only on the binary masked region of the ROI
     X = np.column_stack(np.nonzero(binary_mask))
     roi_labels = dbscan_clustering(X)
 
-    labeled_volume = np.full_like(volume, fill_value=-1, dtype=np.int32)
+    labeled_volume = np.full_like(volume, fill_value=-1, dtype=np.int32) # fill_value = -1 gives all the voxels in the input a no-label state, meaning they have no been tested nor are they a part of a pre-determined cluster
     for i, coord in enumerate(X):
         labeled_volume[coord[0], y_min + coord[1], x_min + coord[2]] = roi_labels[i]
 
-    cluster_coords = {label: X[roi_labels == label] for label in set(roi_labels) if label != -1}
+    # creating a dict of coordinates for each cluster
+    cluster_coords = {label: X[roi_labels == label] for label in set(roi_labels) if label != -1} # sets condition to exclude noise points (if label != -1)
 
+    # initializing binary masks; creates a representation of which parts are considered brain/skull respectively
     brain_mask, skull_mask = initialize_masks(roi_volume)
 
-    #iterating through each of the different slices to ensure the overall process is accurate instead of just applying it once to the 3d image.
+    # iterating through each slice to identify the true regions of the brain and skull
     for idx in range(roi_volume.shape[0]):
-        slice_clahe = clahe_roi_volume[idx]
-        edges = feature.canny(slice_clahe)
-        closed_edges = morphology.binary_closing(edges)
-        labeled_regions, num_regions = measure.label(closed_edges, return_num=True)
+        slice_clahe = clahe_roi_volume[idx] # apply equalization to each slice 
+        edges = feature.canny(slice_clahe) # detect and identify edges of where one ends and the other begins (feature submodule of skimage)
+        closed_edges = morphology.binary_closing(edges) # detects edges and performs binary closing aka any gaps/holes in the areas within those edges will be filled in so they can all be combined (morphology submodule of skimage)
+        labeled_regions, num_regions = measure.label(closed_edges, return_num=True) # label the connected regions, then count how many there are (measure submodule of skimage)
 
         # Identifying Skull and Brain Regions. 
-        # These are still not 100% accurate, but they're a lot better
         if num_regions > 1:
-            brain_region_label = 1 + np.argmax([np.sum(labeled_regions == i) for i in range(1, num_regions)])
-            brain_mask[idx] = labeled_regions == brain_region_label
-            skull_mask[idx] = labeled_regions > 0
-            skull_mask[idx][brain_mask[idx]] = False
+            brain_region_label = 1 + np.argmax([np.sum(labeled_regions == i) for i in range(1, num_regions)]) # finds the largest region within the parameters and labels it as the brain
+            brain_mask[idx] = labeled_regions == brain_region_label # creating the binary mask of the brain
+            skull_mask[idx] = labeled_regions > 0 # creating the binary mask for the skull (this step will make the mask identify everything as a part of the "skull")
+            skull_mask[idx][brain_mask[idx]] = False # subtracting the prelabeled brain area from the overall skull mask, leaving only the skull within the second binary mask
 
-    # Adjusting the brain_mask and skull_mask back to the entire image size
+    # Adjusting the brain_mask and skull_mask back to the size of the entire image volume so coordinates aren't measured within only the roi parameters
     whole_brain_mask, whole_skull_mask = adjust_masks_to_whole_volume(brain_mask, skull_mask, volume, x_min, x_max, y_min, y_max)
 
     return labeled_volume, cluster_coords, whole_brain_mask, whole_skull_mask
 
-# Initializing full-size masks
+# initializing masks with the roi volume (3d array)
+# this creates the array and initial shape, but sets all elements in the array to 0 since the actual mask volume values aren't identified yet
+# pretty much placeholder arrays that get updated
 def initialize_masks(roi_volume):
     brain_mask = np.zeros_like(roi_volume, dtype=bool)
     skull_mask = np.zeros_like(roi_volume, dtype=bool)
     return brain_mask, skull_mask
 
-#applying masks to the full scan volume
+# initializing masks to the full scan volume
+# also creating arrays placeholder arrays
 def adjust_masks_to_whole_volume(brain_mask, skull_mask, volume, x_min, x_max, y_min, y_max):
     whole_brain_mask = np.zeros_like(volume, dtype=bool)
     whole_skull_mask = np.zeros_like(volume, dtype=bool)
