@@ -1,4 +1,4 @@
-# PDF: probability density function
+# "# ADJUSTABLE:" indicates all the values that can be changed
 # ROI: region of interest
 
 # All additional necessary libraries are in requirements.txt
@@ -24,18 +24,22 @@ def input_dcm_dict(folder_path):
 # Gaussian filter 
 # uses the gaussian PDF to smooth/ lower contrast in the roi by blurring and reducing noise
 def apply_gaussian_filter(roi_volume):
-    return gaussian_filter(roi_volume, sigma=1)
+    return gaussian_filter(roi_volume, sigma=1) 
+    # ADJUSTABLE: sigma is the stdev of the gaussian distribution
+    # a higher sigma can make it smoother (aka less noise), but will also blur it more which decreases accuracy
 
-#also helps with smoothing aka decreasing noise
+# CLAHE: Contrast Limited Adaptive Histogram Equalization 
+# enhances local contrast; so it only adjusts exposure in smaller areas of the scan where it's more necessary without jeopardizing quality
 def apply_clahe(smoothed_roi_volume):
-    return exposure.equalize_adapthist(smoothed_roi_volume)
+    return exposure.equalize_adapthist(smoothed_roi_volume) # specifically applies clahe alg from the exposure submodule
 
-#Adaptive Thresholding
-#Block size and offset values are not finalized. 
-# I'm still testing different values to determine what's best.
+# Adaptive Thresholding - evaluates each individual pixel to its surrounding mean
+# this creates binary masks where it separates the two areas at the edge where they change
 def adaptive_thresholding(clahe_roi_volume):
     adaptive_thresh = threshold_local(clahe_roi_volume, block_size=35, offset=0.1)
     return clahe_roi_volume > adaptive_thresh
+    # ADJUSTABLE: block_size is the size of the pixel's local region. offset is subtracted from the mean of the local area
+    # higher block size = larger area; higher offset = more lenient aka lowers brightness requirements
 
 #using density-based clustering
 #eps and min are not 100% accurate yet.
