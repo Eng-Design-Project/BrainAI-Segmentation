@@ -1,4 +1,7 @@
-#All necessary libraries are in requirements.txt
+# PDF: probability density function
+# ROI: region of interest
+
+# All additional necessary libraries are in requirements.txt
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -11,15 +14,15 @@ from skimage import feature
 from skimage import exposure
 from skimage.filters import threshold_local
 
-#dictionary of dcm images as input
+# folder of DCM images as input
 def input_dcm_dict(folder_path):
-    image_files = [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))]
-    slices = [pydicom.dcmread(os.path.join(folder_path, f)) for f in image_files]
-    slices.sort(key=lambda x: float(x.ImagePositionPatient[2]))
+    image_files = [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))] # gather files
+    slices = [pydicom.dcmread(os.path.join(folder_path, f)) for f in image_files] # read each file
+    slices.sort(key=lambda x: float(x.ImagePositionPatient[2])) # sorting and maintaining correct order
     return np.stack([s.pixel_array for s in slices])
 
-# Gausian probability density to "smooth" and enhance contrast. 
-# This decreases noise in the scan.
+# Gaussian filter 
+# uses the gaussian PDF to smooth/ lower contrast in the roi by blurring and reducing noise
 def apply_gaussian_filter(roi_volume):
     return gaussian_filter(roi_volume, sigma=1)
 
@@ -106,8 +109,8 @@ def adjust_masks_to_whole_volume(brain_mask, skull_mask, volume, x_min, x_max, y
 def cluster_coordinates(cluster_coords, brain_mask, skull_mask):
     x_min, y_min = 25, 20
 
-    brain_coordinates = {}
-    skull_coordinates = {}
+    brain_cluster_coordinates = {}
+    skull_cluster_coordinates = {}
 
     for label, coords in cluster_coords.items():
         coords[:, 1] += y_min
@@ -115,18 +118,18 @@ def cluster_coordinates(cluster_coords, brain_mask, skull_mask):
 
         for coord in coords:
             if brain_mask[tuple(coord)]:
-                if label not in brain_coordinates:
-                    brain_coordinates[label] = []
-                brain_coordinates[label].append(coord)
+                if label not in brain_cluster_coordinates:
+                    brain_cluster_coordinates[label] = []
+                brain_cluster_coordinates[label].append(coord)
             elif skull_mask[tuple(coord)]:
-                if label not in skull_coordinates:
-                    skull_coordinates[label] = []
-                skull_coordinates[label].append(coord)
+                if label not in skull_cluster_coordinates:
+                    skull_cluster_coordinates[label] = []
+                skull_cluster_coordinates[label].append(coord)
 
-    brain_coordinates = {k: np.array(v) for k, v in brain_coordinates.items()}
-    skull_coordinates = {k: np.array(v) for k, v in skull_coordinates.items()}
+    brain_cluster_coordinates = {k: np.array(v) for k, v in brain_cluster_coordinates.items()}
+    skull_cluster_coordinates = {k: np.array(v) for k, v in skull_cluster_coordinates.items()}
 
-    return brain_coordinates, skull_coordinates
+    return brain_cluster_coordinates, skull_cluster_coordinates
 
 #normalization on each of the individual 2d slices
 #this helps ensure more accuracy compared to just tesing the 3d image once
@@ -183,8 +186,8 @@ def execute_db_clustering(sitk_dict):
     output_coords = {}
     for key in sitk_dict:
         labeled_volume, cluster_coords, brain_mask, skull_mask = dbscan_3d(sitk_dict.key)
-        brain_coordinates, skull_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
-        output_coords[key] = brain_coordinates
+        brain_cluster_coordinates, skull_cluster_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
+        output_coords[key] = brain_cluster_coordinates
         #display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
     #dbscan optimized for entire brain, not atlas segments, currently outputs brain coords as opposed to "skull coords"
     return output_coords
@@ -196,11 +199,11 @@ if __name__ == "__main__":
     volume = input_dcm_dict(folder_path)
 
     labeled_volume, cluster_coords, brain_mask, skull_mask = dbscan_3d(volume)
-    brain_coordinates, skull_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
+    brain_cluster_coordinates, skull_cluster_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
     display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
 
     print("3D Brain Cluster Coordinates:")
-    print(brain_coordinates)
+    print(brain_cluster_coordinates)
 
     print("3D Skull Cluster Coordinates:")
-    print(skull_coordinates) 
+    print(skull_cluster_coordinates) 
