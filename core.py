@@ -35,6 +35,8 @@ import data
         for button in [self.image_scoring_button, self.clustering_button, self.deep_learning_button, self.back_button]:
             button.pack(pady=20)"""
 
+#global variable
+segmentation_results= None
 
 class ImageScoringPopup:
     def __init__(self, master,image_paths, callback):
@@ -160,7 +162,7 @@ class Core:
 
         self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.advanced_segmentation_button, self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button],[self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
 
-        self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button, self.results_label,self.previous_button,self.next_button, self.clustering_back_button]))
+        self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button, self.clustering_algorithm_label, self.previous_button,self.next_button, self.clustering_back_button]))
 
         self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.deeplearning_back_button]))
 
@@ -199,29 +201,59 @@ class Core:
 
         
     def execute_clustering(self):
-        # Get the selected clustering algorithm
-        selected_algorithm = self.clustering_algorithm_combobox.get()
+        # Create a popup window for selecting clustering parameters
+        popup_window = tk.Toplevel(self.master)
+        popup_window.title("Select Clustering Parameters")
 
-        clustering_results = ""
-        # Implement clustering logic based on the selected algorithm
-        if selected_algorithm == "K-Means":
-        # Implement K-Means clustering logic here
-            clustering_results = "K-Means clustering results..."
-        elif selected_algorithm == "DBSCAN":
-        # Implement DBSCAN clustering logic here
-            clustering_results = "DBSCAN clustering results..."
-        elif selected_algorithm == "Hierarchical":
-        # Implement Hierarchical clustering logic here
-            clustering_results = "Hierarchical clustering results..."
-        elif selected_algorithm == "Other":
-        # Implement your custom clustering algorithm logic here
-            clustering_results = "Other clustering results..."
+        # Create a label to instruct the user
+        label = tk.Label(popup_window, text="Select clustering parameters:")
+        label.pack(pady=10)
 
-    # Display clustering results within the GUI or perform any desired actions
-    # Display clustering results within the GUI
-        self.display_clustering_results(selected_algorithm,clustering_results)
-    # You can use labels or other widgets to display the clustering results.
+        # Create radio buttons for clustering algorithm options
+        algorithm_var = tk.StringVar()
+        algorithm_var.set(None)
+        kmeans_option = tk.Radiobutton(popup_window, text="K-Means", variable=algorithm_var, value="K-Means")
+        kmeans_option.pack()
+        dbscan_option = tk.Radiobutton(popup_window, text="DBSCAN", variable=algorithm_var, value="DBSCAN")
+        dbscan_option.pack()
+        hierarchical_option = tk.Radiobutton(popup_window, text="Hierarchical", variable=algorithm_var, value="Hierarchical")
+        hierarchical_option.pack()
 
+        # Create radio buttons for data source options
+        source_var = tk.StringVar()
+        source_var.set(None)  # Set an initial value that does not correspond to any option
+        file_option = tk.Radiobutton(popup_window, text="From File", variable=source_var, value="file")
+        file_option.pack()
+        memory_option = tk.Radiobutton(popup_window, text="From Memory", variable=source_var, value="memory")
+        memory_option.pack()
+
+        # Create a button to confirm the selection and execute clustering
+        confirm_button = tk.Button(popup_window, text="Execute Clustering", command=lambda: self.handle_clustering_selection(popup_window, algorithm_var.get(), source_var.get()))
+        confirm_button.pack(pady=20)
+
+    def handle_clustering_selection(self, popup_window, algorithm, source):
+        # Close the popup window
+        popup_window.destroy()
+
+        if source == "file":
+            # Add code to get the selected file or folder here and store it
+            selected_folder = self.get_selected_folder()
+            data.set_seg_results(selected_folder)
+            print("Selected file or folder:", selected_folder)
+
+            # Logic to perform clustering from a file and set the clustering_results variable
+            clustering_results = {}  # Implement file-based clustering logic here
+        elif source == "memory":
+            # Logic to perform clustering from memory and set the clustering_results variable
+            data.set_seg_results()
+            clustering_results = {}  # Implement memory-based clustering logic here
+
+        # Display clustering results within the GUI
+        self.display_clustering_results(algorithm, clustering_results)
+
+        # You can use labels or other widgets to display the clustering results.
+
+        # Set image paths and current image index (replace with your own data)
         self.image_paths = ["/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png", "/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png", "/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011546_3_S32031_I54071.png"]
         self.current_image_index = 0
 
@@ -234,11 +266,11 @@ class Core:
             self.previous_button.pack_forget()
             self.next_button.pack_forget()
 
-
-    def display_clustering_results(self, selected_algorithm, clustering_results):
-         # Create a label or canvas to display the clustering results
-        self.results_label = tk.Label(self.master, text="Clustering Results for " + selected_algorithm + ":")
-        self.results_label.pack()
+    def display_clustering_results(self, algorithm, clustering_results):
+        # Create a label or canvas to display the clustering results
+        results_label = tk.Label(self.master, text=f"Clustering Results for {algorithm}:")
+        results_label.pack()
+        # You can use labels or other widgets to display the clustering results here.
 
     def show_current_image(self):
         if self.image_paths:
@@ -262,31 +294,31 @@ class Core:
             self.show_current_image()
 
     def execute_deep_learning_click(self):
-        # Create a popup window for selecting segmentation results
-
         #wrap all of this in an if statement that checks if data.segmentation results is empty ( and run the logic)
         #then we call the deep learning function with the segmentation results passed as a parameter
-        if (data.segmentation_results=={}):
-            popup_window = tk.Toplevel(self.master)
-            popup_window.title("Select Segmentation Results")
+    #if (data.segmentation_results=={}):
+        # Create a popup window for selecting segmentation results
+        popup_window = tk.Toplevel(self.master)
+        popup_window.title("Select Segmentation Results")
 
-            # Create a label to instruct the user
-            label = tk.Label(popup_window, text="Select segmentation results source:")
-            label.pack(pady=10)
+        # Create a label to instruct the user
+        label = tk.Label(popup_window, text="Select segmentation results source:")
+        label.pack(pady=10)
 
-            # Create radio buttons for file and memory options
-            selection_var = tk.StringVar()
-            file_option = tk.Radiobutton(popup_window, text="From File", variable=selection_var, value="file")
-            file_option.pack()
-            memory_option = tk.Radiobutton(popup_window, text="From Memory", variable=selection_var, value="memory")
-            memory_option.pack()
+        # Create radio buttons for file and memory options
+        selection_var = tk.StringVar()
+        selection_var.set(None)  # Set an initial value that does not correspond to any option
+        file_option = tk.Radiobutton(popup_window, text="From File", variable=selection_var, value="file")
+        file_option.pack()
+        memory_option = tk.Radiobutton(popup_window, text="From Memory", variable=selection_var, value="memory")
+        memory_option.pack()
 
-            # Create a button to confirm the selection
-            confirm_button = tk.Button(popup_window, text="Confirm", command=lambda: self.handle_segmentation_selection(popup_window, selection_var.get()))
-            confirm_button.pack(pady=20)
-        
-        ## call the deep learning function with data.segmentation_results in the parameter
-        
+        # Create a button to confirm the selection
+        confirm_button = tk.Button(popup_window, text="Confirm", command=lambda: self.handle_segmentation_selection(popup_window, selection_var.get()))
+        confirm_button.pack(pady=20)
+        # else:
+        # Call the deep learning function with data.segmentation_results as a parameter
+        #self.deep_learning_function(data.segmentation_results)
 
 
     def handle_segmentation_selection(self, popup_window, selection):
@@ -297,19 +329,19 @@ class Core:
             # Add code to get the selected folder here and store it
             selected_folder = self.get_selected_folder()
             data.set_seg_results(selected_folder)
-            self.segmentation_results = data.segmentation_results
             print("Selected folder:", selected_folder)
             # Logic to select segmentation results from a file and set the variable
             # You can use file dialogs to allow the user to choose a file
+            segmentation_results = {}  # Implement file selection logic here
         elif selection == "memory":
             data.set_seg_results()
-            self.segmentation_results = data.segmentation_results
             # Logic to select segmentation results from memory and set the variable
             # You can populate segmentation_results with data from memory
+            segmentation_results = {}  # Implement memory selection logic here
 
         # Now you have the segmentation_results variable with the selected data
         # You can use it for deep learning or any other processing
-        print("Selected segmentation results:", self.segmentation_results)
+        print("Selected segmentation results:", segmentation_results)
         
     def show_main_window(self):
         self.master.deiconify()  # Show the main window

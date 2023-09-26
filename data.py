@@ -10,8 +10,6 @@ import sys
 import segmentation
 #from pydicom import dcmread
 
-
-
 def get_3d_image(directory):
     # Get a list of all DICOM files in the directory
     scan_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")]
