@@ -230,7 +230,24 @@ def subfolders_to_dictionary(directory):
         region_dict[i] = get_3d_image(os.path.join(directory, i))
 
     return region_dict
+    
+# function copied from segmentation
+def DCMs_to_sitk_img_dict(directory):
+    image = get_3d_image(directory)
+    def generate_regions(): 
+        region1 = [[x, y, z] for x in range(0, 51) for y in range(0, 51) for z in range(0, 51)]
+        region2 = [[x, y, z] for x in range(50, 101) for y in range(50, 101) for z in range(0, 50)]
 
+        region_dict = {
+            "Region1": region1,
+            "Region2": region2
+        }
+        return region_dict
+    region_dict = generate_regions()
+    region_images = create_seg_images(image, region_dict)
+    #display_regions_from_dict(region_images)
+    display_seg_images(region_images)
+    return region_images
 
 # the following code tests the "subfolders_to_dictionary()" function
 def test_subfolders_to_dictionary(directory):
