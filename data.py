@@ -240,6 +240,15 @@ def test_subfolders_to_dictionary(directory):
 #test_store_seg_img_on_file("brain1")
 #test_subfolders_to_dictionary("brain1")
 
+# this function sets the global variable segmentation_results to a dictionary of regions:sitk images
+# It takes an optional argument of a directory of DCMS. If no directory is passed, it uses "scan1"
+def set_seg_results(directory = "scan1"):
+    global segmentation_results
+    segmentation_results = DCMs_to_sitk_img_dict(directory)
+    print("segmentation results: ",segmentation_results.keys())
+
+# set_seg_results()
+
    
 # Path to the directory that contains the DICOM files
 #directory1 = "scan1"
