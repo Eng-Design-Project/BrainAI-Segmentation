@@ -245,15 +245,26 @@ class Core:
             clustering_results = {}  # Implement file-based clustering logic here
         elif source == "memory":
             # Logic to perform clustering from memory and set the clustering_results variable
+            data.set_seg_results()
             clustering_results = {}  # Implement memory-based clustering logic here
 
         # Display clustering results within the GUI
         self.display_clustering_results(algorithm, clustering_results)
 
-        # Set the current image index to 0 and show the current image
-        self.current_image_index = 0
-        self.show_current_image()
+        # You can use labels or other widgets to display the clustering results.
 
+        # Set image paths and current image index (replace with your own data)
+        self.image_paths = ["/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png", "/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png", "/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011546_3_S32031_I54071.png"]
+        self.current_image_index = 0
+
+        # Show or hide "Previous" and "Next" buttons based on whether images are available
+        if self.image_paths:
+            self.show_current_image()
+            self.previous_button.pack(pady=10, anchor="center")
+            self.next_button.pack(pady=10, anchor="center")
+        else:
+            self.previous_button.pack_forget()
+            self.next_button.pack_forget()
 
     def display_clustering_results(self, algorithm, clustering_results):
         # Create a label or canvas to display the clustering results
