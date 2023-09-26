@@ -276,6 +276,20 @@ def test_subfolders_to_dictionary(directory):
 #test_store_seg_img_on_file("brain1")
 #test_subfolders_to_dictionary("brain1")
 
+# function copied from segmentation
+def create_black_copy(image: sitk.Image) -> sitk.Image:
+    # Create a copy of the input image
+    black_image = sitk.Image(image.GetSize(), image.GetPixelID())
+    black_image.SetOrigin(image.GetOrigin())
+    black_image.SetSpacing(image.GetSpacing())
+    black_image.SetDirection(image.GetDirection())
+
+    # All pixel values are already set to 0 (black) upon initialization
+    return black_image
+
+#global variable
+segmentation_results= None
+
 # this function sets the global variable segmentation_results to a dictionary of regions:sitk images
 # It takes an optional argument of a directory of DCMS. If no directory is passed, it uses "scan1"
 def set_seg_results(directory = "scan1"):
