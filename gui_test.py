@@ -254,7 +254,7 @@ class Core:
         # You can use labels or other widgets to display the clustering results.
 
         # Set image paths and current image index (replace with your own data)
-        self.image_paths = ["scan1_pngs\ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png", "scan1_pngs\ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png", "scan1_pngs\ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011546_3_S32031_I54071.png"]
+        self.image_paths = ["scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png", "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png", "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011546_3_S32031_I54071.png"]
         self.current_image_index = 0
 
         # Show or hide "Previous" and "Next" buttons based on whether images are available
@@ -382,8 +382,8 @@ class Core:
 
     def open_image_scoring_popup(self):
         image_paths = [
-        "scan1_pngs\ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png",  # Replace with actual image paths
-        "scan1_pngs\ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png"]
+        "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png",  # Replace with actual image paths
+        "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png"]
 
         popup_window = tk.Toplevel(self.master)
         image_scoring_popup = ImageScoringPopup(popup_window, image_paths, self.save_scores)
