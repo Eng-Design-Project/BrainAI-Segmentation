@@ -230,6 +230,25 @@ def subfolders_to_dictionary(directory):
         region_dict[i] = get_3d_image(os.path.join(directory, i))
 
     return region_dict
+
+    # function copied from segmentation 
+def create_seg_images(image, region_dict):
+    output_images = {}
+    for region_name, coordinates_list in region_dict.items():
+        blank_image = create_black_copy(image)
+        
+        for coordinates in coordinates_list:
+            x, y, z = coordinates
+            if (0 <= x < image.GetSize()[0]) and \
+               (0 <= y < image.GetSize()[1]) and \
+               (0 <= z < image.GetSize()[2]):
+                pixel_value = image[x, y, z]
+                blank_image[x, y, z] = pixel_value
+                
+        # Append the finished blank_image to the output_images dictionary
+        output_images[region_name] = blank_image
+    #print(f"Size of output images:  {len(output_images)}")
+    return output_images
     
 # function copied from segmentation
 def DCMs_to_sitk_img_dict(directory):
