@@ -428,6 +428,29 @@ def test_encode_atlas_colors():
 #RuntimeError: filter weights array has incorrect shape.
 #test_encode_atlas_colors()
 
+def execute_atlas_seg(atlas, atlas_colors, image):
+    print("executing atlas seg")
+    # Convert the SimpleITK Images to NumPy arrays
+    moving_image = sitk.GetArrayFromImage(image)
+    target_image = sitk.GetArrayFromImage(atlas)
+    #register the 3d array to atlas 3d array
+    reg_image_array = scipy_register_images(target_image, moving_image)
+    #convert registered array to sitk image
+    reg_image = array_to_image_with_ref(reg_image_array, image)
+    
+    #coordinates of region based on atlas
+    region_to_coord_dict = encode_atlas_colors(atlas_colors)
+
+    #create image dict from coords dict and sitk_image
+    final_dict = create_seg_images(reg_image, region_to_coord_dict)
+
+    #expand roi
+
+    return final_dict
+    #save registered image as dcm first, then as png
+    #data.save_sitk_3d_img_to_dcm(reg_image, "atlas_seg_results")
+    #data.save_dcm_dir_to_png_dir("atlas_seg_results", "atlas_seg_results_png")
+
 
 
 '''
