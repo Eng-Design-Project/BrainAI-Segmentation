@@ -35,8 +35,9 @@ import data
         for button in [self.image_scoring_button, self.clustering_button, self.deep_learning_button, self.back_button]:
             button.pack(pady=20)"""
 
-#global variable
+#global variables
 segmentation_results= None
+iteration = 0 # score iterations, meaning how many times the user has scored a pair of images
 
 class ImageScoringPopup:
     def __init__(self, master, image_path, callback):
@@ -44,6 +45,7 @@ class ImageScoringPopup:
         self.callback = callback
         self.image1_path = image_path[0]
         self.image2_path = image_path[1]
+        print("master: ",self.master)
 
         self.image1 = tk.PhotoImage(file=image_path[0])
         self.image2 = tk.PhotoImage(file=image_path[1])
@@ -86,6 +88,9 @@ class ImageScoringPopup:
 
     def submit_scores(self):
         try:
+            global iteration
+            print(iteration)
+            iteration += 1
             score1 = float(self.score_entry1.get())
             score2 = float(self.score_entry2.get())
         
@@ -110,7 +115,6 @@ class Core:
         self.master = master
         self.current_page = None  # Track the current page being displayed
         self.segmentation_results = {}  # Initialize the segmentation_results variable as an empty dictionary
-
 
         self.master.title("Image Analysis Tool")
         self.style = ttk.Style()
@@ -359,9 +363,10 @@ class Core:
         self.current_page = self.advanced_segmentation_page"""
 
     def open_image_scoring_popup(self):
+        global iteration
         image_paths = [
-        "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png",  # Replace with actual image paths
-        "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png"]
+        "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_"+str(iteration*2+1)+"_S32031_I54071.png",  # Replace with actual image paths
+        "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_"+str(iteration*2+2)+"_S32031_I54071.png"]
 
         popup_window = tk.Toplevel(self.master)
         image_scoring_popup = ImageScoringPopup(popup_window, image_paths, self.save_scores)
