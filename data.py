@@ -232,17 +232,7 @@ def subfolders_to_dictionary(directory):
 
     return region_dict
 
-
-# the following code tests the "subfolders_to_dictionary()" function
-def test_subfolders_to_dictionary(directory):
-    regions = subfolders_to_dictionary(directory)
-    for key, value in regions.items():
-        view_sitk_3d_image(value, 15, key)
-#test_store_seg_img_on_file("brain1")
-#test_subfolders_to_dictionary("brain1")
-
-
-# function copied from segmentation 
+    # function copied from segmentation 
 def create_seg_images(image, region_dict):
     output_images = {}
     for region_name, coordinates_list in region_dict.items():
@@ -260,7 +250,7 @@ def create_seg_images(image, region_dict):
         output_images[region_name] = blank_image
     #print(f"Size of output images:  {len(output_images)}")
     return output_images
-
+    
 # function copied from segmentation
 def DCMs_to_sitk_img_dict(directory):
     image = get_3d_image(directory)
@@ -278,6 +268,14 @@ def DCMs_to_sitk_img_dict(directory):
     #display_regions_from_dict(region_images)
     display_seg_images(region_images)
     return region_images
+
+# the following code tests the "subfolders_to_dictionary()" function
+def test_subfolders_to_dictionary(directory):
+    regions = subfolders_to_dictionary(directory)
+    for key, value in regions.items():
+        view_sitk_3d_image(value, 15, key)
+#test_store_seg_img_on_file("brain1")
+#test_subfolders_to_dictionary("brain1")
 
 # function copied from segmentation
 def create_black_copy(image: sitk.Image) -> sitk.Image:
@@ -300,8 +298,8 @@ def set_seg_results(directory = "scan1"):
     segmentation_results = DCMs_to_sitk_img_dict(directory)
     print("segmentation results: ",segmentation_results.keys())
 
-#set_seg_results()
-   
+# set_seg_results()
+  
 # Path to the directory that contains the DICOM files
 #directory1 = "scan1"
 #directory2 = "scan2"
