@@ -316,6 +316,10 @@ class Core:
         # Create a button to confirm the selection
         confirm_button = tk.Button(popup_window, text="Confirm", command=lambda: self.handle_segmentation_selection(popup_window, selection_var.get()))
         confirm_button.pack(pady=20)
+
+        #if seg results loaded from file, have to convert nested folder directory to dict of sitk images
+        #alternative is running atlas seg
+
         # else:
         # Call the deep learning function with data.segmentation_results as a parameter
         #self.deep_learning_function(data.segmentation_results)
@@ -368,6 +372,17 @@ class Core:
 
     def atlas_segment(self):
         print("Atlas Segmentation called")
+        #gets selected folder global from core class
+        #if empty, have to get it
+        #use functions in data to read the atlas and 
+        #   the image in question into memory here as sitk images
+        #get atlas colors as 3d np array
+        #call execute atlas seg, passing image, atlas and atlas colors as args
+        #returns dict of simple itk images
+        #save them as dcms to the nested folder
+        #save as pngs in nested folder by region structure
+        #display pngs in gui
+        # save dict of sitk images to data global seg results 
         # Implement your atlas segmentation logic here
 
     """def show_advanced_segmentation_buttons(self):

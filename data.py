@@ -7,9 +7,30 @@ import pydicom
 from skimage.transform import resize
 import subprocess
 import sys
+from PIL import Image
 #from pydicom import dcmread
 
 
+def get_3d_png_array(directory):
+    # Get a list of all PNG files in the directory
+    scan_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".png")]
+    
+    # Sort files to ensure they are loaded in the correct order
+    scan_files.sort()
+    
+    # Initialize an empty list to hold the 2D image data
+    image_list = []
+    
+    # Loop through each file
+    for file in scan_files:
+        # Read the 2D image data and append it to the list
+        image_data = np.asarray(Image.open(file))
+        image_list.append(image_data)
+    
+    # Convert the list of 2D arrays into a 3D array
+    volume_data = np.stack(image_list, axis=2)
+    
+    return volume_data
 
 def get_3d_image(directory):
     # Get a list of all DICOM files in the directory
@@ -133,7 +154,7 @@ def save_sitk_3d_img_to_dcm(image, new_dir):
 #temporarily "scan1" until atlas is complete
 #hard coded, we only have 1 atlas
 def get_atlas_path():
-    atlas_dir = "scan1"
+    atlas_dir = "atlas"
     return atlas_dir
 
 def get_file_path():
