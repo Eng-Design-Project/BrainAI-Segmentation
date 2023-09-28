@@ -177,6 +177,33 @@ def save_sitk_3d_img_to_dcm(image, new_dir):
 
     print("Saved 3D image to {}".format(new_dir))
 
+
+def save_sitk_3d_img_to_png(image, new_dir):
+    # Check if the directory exists, if not, create it
+    if not os.path.exists(new_dir):
+        os.makedirs(new_dir)
+
+    # Get the 3D image size to iterate through the slices
+    size = image.GetSize()
+
+    # Iterate through the slices and save each one as PNG
+    for z in range(size[2]):
+        slice_image = image[:,:,z]
+        slice_image_np = sitk.GetArrayFromImage(slice_image)
+        slice_image_np = np.uint8(slice_image_np)  # Convert to 8-bit for PNG
+
+        # Create a filename for the slice
+        filename = os.path.join(new_dir, "slice_{:03d}.png".format(z))
+
+        # Save the slice as PNG using PIL (Python Imaging Library)
+        slice_png = Image.fromarray(slice_image_np)
+        slice_png.save(filename)
+
+        print("Saved slice {} to {}".format(z, filename))
+
+    print("Saved 3D image slices as PNG in {}".format(new_dir))
+
+
 #just spits out "atlas"
 def get_atlas_path():
     atlas_dir = "atlas"
@@ -265,6 +292,18 @@ def test_store_seg_img_on_file(new_dir):
     dictionary = {"neocortex":image1, "frontal lobe":image2}
     store_seg_img_on_file(dictionary, new_dir)
 
+def store_seg_png_on_file(dict, new_dir):
+    # Check if the directory exists, if not, create it (higher level folder)
+    if not os.path.exists(new_dir):
+        os.makedirs(new_dir)
+    
+    for key in dict:
+        # making a sub folder based on the brain region name
+        sub_dir = os.path.join(new_dir, key)
+        os.makedirs(sub_dir)
+
+        save_sitk_3d_img_to_png(dict[key], sub_dir)
+        #print("key:", key)
 
 # first argument should be a higher level folder with brain region subfolders containing DCM files.
 # the output is a dictionary with brain region names as keys and sitk images as values
