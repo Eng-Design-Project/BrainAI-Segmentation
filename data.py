@@ -177,7 +177,7 @@ def save_sitk_3d_img_to_dcm(image, new_dir):
 
     print("Saved 3D image to {}".format(new_dir))
 
-
+#note, this function may have issues -Kevin
 def save_sitk_3d_img_to_png(image, new_dir):
     # Check if the directory exists, if not, create it
     if not os.path.exists(new_dir):
@@ -292,6 +292,7 @@ def test_store_seg_img_on_file(new_dir):
     dictionary = {"neocortex":image1, "frontal lobe":image2}
     store_seg_img_on_file(dictionary, new_dir)
 
+#note, this function may have issues, I haven't tested it exetensively -Kevin
 def store_seg_png_on_file(dict, new_dir):
     # Check if the directory exists, if not, create it (higher level folder)
     if not os.path.exists(new_dir):

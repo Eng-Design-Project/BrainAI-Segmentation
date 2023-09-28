@@ -378,23 +378,23 @@ class Core:
         if(self.selected_folder == ""):
             print("no folder selected") 
             #prompt the user to select a folder
-        else:
-        #use functions in data to read the atlas and 
+            self.select_folder()
+        # use functions in data to read the atlas and 
         #   the image in question into memory here as sitk images
-            image = data.get_3d_image(self.selected_folder)
-            atlas_path = data.get_atlas_path()
-            atlas = data.get_3d_image(atlas_path)
-        #get atlas colors as 3d np array
-            atlas_colors = data.get_3d_png_array("color atlas")
-        #call execute atlas seg, passing image, atlas and atlas colors as args
-            seg_results = segmentation.execute_atlas_seg(atlas, atlas_colors, image)
-        #returns dict of simple itk images
-        #save them as dcms to the nested folder
-            data.store_seg_img_on_file(seg_results, "atl_segmentation_DCMs")
-        #save as pngs in nested folder by region structure
-            data.store_seg_png_on_file(seg_results, "atl_segmentation_PNGs") # outputs black PNGs at the moment
-            #data.save_dcm_dir_to_png_dir("atl_segmentation_DCMs/Region1","atl_segmentation_pngs") # also outputs black pngs at the moment
-        #display pngs in gui
+        image = data.get_3d_image(self.selected_folder)
+        atlas_path = data.get_atlas_path()
+        atlas = data.get_3d_image(atlas_path)
+        # get atlas colors as 3d np array
+        atlas_colors = data.get_3d_png_array("color atlas")
+        # call execute atlas seg, passing image, atlas and atlas colors as args
+        seg_results = segmentation.execute_atlas_seg(atlas, atlas_colors, image)
+        # returns dict of simple itk images
+        # save them as dcms to the nested folder
+        data.store_seg_img_on_file(seg_results, "atl_segmentation_DCMs")
+        # save as pngs in nested folder by region structure
+        data.store_seg_png_on_file(seg_results, "atl_segmentation_PNGs") # outputs black PNGs at the moment
+        #data.save_dcm_dir_to_png_dir("atl_segmentation_DCMs/Region1","atl_segmentation_pngs") # also outputs black pngs at the moment
+        # display pngs in gui
         # save dict of sitk images to data global seg results 
         # Implement your atlas segmentation logic here
 
