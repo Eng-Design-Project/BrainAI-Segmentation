@@ -10,6 +10,17 @@ def print_hello():
     print(" Entered deep learning ")
 
 
+# New U-Net architecture
+def unet(pretrained_weights=None, input_size=(256, 256, 1)):
+    inputs = tf.keras.layers.Input(input_size)  # Fully qualified name
+    # ... (Your existing U-Net architecture code here)
+    outputs = None  # This should be defined in your existing U-Net code
+    model = tf.keras.models.Model(inputs, outputs)  # Fully qualified name
+    if pretrained_weights:
+        model.load_weights(pretrained_weights)
+    return model
+
+
 #dummy input data
 sitk_images_dict = {
     "image1": data.get_3d_image("scan1"),
@@ -113,19 +124,23 @@ def build_boundary_window_model(window_size=3):
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     return model
 
+# Modified training function
 def train_model(model, windows, labels, success_metric):
-    # Simple example, you might want to adjust training based on the success metric
-    model.fit(windows, labels, epochs=int(success_metric * 10))  # Hypothetical usage of success_metric
+    model.compile(optimizer=tf.keras.optimizers.Adam(lr=1e-4), loss='binary_crossentropy', metrics=['accuracy'])
+    model.fit(windows, labels, epochs=int(success_metric * 10))
 
 def classify_voxels(segment_volume, success_metric, window_size=3):
     boundary = find_boundary(segment_volume)
-    windows, indices = extract_windows(segment_volume, boundary)
+    windows, indices = extract_windows(segment_volume, boundary, window_size)
     windows = windows[..., np.newaxis]  # Adding a channel dimension
-    model = build_boundary_window_model(window_size=window_size)
-    
+
+    # Here, I'm using your U-Net model instead of a newly built one.
+    model = unet(input_size=(window_size, window_size, window_size, 1))
+
     # Dummy labels for demonstration; replace with actual labels if available
-    labels = np.random.randint(0, 2, size=len(windows))  
+    labels = np.random.randint(0, 2, size=len(windows))
     
+    # Train the model
     train_model(model, windows, labels, success_metric)
     
     predictions = model.predict(windows)
@@ -133,51 +148,11 @@ def classify_voxels(segment_volume, success_metric, window_size=3):
     
     classified_indices = indices[predicted_labels == 1]
     return classified_indices.tolist()
+
+
 def test_classify_voxels():
     boundary_volume = np.random.randint(0, 2, (128, 128, 128))  # Replace with your actual boundary volume
     success_metric = 0.8  # Replace with your actual success metric
     classified_indices = classify_voxels(boundary_volume, success_metric)
     print(classified_indices)
 
-
-'''
-#class not needed
-class DeepLearningModule:
-    def __init__(self):
-        self.atlas_segmentation_data = {}
-        self.user_score1 = -1
-        self.user_score2 = -2
-
-    def load_regions(self, region_data):
-        for region_name, sitk_name in region_data.items():
-            try:
-                region_image = sitk.ReadImage(sitk_name)
-                print(f"Loaded {region_name} from {sitk_name}")
-            except Exception as e:
-                print(f"Error loading {region_name} from {sitk_name}: {e}")
-
-    def load_atlas_data(self, atlas_data1, atlas_data2):
-        for folder_path in [atlas_data1, atlas_data2]:
-            for filename in os.listdir(folder_path):
-                file_path = os.path.join(folder_path, filename)
-                try:
-                    atlas_image = sitk.ReadImage(file_path)
-                    self.atlas_segmentation_data[filename] = atlas_image
-                    print(f"Loaded atlas data from {file_path}")
-                except Exception as e:
-                    print(f"Error loading atlas data from {file_path}: {e}")
-
-
-# Existing user score global variables and function
-#will prob be removed, user score will be supplied to dl algo as argument from core
-user_score1 = -1
-user_score2 = -2
-
-#will be removed, user score updated in core
-def get_user_score(x1, x2):
-    global user_score1, user_score2
-    user_score1 = x1
-    user_score2 = x2
-    print("score 1 is: ", user_score1)
-    print("score 2 is: ", user_score2)
-'''
