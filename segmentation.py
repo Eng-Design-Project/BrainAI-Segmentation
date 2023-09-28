@@ -446,11 +446,19 @@ def execute_atlas_seg(atlas, atlas_colors, image):
     final_dict = create_seg_images(reg_image, region_to_coord_dict)
 
     #expand roi
-    for region, segment in final_dict.items():
-        final_dict[region] = expand_roi(reg_image, segment)
+    #for region, segment in final_dict.items():
+    #    final_dict[region] = expand_roi(reg_image, segment)
 
     return final_dict
 
+if __name__ == "__main__":
+    atlas_path = data.get_atlas_path()
+    atlas = data.get_3d_image(atlas_path)
+    image = data.get_3d_image("scan1")
+    color_atlas = data.get_3d_png_array("color atlas")
+    data.display_array_slices(color_atlas, 5)
+    seg_results = execute_atlas_seg(atlas, color_atlas, image)
+    data.store_seg_img_on_file(seg_results, "seg results test")
 
 '''
 # Replace 'image.dcm' with the path to your DICOM file

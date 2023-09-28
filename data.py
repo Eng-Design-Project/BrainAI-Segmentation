@@ -12,25 +12,51 @@ from PIL import Image
 
 
 def get_3d_png_array(directory):
-    # Get a list of all PNG files in the directory
-    scan_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".png")]
+    image_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".png")]
+    image_array_list = []
+
+    for image_file in image_files:
+        # Open the image using Pillow
+        img = Image.open(image_file)
+        # Convert the Pillow image to a numpy array
+        img_arr = np.array(img)
+        # Check if the array is already 128x128x3
+        if img_arr.shape == (128, 128, 3):
+            # If it is, use it as is
+            image_array_list.append(img_arr)
+        else:
+            # If it's not, convert the image to RGB
+            rgb_img = img.convert('RGB')
+            # Convert the RGB image to a numpy array and append to the list
+            image_array_list.append(np.array(rgb_img))
+
+    # Stack all the 2D arrays into a single 3D array
+    image_3d_array = np.stack(image_array_list, axis=-1)
+    return image_3d_array
+
+def display_array_slices(img_3d, num_slices):
+    print(img_3d.shape)
+    # Ensure that num_slices does not exceed the number of available slices
+    num_slices = min(num_slices, img_3d.shape[2])
+
+    # Calculate grid dimensions
+    cols = int(np.ceil(np.sqrt(num_slices)))
+    rows = int(np.ceil(num_slices / cols))
     
-    # Sort files to ensure they are loaded in the correct order
-    scan_files.sort()
+    fig, axes = plt.subplots(rows, cols, figsize=(15, 15))
     
-    # Initialize an empty list to hold the 2D image data
-    image_list = []
+    for i in range(num_slices):
+        ax = axes.flat[i]
+        ax.imshow(img_3d[:, :, :, i])
+        ax.axis('off')  # Hide the axis
+
+    # Hide any remaining empty subplots
+    for i in range(num_slices, rows * cols):
+        axes.flat[i].axis('off')
     
-    # Loop through each file
-    for file in scan_files:
-        # Read the 2D image data and append it to the list
-        image_data = np.asarray(Image.open(file))
-        image_list.append(image_data)
-    
-    # Convert the list of 2D arrays into a 3D array
-    volume_data = np.stack(image_list, axis=2)
-    
-    return volume_data
+    plt.tight_layout()
+    plt.show()
+
 
 def get_3d_image(directory):
     # Get a list of all DICOM files in the directory
@@ -151,8 +177,7 @@ def save_sitk_3d_img_to_dcm(image, new_dir):
 
     print("Saved 3D image to {}".format(new_dir))
 
-#temporarily "scan1" until atlas is complete
-#hard coded, we only have 1 atlas
+#just spits out "atlas"
 def get_atlas_path():
     atlas_dir = "atlas"
     return atlas_dir
