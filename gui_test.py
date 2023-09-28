@@ -162,7 +162,7 @@ class Core:
 
         self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.advanced_segmentation_button, self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button],[self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
 
-        self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button, self.results_label,self.previous_button,self.next_button, self.clustering_back_button]))
+        self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button, self.clustering_algorithm_label, self.previous_button,self.next_button, self.clustering_back_button]))
 
         self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.deeplearning_back_button]))
 
@@ -254,7 +254,7 @@ class Core:
         # You can use labels or other widgets to display the clustering results.
 
         # Set image paths and current image index (replace with your own data)
-        self.image_paths = ["/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png", "/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png", "/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011546_3_S32031_I54071.png"]
+        self.image_paths = ["scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png", "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png", "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011546_3_S32031_I54071.png"]
         self.current_image_index = 0
 
         # Show or hide "Previous" and "Next" buttons based on whether images are available
@@ -329,16 +329,15 @@ class Core:
             # Add code to get the selected folder here and store it
             selected_folder = self.get_selected_folder()
             data.set_seg_results(selected_folder)
-            self.segmentation_results = data.segmentation_results
             print("Selected folder:", selected_folder)
             # Logic to select segmentation results from a file and set the variable
-            
+            # You can use file dialogs to allow the user to choose a file
+            segmentation_results = {}  # Implement file selection logic here
         elif selection == "memory":
             data.set_seg_results()
-            self.segmentation_results = data.segmentation_results
             # Logic to select segmentation results from memory and set the variable
             # You can populate segmentation_results with data from memory
-            
+            segmentation_results = {}  # Implement memory selection logic here
 
         # Now you have the segmentation_results variable with the selected data
         # You can use it for deep learning or any other processing
@@ -383,8 +382,8 @@ class Core:
 
     def open_image_scoring_popup(self):
         image_paths = [
-        "/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png",  # Replace with actual image paths
-        "/Users/kylepalmer/Documents/GitHub/BrainAI-Segmentation/scan 1/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png"]
+        "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png",  # Replace with actual image paths
+        "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png"]
 
         popup_window = tk.Toplevel(self.master)
         image_scoring_popup = ImageScoringPopup(popup_window, image_paths, self.save_scores)

@@ -7,9 +7,56 @@ import pydicom
 from skimage.transform import resize
 import subprocess
 import sys
+from PIL import Image
 #from pydicom import dcmread
 
-programMemory = {}
+
+def get_3d_png_array(directory):
+    image_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".png")]
+    image_array_list = []
+
+    for image_file in image_files:
+        # Open the image using Pillow
+        img = Image.open(image_file)
+        # Convert the Pillow image to a numpy array
+        img_arr = np.array(img)
+        # Check if the array is already 128x128x3
+        if img_arr.shape == (128, 128, 3):
+            # If it is, use it as is
+            image_array_list.append(img_arr)
+        else:
+            # If it's not, convert the image to RGB
+            rgb_img = img.convert('RGB')
+            # Convert the RGB image to a numpy array and append to the list
+            image_array_list.append(np.array(rgb_img))
+
+    # Stack all the 2D arrays into a single 3D array
+    image_3d_array = np.stack(image_array_list, axis=-1)
+    return image_3d_array
+
+def display_array_slices(img_3d, num_slices):
+    print(img_3d.shape)
+    # Ensure that num_slices does not exceed the number of available slices
+    num_slices = min(num_slices, img_3d.shape[2])
+
+    # Calculate grid dimensions
+    cols = int(np.ceil(np.sqrt(num_slices)))
+    rows = int(np.ceil(num_slices / cols))
+    
+    fig, axes = plt.subplots(rows, cols, figsize=(15, 15))
+    
+    for i in range(num_slices):
+        ax = axes.flat[i]
+        ax.imshow(img_3d[:, :, :, i])
+        ax.axis('off')  # Hide the axis
+
+    # Hide any remaining empty subplots
+    for i in range(num_slices, rows * cols):
+        axes.flat[i].axis('off')
+    
+    plt.tight_layout()
+    plt.show()
+
 
 def get_3d_image(directory):
     # Get a list of all DICOM files in the directory
@@ -75,30 +122,9 @@ def save_dcm_dir_to_png_dir(directory, new_dir):
         output_file = os.path.basename(scan_files[i]).split(".")[0] + ".png"
         output_file_path = os.path.join(new_dir, output_file)
         plt.imsave(output_file_path, png_file, cmap='gray')
+#save_dcm_dir_to_png_dir("scan4", "scan4_pngs")
 
 
-#currently only copies single files
-#a rework would involve getting the whole block of files, 
-#then sorting them by meta data
-def copy_meta_data(metadata_dcm_file, target_dcm_file):
-    # Read the original DICOM file
-    metadata_dcm = pydicom.dcmread(metadata_dcm_file)
-
-    # Read the target DICOM file (the one you want to copy the metadata to)
-    target_dcm = pydicom.dcmread(target_dcm_file)
-
-    pixel_data = target_dcm.PixelData
-
-    metadata_dcm.PixelData = pixel_data
-
-    # Copy metadata from original to target
-    # for elem in original_dcm.iterall():
-    #     if elem.tag != (0x7FE0, 0x0010) and elem.tag.group not in (0x0002, 0x0004):
-    #         target_dcm.add(elem)
-
-    # Save the target DICOM file with the updated metadata
-    metadata_dcm.save_as(target_dcm_file)
-#copy_meta_data('scan1', 'registered')
 
 #takes a directory and index, spits out filepath
 def get_filepath(directory, index):
@@ -151,10 +177,36 @@ def save_sitk_3d_img_to_dcm(image, new_dir):
 
     print("Saved 3D image to {}".format(new_dir))
 
-#temporarily "scan1" until atlas is complete
-#hard coded, we only have 1 atlas
+
+def save_sitk_3d_img_to_png(image, new_dir):
+    # Check if the directory exists, if not, create it
+    if not os.path.exists(new_dir):
+        os.makedirs(new_dir)
+
+    # Get the 3D image size to iterate through the slices
+    size = image.GetSize()
+
+    # Iterate through the slices and save each one as PNG
+    for z in range(size[2]):
+        slice_image = image[:,:,z]
+        slice_image_np = sitk.GetArrayFromImage(slice_image)
+        slice_image_np = np.uint8(slice_image_np)  # Convert to 8-bit for PNG
+
+        # Create a filename for the slice
+        filename = os.path.join(new_dir, "slice_{:03d}.png".format(z))
+
+        # Save the slice as PNG using PIL (Python Imaging Library)
+        slice_png = Image.fromarray(slice_image_np)
+        slice_png.save(filename)
+
+        print("Saved slice {} to {}".format(z, filename))
+
+    print("Saved 3D image slices as PNG in {}".format(new_dir))
+
+
+#just spits out "atlas"
 def get_atlas_path():
-    atlas_dir = "scan1"
+    atlas_dir = "atlas"
     return atlas_dir
 
 def get_file_path():
@@ -240,6 +292,18 @@ def test_store_seg_img_on_file(new_dir):
     dictionary = {"neocortex":image1, "frontal lobe":image2}
     store_seg_img_on_file(dictionary, new_dir)
 
+def store_seg_png_on_file(dict, new_dir):
+    # Check if the directory exists, if not, create it (higher level folder)
+    if not os.path.exists(new_dir):
+        os.makedirs(new_dir)
+    
+    for key in dict:
+        # making a sub folder based on the brain region name
+        sub_dir = os.path.join(new_dir, key)
+        os.makedirs(sub_dir)
+
+        save_sitk_3d_img_to_png(dict[key], sub_dir)
+        #print("key:", key)
 
 # first argument should be a higher level folder with brain region subfolders containing DCM files.
 # the output is a dictionary with brain region names as keys and sitk images as values
@@ -252,22 +316,73 @@ def subfolders_to_dictionary(directory):
 
     return region_dict
 
+    # function copied from segmentation 
+def create_seg_images(image, region_dict):
+    output_images = {}
+    for region_name, coordinates_list in region_dict.items():
+        blank_image = create_black_copy(image)
+        
+        for coordinates in coordinates_list:
+            x, y, z = coordinates
+            if (0 <= x < image.GetSize()[0]) and \
+               (0 <= y < image.GetSize()[1]) and \
+               (0 <= z < image.GetSize()[2]):
+                pixel_value = image[x, y, z]
+                blank_image[x, y, z] = pixel_value
+                
+        # Append the finished blank_image to the output_images dictionary
+        output_images[region_name] = blank_image
+    #print(f"Size of output images:  {len(output_images)}")
+    return output_images
+    
+# function copied from segmentation
+def DCMs_to_sitk_img_dict(directory):
+    image = get_3d_image(directory)
+    def generate_regions(): 
+        region1 = [[x, y, z] for x in range(0, 51) for y in range(0, 51) for z in range(0, 51)]
+        region2 = [[x, y, z] for x in range(50, 101) for y in range(50, 101) for z in range(0, 50)]
+
+        region_dict = {
+            "Region1": region1,
+            "Region2": region2
+        }
+        return region_dict
+    region_dict = generate_regions()
+    region_images = create_seg_images(image, region_dict)
+    #display_regions_from_dict(region_images)
+    display_seg_images(region_images)
+    return region_images
 
 # the following code tests the "subfolders_to_dictionary()" function
 def test_subfolders_to_dictionary(directory):
     regions = subfolders_to_dictionary(directory)
     for key, value in regions.items():
         view_sitk_3d_image(value, 15, key)
-
-
-# Example variable to hold atlas segmentation data
-atlas_segmentation_data = None
-
-def get_atlas_segmentation_data():
-    global atlas_segmentation_data
-    return atlas_segmentation_data
 #test_store_seg_img_on_file("brain1")
 #test_subfolders_to_dictionary("brain1")
+
+# function copied from segmentation
+def create_black_copy(image: sitk.Image) -> sitk.Image:
+    # Create a copy of the input image
+    black_image = sitk.Image(image.GetSize(), image.GetPixelID())
+    black_image.SetOrigin(image.GetOrigin())
+    black_image.SetSpacing(image.GetSpacing())
+    black_image.SetDirection(image.GetDirection())
+
+    # All pixel values are already set to 0 (black) upon initialization
+    return black_image
+
+#global variable
+segmentation_results= None
+
+# this function sets the global variable segmentation_results to a dictionary of regions:sitk images
+# It takes an optional argument of a directory of DCMS. If no directory is passed, it uses "scan1"
+def set_seg_results(directory = "scan1"):
+    global segmentation_results
+    segmentation_results = DCMs_to_sitk_img_dict(directory)
+    print("segmentation results: ",segmentation_results.keys())
+
+# set_seg_results()
 
    
 # Path to the directory that contains the DICOM files
@@ -350,3 +465,44 @@ def p_arrays(*files):
 # below is an example of accessing a pixel array from the list, and displaying it with plt
 #plt.imshow(p_array_list[2], 'gray', origin='lower')
 #plt.show()
+
+'''
+#won't work can't apply pixeldata from one dcm to another
+#pixeldata is dependent on metadata
+def copy_metadata(metadata_dcm_file, target_dcm_file):
+    # Read the original DICOM file
+    metadata_dcm = pydicom.dcmread(metadata_dcm_file)
+
+    # Read the target DICOM file (the one you want to copy the metadata to)
+    target_dcm = pydicom.dcmread(target_dcm_file)
+
+    pixel_data = target_dcm.PixelData
+
+    metadata_dcm.PixelData = pixel_data
+
+    # Copy metadata from original to target
+    # for elem in original_dcm.iterall():
+    #     if elem.tag != (0x7FE0, 0x0010) and elem.tag.group not in (0x0002, 0x0004):
+    #         target_dcm.add(elem)
+
+    # Save the target DICOM file with the updated metadata
+    metadata_dcm.save_as(target_dcm_file)
+#copy_meta_data('scan1', 'registered')
+
+#doesn't work because pixel data is dependent on metadata
+# can't apply pixel data from one dcm to another, it just doesn't work 
+def full_copy_metadata(metadata_dcm_dir, target_dcm_dir):
+    
+    metadata_files = [os.path.join(metadata_dcm_dir, f) for f in os.listdir(metadata_dcm_dir) if f.endswith(".dcm")]
+    target_files = [os.path.join(target_dcm_dir, f) for f in os.listdir(target_dcm_dir) if f.endswith(".dcm")]
+    #final_files = [os.path.join(target_dcm_dir, f) for f in os.listdir(metadata_dcm_dir) if f.endswith(".dcm")]
+
+    
+    for i in range(min(len(metadata_files), len(target_files))):
+        metadata_img = pydicom.dcmread(metadata_files[i])
+        target_img = pydicom.dcmread(target_files[i])
+        metadata_img.PixelData = target_img.PixelData
+        
+        metadata_img.save_as(target_files[i])
+#full_copy_metadata("scipy_reg_image_dcm", "scipy_reg_image_dcm")
+'''

@@ -67,12 +67,12 @@ def test_scipy_register_images(atlas, image):
     #convert registered array to sitk image
     reg_image = array_to_image_with_ref(reg_image, sitk_moving_image)
     #save registered image as dcm first, then as png
-    data.save_sitk_3d_img_to_dcm(reg_image, "scipy reg image dcm")
-    data.save_dcm_dir_to_png_dir("scipy reg image dcm", "scipy reg png")
+    data.save_sitk_3d_img_to_dcm(reg_image, "scipy_reg_image_dcm")
+    data.save_dcm_dir_to_png_dir("scipy_reg_image_dcm", "scipy_reg_png")
 
     #note: the problem may be with sitk registration where the dcm's have different values 
     # for metadata like spacing
-#test_scipy_register_images("scan1", "scan2")
+#test_scipy_register_images("atlas", "scan2")
 
 # Example usage
 #target_image = np.random.rand(100, 100, 100)
@@ -132,14 +132,14 @@ def atlas_segment(atlas, image,
         registration_method.SetOptimizerScalesFromPhysicalShift()
 
     #initial transform
-    initial_transform = sitk.TranslationTransform(atlas.GetDimension())
+    #initial_transform = sitk.TranslationTransform(atlas.GetDimension())
         #transforms only translation? affline instead?
     #Rigid Transform (Rotation + Translation):
     #initial_transform = sitk.Euler3DTransform()
     #Similarity Transform (Rigid + isotropic scaling):
     #initial_transform = sitk.Similarity3DTransform()
     #Affine Transform (includes rotations, translations, scaling, and shearing):
-    #initial_transform = sitk.AffineTransform(atlas.GetDimension())
+    initial_transform = sitk.AffineTransform(atlas.GetDimension())
     #BSpline Transform (a non-rigid, deformable transform): *DOES NOT CURRENTLY WORK*
     #order_x, order_y, order_z = 5, 5, 5
     #initial_transform = sitk.BSplineTransformInitializer(atlas, [order_x, order_y, order_z])
@@ -428,7 +428,37 @@ def test_encode_atlas_colors():
 #RuntimeError: filter weights array has incorrect shape.
 #test_encode_atlas_colors()
 
+#atlas and image are both sitk images, atlas colors is a 3d np array
+def execute_atlas_seg(atlas, atlas_colors, image):
+    print("executing atlas seg")
+    # Convert the SimpleITK Images to NumPy arrays
+    moving_image = sitk.GetArrayFromImage(image)
+    target_image = sitk.GetArrayFromImage(atlas)
+    #register the 3d array to atlas 3d array
+    reg_image_array = scipy_register_images(target_image, moving_image)
+    #convert registered array to sitk image
+    reg_image = array_to_image_with_ref(reg_image_array, image)
+    
+    #coordinates of region based on atlas
+    region_to_coord_dict = encode_atlas_colors(atlas_colors)
 
+    #create image dict from coords dict and sitk_image
+    final_dict = create_seg_images(reg_image, region_to_coord_dict)
+
+    #expand roi
+    #for region, segment in final_dict.items():
+    #    final_dict[region] = expand_roi(reg_image, segment)
+
+    return final_dict
+
+if __name__ == "__main__":
+    atlas_path = data.get_atlas_path()
+    atlas = data.get_3d_image(atlas_path)
+    image = data.get_3d_image("scan1")
+    color_atlas = data.get_3d_png_array("color atlas")
+    data.display_array_slices(color_atlas, 5)
+    seg_results = execute_atlas_seg(atlas, color_atlas, image)
+    data.store_seg_img_on_file(seg_results, "seg results test")
 
 '''
 # Replace 'image.dcm' with the path to your DICOM file
