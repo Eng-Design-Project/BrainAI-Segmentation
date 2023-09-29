@@ -365,8 +365,9 @@ class Core:
     def open_image_scoring_popup(self):
         global iteration
         image_paths = [
-        "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_"+str(iteration*2+1)+"_S32031_I54071.png",  # Replace with actual image paths
-        "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_"+str(iteration*2+2)+"_S32031_I54071.png"]
+        data.get_filepath("scan1_pngs", 0),  # Replace with actual image paths
+        data.get_filepath("scan1_pngs", 1)]
+        print("File path: ",data.get_filepath("scan1_pngs", 0))
 
         popup_window = tk.Toplevel(self.master)
         image_scoring_popup = ImageScoringPopup(popup_window, image_paths, self.save_scores)
