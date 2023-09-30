@@ -83,7 +83,7 @@ def test_scipy_register_images(atlas, image):
 
 #expand region of interest
 #this adds an extra layer of pixels to a segmented image from the original image
-#currently takes 2 3d arrays. Unsure if this will take simpleITK images instead
+#takes sitk images now
 def expand_roi(original_sitk, segment_sitk):
     #convert to 3d arrays for convolution
     original_arr = sitk.GetArrayFromImage(original_sitk)
