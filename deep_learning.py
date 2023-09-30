@@ -139,6 +139,10 @@ def test_classify_voxels():
     classified_indices = classify_voxels(boundary_volume, success_metric)
     print(classified_indices)
 
+    
+if __name__ == '__main__':
+    test_classify_voxels()
+
 
 '''
 #class not needed
