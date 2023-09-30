@@ -11,14 +11,23 @@ def print_hello():
 
 
 # New U-Net architecture
-def unet(pretrained_weights=None, input_size=(256, 256, 1)):
-    inputs = tf.keras.layers.Input(input_size)  # Fully qualified name
-    # ... (Your existing U-Net architecture code here)
-    outputs = None  # This should be defined in your existing U-Net code
-    model = tf.keras.models.Model(inputs, outputs)  # Fully qualified name
+def unet(pretrained_weights=None, input_size=(256, 256, 256, 1)):
+    inputs = tf.keras.layers.Input(input_size)
+    conv1 = tf.keras.layers.Conv3D(64, (3, 3, 3), activation='relu', padding='same')(inputs)
+    pool1 = tf.keras.layers.MaxPooling3D(pool_size=(2, 2, 2))(conv1)
+    # ... More layers here ...
+    
+    # Final layer
+    flatten = tf.keras.layers.Flatten()(pool1)
+    outputs = tf.keras.layers.Dense(1, activation='sigmoid')(flatten)
+
+    model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
+    
     if pretrained_weights:
         model.load_weights(pretrained_weights)
+        
     return model
+
 
 
 #dummy input data
@@ -155,4 +164,7 @@ def test_classify_voxels():
     success_metric = 0.8  # Replace with your actual success metric
     classified_indices = classify_voxels(boundary_volume, success_metric)
     print(classified_indices)
+
+if __name__ == '__main__':
+    test_classify_voxels()
 
