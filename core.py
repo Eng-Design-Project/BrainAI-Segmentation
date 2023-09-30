@@ -8,6 +8,7 @@ import deep_learning
 import clustering
 import segmentation
 import data
+import os
 
 """class AdvancedSegmentationPage:
     def __init__(self, master, core_instance):
@@ -255,7 +256,8 @@ class Core:
         # You can use labels or other widgets to display the clustering results.
 
         # Set image paths and current image index (replace with your own data)
-        self.image_paths = ["scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png", "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png", "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011546_3_S32031_I54071.png"]
+        folder_path = "scan1_pngs"
+        self.image_paths = [os.path.join(folder_path, filename) for filename in os.listdir(folder_path) if filename.endswith(".png")]
         self.current_image_index = 0
 
         # Show or hide "Previous" and "Next" buttons based on whether images are available
@@ -347,6 +349,19 @@ class Core:
         # Now you have the segmentation_results variable with the selected data
         # You can use it for deep learning or any other processing
         print("Selected segmentation results:", segmentation_results)
+
+        folder_path = "scan1_pngs"
+        self.image_paths = [os.path.join(folder_path, filename) for filename in os.listdir(folder_path) if filename.endswith(".png")]
+        self.current_image_index = 0
+
+        # Show or hide "Previous" and "Next" buttons based on whether images are available
+        if self.image_paths:
+            self.show_current_image()
+            self.previous_button.pack(pady=10, anchor="center")
+            self.next_button.pack(pady=10, anchor="center")
+        else:
+            self.previous_button.pack_forget()
+            self.next_button.pack_forget()
         
     def show_main_window(self):
         self.master.deiconify()  # Show the main window
@@ -385,9 +400,9 @@ class Core:
         atlas_path = data.get_atlas_path()
         atlas = data.get_3d_image(atlas_path)
         # get atlas colors as 3d np array
-        atlas_colors = data.get_3d_png_array("color atlas")
+        color_atlas = data.get_2d_png_array_list("color atlas")
         # call execute atlas seg, passing image, atlas and atlas colors as args
-        seg_results = segmentation.execute_atlas_seg(atlas, atlas_colors, image)
+        seg_results = segmentation.execute_atlas_seg(atlas, color_atlas, image)
         # returns dict of simple itk images
         # save them as dcms to the nested folder
         data.store_seg_img_on_file(seg_results, "atl_segmentation_DCMs")
@@ -395,7 +410,8 @@ class Core:
         data.store_seg_png_on_file(seg_results, "atl_segmentation_PNGs") # outputs black PNGs at the moment
         #data.save_dcm_dir_to_png_dir("atl_segmentation_DCMs/Region1","atl_segmentation_pngs") # also outputs black pngs at the moment
         # display pngs in gui
-        # save dict of sitk images to data global seg results 
+        # save dict of sitk images to data global seg results
+        data.set_seg_results = seg_results 
         # Implement your atlas segmentation logic here
 
     """def show_advanced_segmentation_buttons(self):
