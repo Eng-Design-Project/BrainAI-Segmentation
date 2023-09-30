@@ -140,8 +140,8 @@ def test_classify_voxels():
     print(classified_indices)
 
     
-if __name__ == '__main__':
-    test_classify_voxels()
+#if __name__ == '__main__':
+ #   test_classify_voxels()
 
 
 '''
