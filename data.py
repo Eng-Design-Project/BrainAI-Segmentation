@@ -10,7 +10,7 @@ import sys
 from PIL import Image
 #from pydicom import dcmread
 
-
+#tried to use to load color atlas, to hard to parse coords
 def get_3d_png_array(directory):
     image_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".png")]
     image_array_list = []
@@ -34,6 +34,7 @@ def get_3d_png_array(directory):
     image_3d_array = np.stack(image_array_list, axis=-1)
     return image_3d_array
 
+#currently used for loading color atlas
 def get_2d_png_array_list(directory):
     image_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".png")]
     image_array_list = []
@@ -228,7 +229,8 @@ def save_sitk_3d_img_to_png(image, new_dir):
     for z in range(size[2]):
         slice_image = image[:,:,z]
         slice_image_np = sitk.GetArrayFromImage(slice_image)
-        slice_image_np = np.uint8(slice_image_np)  # Convert to 8-bit for PNG
+        slice_image_np = np.interp(slice_image_np, (slice_image_np.min(), slice_image_np.max()), (0, 255))
+        slice_image_np = np.uint8(slice_image_np)
 
         # Create a filename for the slice
         filename = os.path.join(new_dir, "slice_{:03d}.png".format(z))
