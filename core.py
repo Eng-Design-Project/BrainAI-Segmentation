@@ -10,6 +10,7 @@ import segmentation
 import data
 import os
 
+
 """class AdvancedSegmentationPage:
     def __init__(self, master, core_instance):
         self.master = master
