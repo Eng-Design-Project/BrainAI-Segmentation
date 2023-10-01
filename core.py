@@ -165,9 +165,9 @@ class Core:
 
         self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.advanced_segmentation_button, self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button],[self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
 
-        self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button, self.clustering_algorithm_label, self.previous_button,self.next_button, self.clustering_back_button]))
+        self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.results_label, self.clustering_algorithm_combobox, self.execute_clustering_button, self.clustering_algorithm_label, self.image_label, self.previous_button, self.next_button, self.clustering_back_button]))
 
-        self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.deeplearning_back_button]))
+        self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.image_label ,self.previous_button, self.next_button, self.deeplearning_back_button]))
 
         """self.image_file_path = 'mytest.png'
         self.image_button = tk.Button(self.master, text="Display Image", command=self.display_file_png)
@@ -272,8 +272,8 @@ class Core:
 
     def display_clustering_results(self, algorithm, clustering_results):
         # Create a label or canvas to display the clustering results
-        results_label = tk.Label(self.master, text=f"Clustering Results for {algorithm}:")
-        results_label.pack()
+        self.results_label = tk.Label(self.master, text=f"Clustering Results for {algorithm}:")
+        self.results_label.pack()
         # You can use labels or other widgets to display the clustering results here.
 
     def show_current_image(self):
