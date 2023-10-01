@@ -83,21 +83,27 @@ def test_scipy_register_images(atlas, image):
 
 #expand region of interest
 #this adds an extra layer of pixels to a segmented image from the original image
-#currently takes 2 3d arrays. Unsure if this will take simpleITK images instead
-def expand_roi(original, segment):
+#takes sitk images now
+def expand_roi(original_sitk, segment_sitk):
+    #convert to 3d arrays for convolution
+    original_arr = sitk.GetArrayFromImage(original_sitk)
+    segment_arr = sitk.GetArrayFromImage(segment_sitk)
+
     # Define a kernel for 3D convolution that checks for 26 neighbors in 3D
     kernel = np.ones((3, 3, 3))
     kernel[1, 1, 1] = 0
     
     # Convolve with the segment to find the boundary of ROI
-    boundary = convolve(segment > 0, kernel) > 0
-    boundary[segment > 0] = 0  # Remove areas that are already part of the segment
+    boundary = convolve(segment_arr > 0, kernel) > 0
+    boundary[segment_arr > 0] = 0  # Remove areas that are already part of the segment
     
     # Create a copy of the segment
-    expanded_segment = segment.copy()
+    expanded_segment_arr = segment_arr.copy()
     
     # Copy pixel values from the original image to the boundary in the expanded segment
-    expanded_segment[boundary] = original[boundary]
+    expanded_segment_arr[boundary] = original_arr[boundary]
+
+    expanded_segment = sitk.GetImageFromArray(expanded_segment_arr)
     
     return expanded_segment
 
@@ -480,8 +486,8 @@ def execute_atlas_seg(atlas, atlas_colors, image):
     final_dict = create_seg_images(reg_image, region_to_coord_dict)
 
     #expand roi
-    #for region, segment in final_dict.items():
-    #    final_dict[region] = expand_roi(reg_image, segment)
+    for region, segment in final_dict.items():
+        final_dict[region] = expand_roi(reg_image, segment)
 
     return final_dict
 
