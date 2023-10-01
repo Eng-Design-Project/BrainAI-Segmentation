@@ -4,11 +4,12 @@ from tkinter import ttk
 from tkinter import Canvas, Scrollbar, Frame
 from PIL import Image, ImageTk  # Import PIL for image manipulation
 
-import deep_learning
-import clustering
+#import deep_learning
+#import clustering
 import segmentation
 import data
 import os
+
 
 """class AdvancedSegmentationPage:
     def __init__(self, master, core_instance):
