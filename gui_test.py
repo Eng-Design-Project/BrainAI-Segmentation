@@ -2,11 +2,13 @@ import tkinter as tk
 from tkinter import filedialog
 from tkinter import ttk
 from tkinter import Canvas, Scrollbar, Frame
-from PIL import Image, ImageTk  # Import PIL for image manipulation
+import PIL.Image
+import PIL.ImageTk
 
 import deep_learning
 import clustering
 import data
+
 
 """class AdvancedSegmentationPage:
     def __init__(self, master, core_instance):
@@ -35,78 +37,100 @@ import data
         for button in [self.image_scoring_button, self.clustering_button, self.deep_learning_button, self.back_button]:
             button.pack(pady=20)"""
 
+import logging
+logger = logging.getLogger()
+# Log to console
+console_handler = logging.StreamHandler()
+console_formatter = logging.Formatter('%(asctime)s - %(message)s')
+console_handler.setFormatter(console_formatter)
+console_handler.setLevel(logging.INFO)
+logger.addHandler(console_handler)
+
+logger.setLevel(logging.INFO)
 #global variable
 segmentation_results= None
 
 class ImageScoringPopup:
     def __init__(self, master,image_paths, callback):
-        self.master = master
-        self.callback = callback
-        self.image_paths = image_paths
-        self.current_image_index = 0
+        logging.info("Initializing ImageScoringPopup")
+        try:
+            self.master = master
+            self.callback = callback
+            self.image_paths = image_paths
+            self.current_image_index = 0
+            
 
-        self.popup_frame = Frame(master)
-        self.popup_frame.pack(fill='both', expand=True)
+            self.popup_frame = Frame(master)
+            self.popup_frame.pack(fill='both', expand=True)
 
-        self.canvas = Canvas(self.popup_frame)
-        self.canvas.pack(side="left", fill="both", expand=True)
+            self.canvas = Canvas(self.popup_frame)
+            self.canvas.pack(side="left", fill="both", expand=True)
 
-        self.scrollbar = Scrollbar(self.popup_frame, orient="vertical", command=self.canvas.yview)
-        self.scrollbar.pack(side="right", fill="y")
+            self.scrollbar = Scrollbar(self.popup_frame, orient="vertical", command=self.canvas.yview)
+            self.scrollbar.pack(side="right", fill="y")
 
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+            self.canvas.configure(yscrollcommand=self.scrollbar.set)
 
-        self.inner_frame = Frame(self.canvas)
-        self.inner_frame_canvas = self.canvas.create_window((0, 0), window=self.inner_frame, anchor="nw")
+            self.inner_frame = Frame(self.canvas)
+            self.inner_frame_canvas = self.canvas.create_window((0, 0), window=self.inner_frame, anchor="nw")
 
-        self.images = [Image.open(path) for path in image_paths]
-        self.photo_images = [ImageTk.PhotoImage(image) for image in self.images]
+            self.images = [PIL.Image.open(path) for path in image_paths]
+            self.photo_images = [PIL.ImageTk.PhotoImage(image) for image in self.images]
 
-        self.image_label = tk.Label(self.inner_frame, image=self.photo_images[self.current_image_index])
-        self.image_label.pack(pady=(20, 10), anchor="center")
+            self.image_label = tk.Label(self.inner_frame, image=self.photo_images[self.current_image_index])
+            self.image_label.pack(pady=(20, 10), anchor="center")
 
-        self.prev_button = tk.Button(self.inner_frame, text="Previous", command=self.show_previous_image)
-        self.prev_button.pack(side="left", padx=10)
+            self.prev_button = tk.Button(self.inner_frame, text="Previous", command=self.show_previous_image)
+            self.prev_button.pack(side="left", padx=10)
+            
+            self.next_button = tk.Button(self.inner_frame, text="Next", command=self.show_next_image)
+            self.next_button.pack(side="right", padx=10)
+
+            self.score_label1 = tk.Label(self.inner_frame, text="Score Image 1:")
+            self.score_label1.pack(pady=10, anchor="center")
+
+            self.score_entry1 = tk.Scale(self.inner_frame, from_=1, to=10, orient="horizontal", sliderrelief='flat')
+            self.score_entry1.pack(pady=10, anchor="center")
+
+            self.score_label2 = tk.Label(self.inner_frame, text="Score Image 2:")
+            self.score_label2.pack(pady=10, anchor="center")
+
+            self.score_entry2 = tk.Scale(self.inner_frame, from_=1, to=10, orient="horizontal", sliderrelief='flat')
+            self.score_entry2.pack(pady=10, anchor="center")
+
+            self.submit_button = tk.Button(self.inner_frame, text="Submit", command=self.submit_scores)
+            self.submit_button.pack(pady=20, anchor="center")
+
+            self.inner_frame.bind("<Configure>", self.on_frame_configure)
+            self.canvas.bind("<Configure>", self.on_canvas_configure)
+            logging.info("ImageScoringPopup initialization successful")
+        except Exception as e:
+            logging.error(f"Error during initialization: {e}")
         
-        self.next_button = tk.Button(self.inner_frame, text="Next", command=self.show_next_image)
-        self.next_button.pack(side="right", padx=10)
-
-        self.score_label1 = tk.Label(self.inner_frame, text="Score Image 1:")
-        self.score_label1.pack(pady=10, anchor="center")
-
-        self.score_entry1 = tk.Scale(self.inner_frame, from_=1, to=10, orient="horizontal", sliderrelief='flat')
-        self.score_entry1.pack(pady=10, anchor="center")
-
-        self.score_label2 = tk.Label(self.inner_frame, text="Score Image 2:")
-        self.score_label2.pack(pady=10, anchor="center")
-
-        self.score_entry2 = tk.Scale(self.inner_frame, from_=1, to=10, orient="horizontal", sliderrelief='flat')
-        self.score_entry2.pack(pady=10, anchor="center")
-
-        self.submit_button = tk.Button(self.inner_frame, text="Submit", command=self.submit_scores)
-        self.submit_button.pack(pady=20, anchor="center")
-
-        self.inner_frame.bind("<Configure>", self.on_frame_configure)
-        self.canvas.bind("<Configure>", self.on_canvas_configure)
 
     def on_frame_configure(self, event):
+        logging.info("Configuring frame")
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
     def on_canvas_configure(self, event):
+        logging.info("Configuring canvas")
         self.canvas.itemconfig(self.inner_frame_canvas, width=event.width)
 
     def show_previous_image(self):
+        logging.info("Showing previous image")
         if self.current_image_index > 0:
             self.current_image_index -= 1
             self.image_label.config(image=self.photo_images[self.current_image_index])
 
     def show_next_image(self):
+        logging.info("Showing next image")
         if self.current_image_index < len(self.photo_images) - 1:
             self.current_image_index += 1
             self.image_label.config(image=self.photo_images[self.current_image_index])
 
 
     def submit_scores(self):
+        logging.info("Submitting scores")
         try:
             score1 = float(self.score_entry1.get())
             score2 = float(self.score_entry2.get())
@@ -123,12 +147,15 @@ class ImageScoringPopup:
             self.callback(normalized_score1, normalized_score2)
 
             self.master.destroy()
+            logging.info("Scores submitted successfully")
         except ValueError:
             # Handle invalid input (e.g., non-numeric input)
             print("Invalid input. Please enter numeric scores.")
+            logging.warning("Invalid input. Please enter numeric scores.")
 
 class Core:
     def __init__(self, master):
+        logging.info("Initializing Core class")
         self.master = master
         self.current_page = None  # Track the current page being displayed
         self.segmentation_results = {}  # Initialize the segmentation_results variable as an empty dictionary
@@ -201,6 +228,7 @@ class Core:
 
         
     def execute_clustering(self):
+        logging.info("Executing clustering")
         # Create a popup window for selecting clustering parameters
         popup_window = tk.Toplevel(self.master)
         popup_window.title("Select Clustering Parameters")
@@ -233,6 +261,7 @@ class Core:
 
     def handle_clustering_selection(self, popup_window, algorithm, source):
         # Close the popup window
+        logging.info(f"Handling clustering selection for algorithm {algorithm} and source {source}")
         popup_window.destroy()
 
         if source == "file":
@@ -267,16 +296,19 @@ class Core:
             self.next_button.pack_forget()
 
     def display_clustering_results(self, algorithm, clustering_results):
+        logging.info(f"Displaying clustering results for algorithm {algorithm}")
         # Create a label or canvas to display the clustering results
         results_label = tk.Label(self.master, text=f"Clustering Results for {algorithm}:")
         results_label.pack()
         # You can use labels or other widgets to display the clustering results here.
 
     def show_current_image(self):
+        logging.info("Showing current image")
         if self.image_paths:
             current_image_path = self.image_paths[self.current_image_index]
-            image = Image.open(current_image_path)
-            photo = ImageTk.PhotoImage(image)
+            image = PIL.Image.open(current_image_path)
+            photo = PIL.ImageTk.PhotoImage(image)
+
 
             # Update the image label with the current image
             self.image_label.config(image=photo)
@@ -284,16 +316,19 @@ class Core:
             self.image_label.pack()
 
     def show_previous_image(self):
+        logging.info("Navigating to previous image")
         if self.image_paths:
             self.current_image_index = (self.current_image_index - 1) % len(self.image_paths)
             self.show_current_image()
 
     def show_next_image(self):
+        logging.info("Navigating to next image")
         if self.image_paths:
             self.current_image_index = (self.current_image_index + 1) % len(self.image_paths)
             self.show_current_image()
 
     def execute_deep_learning_click(self):
+        logging.info("Initiating deep learning process")
         #wrap all of this in an if statement that checks if data.segmentation results is empty ( and run the logic)
         #then we call the deep learning function with the segmentation results passed as a parameter
     #if (data.segmentation_results=={}):
@@ -323,6 +358,7 @@ class Core:
 
     def handle_segmentation_selection(self, popup_window, selection):
         # Close the popup window
+        logging.info(f"Handling segmentation selection for {selection}")
         popup_window.destroy()
 
         if selection == "file":
@@ -344,11 +380,14 @@ class Core:
         print("Selected segmentation results:", segmentation_results)
         
     def show_main_window(self):
+        logging.info("Showing main window")
         self.master.deiconify()  # Show the main window
 
     def select_folder(self):
+        logging.info("Opening folder selection dialog")
         folder_path = filedialog.askdirectory()
         if folder_path:
+            logging.info(f"Selected folder: {self.selected_folder}")
             print("Selected folder:", folder_path)
             self.selected_folder = folder_path
             self.update_folder_label()
