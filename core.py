@@ -38,8 +38,6 @@ import os
         for button in [self.image_scoring_button, self.clustering_button, self.deep_learning_button, self.back_button]:
             button.pack(pady=20)"""
 
-#global variable
-segmentation_results= None
 
 class ImageScoringPopup:
     def __init__(self, master,image_paths, callback):
@@ -115,8 +113,11 @@ class ImageScoringPopup:
             score2 = float(self.score_entry2.get())
         
             # Ensure the scores are within the desired range (0-10 or 1-10 or 1-5)
-            min_score = min(score1, score2)
-            max_score = max(score1, score2)
+            #min_score = min(score1, score2)
+            #max_score = max(score1, score2)
+            #min and max are hardcoded, not set by user (or risk divide by zero error)
+            min_score = 1
+            max_score = 10
 
             # Normalize the scores between 0 and 1
             normalized_score1 = (score1 - min_score) / (max_score - min_score)
@@ -340,16 +341,16 @@ class Core:
             print("Selected folder:", selected_folder)
             # Logic to select segmentation results from a file and set the variable
             # You can use file dialogs to allow the user to choose a file
-            segmentation_results = {}  # Implement file selection logic here
+            self.segmentation_results = {}  # Implement file selection logic here
         elif selection == "memory":
             data.set_seg_results()
             # Logic to select segmentation results from memory and set the variable
             # You can populate segmentation_results with data from memory
-            segmentation_results = {}  # Implement memory selection logic here
+            self.segmentation_results = {}  # Implement memory selection logic here
 
         # Now you have the segmentation_results variable with the selected data
         # You can use it for deep learning or any other processing
-        print("Selected segmentation results:", segmentation_results)
+        print("Selected segmentation results:", self.segmentation_results)
 
         folder_path = "scan1_pngs"
         self.image_paths = [os.path.join(folder_path, filename) for filename in os.listdir(folder_path) if filename.endswith(".png")]
@@ -408,12 +409,10 @@ class Core:
         # save them as dcms to the nested folder
         data.store_seg_img_on_file(seg_results, "atl_segmentation_DCMs")
         # save as pngs in nested folder by region structure
-        data.store_seg_png_on_file(seg_results, "atl_segmentation_PNGs") # outputs black PNGs at the moment
-        #data.save_dcm_dir_to_png_dir("atl_segmentation_DCMs/Region1","atl_segmentation_pngs") # also outputs black pngs at the moment
+        data.store_seg_png_on_file(seg_results, "atl_segmentation_PNGs")
         # display pngs in gui
         # save dict of sitk images to data global seg results
         data.set_seg_results = seg_results 
-        # Implement your atlas segmentation logic here
 
     """def show_advanced_segmentation_buttons(self):
         if self.current_page:
