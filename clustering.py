@@ -184,7 +184,9 @@ def display_slices(volume, labels, cluster_coords, brain_mask, skull_mask):
     y_min, y_max = 20, 110
 
     # iterate through slices in 3d volume
-    for z in range(volume.shape[0]):
+    for z in range(5):
+        #volume.shape[0]
+        z = z+5
         slice_image = volume[z]  # extract slice
         slice_labels = labels[z]  # extract label
 
