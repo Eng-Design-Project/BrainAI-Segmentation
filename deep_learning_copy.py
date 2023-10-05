@@ -3,32 +3,57 @@ import os
 import tensorflow as tf
 import numpy as np
 from scipy.ndimage import convolve
-import data
+import data  # Your data module
 
+def unet(input_size=(128, 128, 128, 1)):
+    inputs = tf.keras.layers.Input(input_size)
+    
+    conv1 = tf.keras.layers.Conv3D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(inputs)
+    conv1 = tf.keras.layers.Conv3D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv1)
+    pool1 = tf.keras.layers.MaxPooling3D(pool_size=(2, 2, 2))(conv1)
+    
+    conv2 = tf.keras.layers.Conv3D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool1)
+    conv2 = tf.keras.layers.Conv3D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv2)
+    pool2 = tf.keras.layers.MaxPooling3D(pool_size=(2, 2, 2))(conv2)
+    
+    conv3 = tf.keras.layers.Conv3D(256, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool2)
+    conv3 = tf.keras.layers.Conv3D(256, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv3)
+    pool3 = tf.keras.layers.MaxPooling3D(pool_size=(2, 2, 2))(conv3)
 
-def print_hello():
-    print(" Entered deep learning ")
+    conv4 = tf.keras.layers.Conv3D(512, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool3)
+    conv4 = tf.keras.layers.Conv3D(512, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv4)
+    drop4 = tf.keras.layers.Dropout(0.5)(conv4)
+    pool4 = tf.keras.layers.MaxPooling3D(pool_size=(2, 2, 2))(drop4)
 
+    conv5 = tf.keras.layers.Conv3D(1024, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool4)
+    conv5 = tf.keras.layers.Conv3D(1024, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv5)
+    drop5 = tf.keras.layers.Dropout(0.5)(conv5)
 
-# New U-Net architecture
-def unet(pretrained_weights=None, input_size=(256, 256, 1)):
-    inputs = tf.keras.layers.Input(input_size)  # Fully qualified name
-    # ... (Your existing U-Net architecture code here)
-    outputs = None  # This should be defined in your existing U-Net code
-    model = tf.keras.models.Model(inputs, outputs)  # Fully qualified name
-    if pretrained_weights:
-        model.load_weights(pretrained_weights)
+    up6 = tf.keras.layers.UpSampling3D(size=(2, 2, 2))(drop5)
+    crop4 = tf.keras.layers.Cropping3D(cropping=((1, 1), (0, 0), (0, 0)))(drop4)
+    merge6 = tf.keras.layers.concatenate([crop4, up6], axis=-1)
+    conv6 = tf.keras.layers.Conv3D(512, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge6)
+
+    up7 = tf.keras.layers.UpSampling3D(size=(2, 2, 2))(conv6)
+    merge7 = tf.keras.layers.concatenate([conv3, up7], axis=-1)
+    conv7 = tf.keras.layers.Conv3D(256, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge7)
+
+    up8 = tf.keras.layers.UpSampling3D(size=(2, 2, 2))(conv7)
+    merge8 = tf.keras.layers.concatenate([conv2, up8], axis=-1)
+    conv8 = tf.keras.layers.Conv3D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge8)
+
+    up9 = tf.keras.layers.UpSampling3D(size=(2, 2, 2))(conv8)
+    merge9 = tf.keras.layers.concatenate([conv1, up9], axis=-1)
+    conv9 = tf.keras.layers.Conv3D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge9)
+
+    outputs = tf.keras.layers.Conv3D(1, (1, 1, 1), activation='sigmoid')(conv9)
+    
+    model = tf.keras.models.Model(inputs=[inputs], outputs=[outputs])
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    
     return model
 
 
-#dummy input data
-sitk_images_dict = {
-    "image1": data.get_3d_image("scan1"),
-    "image2": data.get_3d_image("scan2"),   
-    # Add other images...
-}
-
-#normalizes pixel value of 3d array
 def normalizeTF(volume3dDict):
     normalizedDict = {}
     for key, value in volume3dDict.items():
@@ -36,123 +61,53 @@ def normalizeTF(volume3dDict):
         minVal = tf.reduce_min(tensor)
         maxVal = tf.reduce_max(tensor)
         normalizedTensor = (tensor - minVal) / (maxVal - minVal)
-        
-        # Convert back to numpy and store it in the dictionary
         normalizedDict[key] = normalizedTensor.numpy()
     return normalizedDict
 
-
-#standard binary classifier, probably not useful for our use-case
-def buildModel(inputShape):
-    model = tf.keras.Sequential([
-        tf.keras.layers.InputLayer(input_shape=inputShape),  # Corrected here
-        tf.keras.layers.Conv2D(32, (3, 3), activation='relu'),
-        tf.keras.layers.MaxPooling2D(2, 2),
-        tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
-        tf.keras.layers.MaxPooling2D(2, 2),
-        tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(128, activation='relu'),
-        tf.keras.layers.Dense(2, activation='softmax')  # Assumes binary classification
-    ])
-
-    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-    return model
-
-#pix by pix classifier, not built with user score in mind
-def buildPixelModel(input_shape, window_size=3):
-    # Assumes input is a 3D patch of size [window_size, window_size, depth]
-    model = tf.keras.Sequential([
-        tf.keras.layers.InputLayer(input_shape=input_shape),
-        tf.keras.layers.Conv2D(32, (window_size, window_size), activation='relu', padding='valid'),
-        tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(128, activation='relu'),
-        tf.keras.layers.Dense(2, activation='softmax')  # Assumes binary classification
-    ])
-
-    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-    return model        
-
-#wrapper for getting the np arrays from sitkimages, normalizing, getting shape,
-# and plugging shape into basic classifier
-def dlAlgorithm(segmentDict):
-    numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()}
-    normalizedDict = normalizeTF(numpyImagesDict)
-
-    """Currently using 3D arrays, might switch to tensors. In such case, the shape might change."""
-    sampleShape = numpyImagesDict[list(numpyImagesDict.keys())[0]].shape
-    model = buildModel((sampleShape[1], sampleShape[2], sampleShape[0]))  # (height, width, channels)
-
-#finds edges of the image, only need to classify edges, not the entire thing
 def find_boundary(segment):
-    # Define a kernel for 3D convolution that checks for 26 neighbors in 3D
     kernel = np.ones((3, 3, 3))
     kernel[1, 1, 1] = 0
-    
-    # Convolve with the segment to find the boundary of ROI
     boundary = convolve(segment > 0, kernel) > 0
-    
-    # Keep only boundary voxels that are non-zero in the original segment
     boundary = boundary & (segment > 0)
-    
     return boundary
 
-#takes boundary (edges), and gets 3d windows around each boundary voxel. These are inputs to the model
-def extract_windows(volume, boundary, window_size=3):
-    padding = window_size // 2
-    padded_volume = np.pad(volume, ((padding, padding), (padding, padding), (padding, padding)), mode='constant')
-    windows = []
-    indices = []
+# Your existing dlAlgorithm function
+def dlAlgorithm(segmentDict):
+    numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()}
+
+    # Debugging Step 1: Verify Data Shape
+    for key, value in numpyImagesDict.items():
+        print(f"Shape of original image array for {key}: {value.shape}")
+
+    normalizedDict = normalizeTF(numpyImagesDict)
+    sampleShape = numpyImagesDict[list(numpyImagesDict.keys())[0]].shape  # Assuming all shapes are the same
     
-    boundary_indices = np.argwhere(boundary)  # Find the indices of boundary voxels
-    
-    for index in boundary_indices:
-        z, y, x = index
-        window = padded_volume[z:z + window_size, y:y + window_size, x:x + window_size]
-        windows.append(window)
-        indices.append((z, y, x))
-    
-    return np.array(windows), np.array(indices)
+    model = unet(input_size=(*sampleShape, 1))
 
-def build_boundary_window_model(window_size=3):
-    model = tf.keras.models.Sequential([
-        tf.keras.layers.Conv3D(16, (3, 3, 3), activation='relu', input_shape=(window_size, window_size, window_size, 1)),
-        tf.keras.layers.MaxPooling3D(),
-        tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(32, activation='relu'),
-        tf.keras.layers.Dense(2, activation='softmax')  # Assuming binary classification (0 or 1)
-    ])
-    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-    return model
+    # Debugging Step 2: Model Architecture
+    model.summary()
 
-# Modified training function
-def train_model(model, windows, labels, success_metric):
-    model.compile(optimizer=tf.keras.optimizers.Adam(lr=1e-4), loss='binary_crossentropy', metrics=['accuracy'])
-    model.fit(windows, labels, epochs=int(success_metric * 10))
+    for key, img_array in normalizedDict.items():
+        boundary_array = find_boundary(img_array)
 
-def classify_voxels(segment_volume, success_metric, window_size=3):
-    boundary = find_boundary(segment_volume)
-    windows, indices = extract_windows(segment_volume, boundary, window_size)
-    windows = windows[..., np.newaxis]  # Adding a channel dimension
+        # Debugging Step 3: Verify shapes before training
+        print(f"Shape of img_array for training {key}: {img_array.shape}")
+        print(f"Shape of boundary_array for training {key}: {boundary_array.shape}")
 
-    # Here, I'm using your U-Net model instead of a newly built one.
-    model = unet(input_size=(window_size, window_size, window_size, 1))
+        img_array = np.expand_dims(np.expand_dims(img_array, axis=0), axis=-1)
+        boundary_array = np.expand_dims(np.expand_dims(boundary_array, axis=0), axis=-1)
 
-    # Dummy labels for demonstration; replace with actual labels if available
-    labels = np.random.randint(0, 2, size=len(windows))
-    
-    # Train the model
-    train_model(model, windows, labels, success_metric)
-    
-    predictions = model.predict(windows)
-    predicted_labels = np.argmax(predictions, axis=1)
-    
-    classified_indices = indices[predicted_labels == 1]
-    return classified_indices.tolist()
+        # Debugging Step 4: Confirm shape compatibility
+        assert img_array.shape == boundary_array.shape, f"Shape mismatch for {key}"
 
+        model.train_on_batch(img_array, boundary_array)
 
-def test_classify_voxels():
-    boundary_volume = np.random.randint(0, 2, (128, 128, 128))  # Replace with your actual boundary volume
-    success_metric = 0.8  # Replace with your actual success metric
-    classified_indices = classify_voxels(boundary_volume, success_metric)
-    print(classified_indices)
+    model.save("unet_model.h5")
 
+# Your existing main code block
+if __name__ == "__main__":
+    sitk_images_dict = {
+        "image1": data.get_3d_image("scan1"),
+        "image2": data.get_3d_image("scan2"),
+    }
+    dlAlgorithm(sitk_images_dict)
