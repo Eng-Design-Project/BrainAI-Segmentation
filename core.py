@@ -4,10 +4,12 @@ from tkinter import ttk
 from tkinter import Canvas, Scrollbar, Frame
 from PIL import Image, ImageTk  # Import PIL for image manipulation
 
-import deep_learning
-import clustering
+#import deep_learning
+#import clustering
 import segmentation
 import data
+import os
+
 
 """class AdvancedSegmentationPage:
     def __init__(self, master, core_instance):
@@ -36,8 +38,6 @@ import data
         for button in [self.image_scoring_button, self.clustering_button, self.deep_learning_button, self.back_button]:
             button.pack(pady=20)"""
 
-#global variable
-segmentation_results= None
 
 class ImageScoringPopup:
     def __init__(self, master,image_paths, callback):
@@ -113,8 +113,11 @@ class ImageScoringPopup:
             score2 = float(self.score_entry2.get())
         
             # Ensure the scores are within the desired range (0-10 or 1-10 or 1-5)
-            min_score = min(score1, score2)
-            max_score = max(score1, score2)
+            #min_score = min(score1, score2)
+            #max_score = max(score1, score2)
+            #min and max are hardcoded, not set by user (or risk divide by zero error)
+            min_score = 1
+            max_score = 10
 
             # Normalize the scores between 0 and 1
             normalized_score1 = (score1 - min_score) / (max_score - min_score)
@@ -163,9 +166,9 @@ class Core:
 
         self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.advanced_segmentation_button, self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button],[self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
 
-        self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button, self.clustering_algorithm_label, self.previous_button,self.next_button, self.clustering_back_button]))
+        self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.results_label, self.clustering_algorithm_combobox, self.execute_clustering_button, self.clustering_algorithm_label, self.image_label, self.previous_button, self.next_button, self.clustering_back_button]))
 
-        self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.deeplearning_back_button]))
+        self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.image_label ,self.previous_button, self.next_button, self.deeplearning_back_button]))
 
         """self.image_file_path = 'mytest.png'
         self.image_button = tk.Button(self.master, text="Display Image", command=self.display_file_png)
@@ -255,7 +258,8 @@ class Core:
         # You can use labels or other widgets to display the clustering results.
 
         # Set image paths and current image index (replace with your own data)
-        self.image_paths = ["scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png", "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png", "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011546_3_S32031_I54071.png"]
+        folder_path = "scan1_pngs"
+        self.image_paths = [os.path.join(folder_path, filename) for filename in os.listdir(folder_path) if filename.endswith(".png")]
         self.current_image_index = 0
 
         # Show or hide "Previous" and "Next" buttons based on whether images are available
@@ -269,8 +273,8 @@ class Core:
 
     def display_clustering_results(self, algorithm, clustering_results):
         # Create a label or canvas to display the clustering results
-        results_label = tk.Label(self.master, text=f"Clustering Results for {algorithm}:")
-        results_label.pack()
+        self.results_label = tk.Label(self.master, text=f"Clustering Results for {algorithm}:")
+        self.results_label.pack()
         # You can use labels or other widgets to display the clustering results here.
 
     def show_current_image(self):
@@ -337,16 +341,29 @@ class Core:
             print("Selected folder:", selected_folder)
             # Logic to select segmentation results from a file and set the variable
             # You can use file dialogs to allow the user to choose a file
-            segmentation_results = {}  # Implement file selection logic here
+            self.segmentation_results = {}  # Implement file selection logic here
         elif selection == "memory":
             data.set_seg_results()
             # Logic to select segmentation results from memory and set the variable
             # You can populate segmentation_results with data from memory
-            segmentation_results = {}  # Implement memory selection logic here
+            self.segmentation_results = {}  # Implement memory selection logic here
 
         # Now you have the segmentation_results variable with the selected data
         # You can use it for deep learning or any other processing
-        print("Selected segmentation results:", segmentation_results)
+        print("Selected segmentation results:", self.segmentation_results)
+
+        folder_path = "scan1_pngs"
+        self.image_paths = [os.path.join(folder_path, filename) for filename in os.listdir(folder_path) if filename.endswith(".png")]
+        self.current_image_index = 0
+
+        # Show or hide "Previous" and "Next" buttons based on whether images are available
+        if self.image_paths:
+            self.show_current_image()
+            self.previous_button.pack(pady=10, anchor="center")
+            self.next_button.pack(pady=10, anchor="center")
+        else:
+            self.previous_button.pack_forget()
+            self.next_button.pack_forget()
         
     def show_main_window(self):
         self.master.deiconify()  # Show the main window
@@ -378,25 +395,24 @@ class Core:
         if(self.selected_folder == ""):
             print("no folder selected") 
             #prompt the user to select a folder
-        else:
-        #use functions in data to read the atlas and 
+            self.select_folder()
+        # use functions in data to read the atlas and 
         #   the image in question into memory here as sitk images
-            image = data.get_3d_image(self.selected_folder)
-            atlas_path = data.get_atlas_path()
-            atlas = data.get_3d_image(atlas_path)
-        #get atlas colors as 3d np array
-            atlas_colors = data.get_3d_png_array("color atlas")
-        #call execute atlas seg, passing image, atlas and atlas colors as args
-            seg_results = segmentation.execute_atlas_seg(atlas, atlas_colors, image)
-        #returns dict of simple itk images
-        #save them as dcms to the nested folder
-            data.store_seg_img_on_file(seg_results, "atl_segmentation_DCMs")
-        #save as pngs in nested folder by region structure
-            data.store_seg_png_on_file(seg_results, "atl_segmentation_PNGs") # outputs black PNGs at the moment
-            #data.save_dcm_dir_to_png_dir("atl_segmentation_DCMs/Region1","atl_segmentation_pngs") # also outputs black pngs at the moment
-        #display pngs in gui
-        # save dict of sitk images to data global seg results 
-        # Implement your atlas segmentation logic here
+        image = data.get_3d_image(self.selected_folder)
+        atlas_path = data.get_atlas_path()
+        atlas = data.get_3d_image(atlas_path)
+        # get atlas colors as 3d np array
+        color_atlas = data.get_2d_png_array_list("color atlas")
+        # call execute atlas seg, passing image, atlas and atlas colors as args
+        seg_results = segmentation.execute_atlas_seg(atlas, color_atlas, image)
+        # returns dict of simple itk images
+        # save them as dcms to the nested folder
+        data.store_seg_img_on_file(seg_results, "atl_segmentation_DCMs")
+        # save as pngs in nested folder by region structure
+        data.store_seg_png_on_file(seg_results, "atl_segmentation_PNGs")
+        # display pngs in gui
+        # save dict of sitk images to data global seg results
+        data.set_seg_results = seg_results 
 
     """def show_advanced_segmentation_buttons(self):
         if self.current_page:

@@ -10,7 +10,7 @@ import sys
 from PIL import Image
 #from pydicom import dcmread
 
-
+#tried to use to load color atlas, to hard to parse coords
 def get_3d_png_array(directory):
     image_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".png")]
     image_array_list = []
@@ -34,7 +34,29 @@ def get_3d_png_array(directory):
     image_3d_array = np.stack(image_array_list, axis=-1)
     return image_3d_array
 
-def display_array_slices(img_3d, num_slices):
+#currently used for loading color atlas
+def get_2d_png_array_list(directory):
+    image_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".png")]
+    image_array_list = []
+
+    for image_file in image_files:
+        # Open the image using Pillow
+        img = Image.open(image_file)
+        # Convert the Pillow image to a numpy array
+        img_arr = np.array(img)
+        # Check if the array is already 128x128x3
+        if img_arr.shape == (128, 128, 3):
+            # If it is, use it as is
+            image_array_list.append(img_arr)
+        else:
+            # If it's not, convert the image to RGB
+            rgb_img = img.convert('RGB')
+            # Convert the RGB image to a numpy array and append to the list
+            image_array_list.append(np.array(rgb_img))
+
+    return image_array_list
+
+def display_3d_array_slices(img_3d, num_slices):
     print(img_3d.shape)
     # Ensure that num_slices does not exceed the number of available slices
     num_slices = min(num_slices, img_3d.shape[2])
@@ -57,6 +79,23 @@ def display_array_slices(img_3d, num_slices):
     plt.tight_layout()
     plt.show()
 
+def save_2d_images_list(image_list, directory):
+    # Ensure the directory exists
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    
+    for i, img_array in enumerate(image_list):
+        # Convert the numpy array to a Pillow Image object
+        img = Image.fromarray(img_array)
+        
+        # Construct a file name for each image
+        file_name = f'image_{i + 1:03d}.png'
+        
+        # Create the full path to the file
+        file_path = os.path.join(directory, file_name)
+        
+        # Save the image
+        img.save(file_path)
 
 def get_3d_image(directory):
     # Get a list of all DICOM files in the directory
@@ -177,7 +216,7 @@ def save_sitk_3d_img_to_dcm(image, new_dir):
 
     print("Saved 3D image to {}".format(new_dir))
 
-
+#note, this function may have issues -Kevin
 def save_sitk_3d_img_to_png(image, new_dir):
     # Check if the directory exists, if not, create it
     if not os.path.exists(new_dir):
@@ -190,7 +229,8 @@ def save_sitk_3d_img_to_png(image, new_dir):
     for z in range(size[2]):
         slice_image = image[:,:,z]
         slice_image_np = sitk.GetArrayFromImage(slice_image)
-        slice_image_np = np.uint8(slice_image_np)  # Convert to 8-bit for PNG
+        slice_image_np = np.interp(slice_image_np, (slice_image_np.min(), slice_image_np.max()), (0, 255))
+        slice_image_np = np.uint8(slice_image_np)
 
         # Create a filename for the slice
         filename = os.path.join(new_dir, "slice_{:03d}.png".format(z))
@@ -292,6 +332,7 @@ def test_store_seg_img_on_file(new_dir):
     dictionary = {"neocortex":image1, "frontal lobe":image2}
     store_seg_img_on_file(dictionary, new_dir)
 
+#note, this function may have issues, I haven't tested it exetensively -Kevin
 def store_seg_png_on_file(dict, new_dir):
     # Check if the directory exists, if not, create it (higher level folder)
     if not os.path.exists(new_dir):
