@@ -3,7 +3,7 @@ import os
 import tensorflow as tf
 import numpy as np
 from scipy.ndimage import convolve
-import data  # Your data module
+import data  
 
 def unet(input_size=(128, 128, 128, 1)):
     inputs = tf.keras.layers.Input(input_size)
@@ -30,16 +30,18 @@ def unet(input_size=(128, 128, 128, 1)):
     drop5 = tf.keras.layers.Dropout(0.5)(conv5)
 
     up6 = tf.keras.layers.UpSampling3D(size=(2, 2, 2))(drop5)
-    crop4 = tf.keras.layers.Cropping3D(cropping=((1, 1), (0, 0), (0, 0)))(drop4)
+    crop4 = tf.keras.layers.Cropping3D(cropping=((0, 1), (0, 0), (0, 0)))(drop4)
     merge6 = tf.keras.layers.concatenate([crop4, up6], axis=-1)
     conv6 = tf.keras.layers.Conv3D(512, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge6)
 
     up7 = tf.keras.layers.UpSampling3D(size=(2, 2, 2))(conv6)
-    merge7 = tf.keras.layers.concatenate([conv3, up7], axis=-1)
+    crop3 = tf.keras.layers.Cropping3D(cropping=((1, 2), (0, 0), (0, 0)))(conv3)
+    merge7 = tf.keras.layers.concatenate([crop3, up7], axis=-1)
     conv7 = tf.keras.layers.Conv3D(256, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge7)
 
     up8 = tf.keras.layers.UpSampling3D(size=(2, 2, 2))(conv7)
-    merge8 = tf.keras.layers.concatenate([conv2, up8], axis=-1)
+    pad8 = tf.keras.layers.ZeroPadding3D(padding=((3, 4), (0, 0), (0, 0)))(up8)
+    merge8 = tf.keras.layers.concatenate([conv2, pad8], axis=-1)
     conv8 = tf.keras.layers.Conv3D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge8)
 
     up9 = tf.keras.layers.UpSampling3D(size=(2, 2, 2))(conv8)
@@ -71,7 +73,7 @@ def find_boundary(segment):
     boundary = boundary & (segment > 0)
     return boundary
 
-# Your existing dlAlgorithm function
+
 def dlAlgorithm(segmentDict):
     numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()}
 
@@ -104,7 +106,7 @@ def dlAlgorithm(segmentDict):
 
     model.save("unet_model.h5")
 
-# Your existing main code block
+
 if __name__ == "__main__":
     sitk_images_dict = {
         "image1": data.get_3d_image("scan1"),
