@@ -71,6 +71,23 @@ def unet(input_size=(5, 128, 128, 1)):
     return model
 
 
+def get_surrounding_slices(original_slice, sub_arrays, slice_index, depth):
+    surrounding_depth = depth // 2
+    surrounding_slices = []
+    for sub_array in sub_arrays:
+        for idx, slice_ in enumerate(sub_array):
+            if np.array_equal(slice_, original_slice):
+                start_idx = max(0, idx - surrounding_depth)
+                end_idx = min(len(sub_array), idx + surrounding_depth + 1)
+                surrounding_slices = sub_array[start_idx:end_idx]
+    if len(surrounding_slices) != depth:
+        # Handle edge cases by padding with zeros
+        padding_slices = depth - len(surrounding_slices)
+        pad_before = padding_slices // 2
+        pad_after = padding_slices - pad_before
+        surrounding_slices = np.pad(surrounding_slices, ((pad_before, pad_after), (0, 0), (0, 0)), 'constant')
+    return surrounding_slices
+
 
 def normalizeTF(volume3dDict):
     normalizedDict = {}
@@ -104,64 +121,78 @@ def show_slices(slices):
 
 
 def dlAlgorithm(segmentDict, depth=5, epochs=3):
-    numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()} # Convert SimpleITK images to NumPy arrays
-    normalizedDict = normalizeTF(numpyImagesDict) # Normalize the images
-    model = unet(input_size=(depth, 128, 128, 1)) # Initialize U-Net model
+    numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()}
+    normalizedDict = normalizeTF(numpyImagesDict)
+    model = unet(input_size=(depth, 128, 128, 1))
     
-    loss_list = [] # Loss list for tracking loss
-    accumulated_slices = [] # List to accumulate slices for batch display
+    loss_list = []
+    accumulated_slices = []
     
-    # Training loop
     for epoch in range(epochs):
         print(f"Epoch: {epoch+1}/{epochs}")
         
-        for img_array in normalizedDict.values():            
-            sub_arrays = split_into_subarrays(img_array, depth)# Split into sub-arrays
+        for img_array in normalizedDict.values():
+            sub_arrays = split_into_subarrays(img_array, depth)
              
-            for sub_img_array in sub_arrays: # Iterate over sub-arrays for training
-                sub_boundary_array = find_boundary(sub_img_array) # Find the boundary segmentation
+            for sub_img_array in sub_arrays:
+                sub_boundary_array = find_boundary(sub_img_array)
                 
-                # Expand dimensions to make it compatible for training
                 sub_img_array_exp = np.expand_dims(np.expand_dims(sub_img_array, axis=0), axis=-1)
                 sub_boundary_array_exp = np.expand_dims(np.expand_dims(sub_boundary_array, axis=0), axis=-1)
                 
-                 # Train the model on the current batch
                 loss = model.train_on_batch(sub_img_array_exp, sub_boundary_array_exp)
                 loss_list.append(loss)
                 
-                # Predict the segmentation
                 prediction = model.predict(sub_img_array_exp)
                 prediction = (prediction[0, :, :, :, 0] > 0.5).astype(np.uint8)
                 
-                slice_index = depth // 2  # Take a middle slice to visualize
+                slice_index = depth // 2
                 
-                # Append as tuple (original_slice, prediction_slice)
                 accumulated_slices.append((sub_img_array[slice_index], prediction[slice_index]))
                 
-                # Check if 3 batches have been accumulated, and if so, show them
-                if len(accumulated_slices) >= 3:
+                if len(accumulated_slices) == 3:
                     show_slices(accumulated_slices)
-                    accumulated_slices = []  # Clear the accumulated_slices for the next set
+                
+                    while True:  # Loop until the user finds the batch acceptable
+                        feedback = input("Is this batch acceptable? (y/n): ")
+                        
+                        if feedback.lower() == 'y':
+                            accumulated_slices = [] # Clear the accumulated slices
+                            break
+                        
+                        elif feedback.lower() == 'n':  
+                            retrained_slices = []  # Create a list to hold the retrained slices
+                            
+                            for original_slice, _ in accumulated_slices:
+                                surrounding_slices = get_surrounding_slices(original_slice, sub_arrays, slice_index, depth)
+                                sub_boundary_array = find_boundary(surrounding_slices)
+                                
+                                surrounding_slices_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
+                                sub_boundary_array_exp = np.expand_dims(np.expand_dims(sub_boundary_array, axis=0), axis=-1)
+                                
+                                model.train_on_batch(surrounding_slices_exp, sub_boundary_array_exp)
+                                
+                                # Repredict the slice and add to retrained_slices
+                                sub_img_array_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
+                                new_prediction = model.predict(sub_img_array_exp)
+                                new_prediction = (new_prediction[0, :, :, :, 0] > 0.5).astype(np.uint8)
+                                new_slice_index = depth // 2
+                                retrained_slices.append((surrounding_slices[new_slice_index], new_prediction[new_slice_index]))
+                            
+                            # Clear the accumulated slices and replace with retrained_slices for re-display
+                            accumulated_slices = retrained_slices
+                            
+                            show_slices(accumulated_slices)  # Re-display the slices
 
-                    # Ask for user feedback
-                    feedback = input("Is this batch acceptable? (y/n): ")
-                    
-                    if feedback.lower() == 'n':  # Retrain on the same batch
-                        for sub_img_array, _ in accumulated_slices:
-                            sub_boundary_array = find_boundary(sub_img_array)
-                            sub_img_array_exp = np.expand_dims(np.expand_dims(sub_img_array, axis=0), axis=-1)
-                            sub_boundary_array_exp = np.expand_dims(np.expand_dims(sub_boundary_array, axis=0), axis=-1)
-                            model.train_on_batch(sub_img_array_exp, sub_boundary_array_exp)
-        # Prompt for continuing to next epoch
+
         proceed = input("Would you like to proceed to the next epoch? (y/n): ")
         if proceed.lower() != 'y':
             break    
-                    
+
     model.save('my_model.keras')
     loaded_model = load_model('my_model.keras')
     loaded_model.summary()
 
-    # Show the loss curve
     plt.plot(loss_list)
     plt.title('Model Loss')
     plt.ylabel('Loss')
@@ -175,8 +206,3 @@ if __name__ == "__main__":
         "image2": data.get_3d_image("scan2"),
     }
     dlAlgorithm(sitk_images_dict)
-
-
-
-
-
