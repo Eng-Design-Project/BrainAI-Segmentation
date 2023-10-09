@@ -131,7 +131,8 @@ def dlAlgorithm(segmentDict, depth=5, epochs=3):
     for epoch in range(epochs):
         print(f"Epoch: {epoch+1}/{epochs}")
         
-        for img_array in normalizedDict.values():
+        for scan_name, img_array in normalizedDict.items():
+            print(f"Processing {scan_name}...")
             sub_arrays = split_into_subarrays(img_array, depth)
              
             for sub_img_array in sub_arrays:
