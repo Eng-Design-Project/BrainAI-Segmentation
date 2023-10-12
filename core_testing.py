@@ -4,11 +4,13 @@ from tkinter import ttk
 from tkinter import Canvas, Scrollbar, Frame
 from PIL import Image, ImageTk  # Import PIL for image manipulation
 
+
 #import deep_learning
 #import clustering
 import segmentation
 import data
 import os
+import deep_learning_copy
 
 
 """class AdvancedSegmentationPage:
@@ -160,7 +162,7 @@ class Core:
 
         self.clustering_button = tk.Button(self.master, text="Clustering", command=lambda:self.change_buttons([self.execute_clustering_button, self.clustering_back_button],[self.advanced_segmentation_button, self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
 
-        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:self.change_buttons([self.execute_deep_learning, self.deeplearning_back_button],[self.deep_learning_button, self.clustering_button, self.execute_clustering_button, self.advanced_back_button]))
+        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:self.change_buttons([self.U_Net_button, self.execute_deep_learning, self.deeplearning_back_button],[self.deep_learning_button, self.clustering_button, self.execute_clustering_button, self.advanced_back_button]))
 
         self.execute_deep_learning = tk.Button(self.master, text="Execute Deep Learning", command=self.execute_deep_learning_click)
 
@@ -168,7 +170,9 @@ class Core:
 
         self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.results_label, self.execute_clustering_button, self.image_label, self.previous_button, self.next_button, self.clustering_back_button]))
 
-        self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.image_label ,self.previous_button, self.next_button, self.deeplearning_back_button]))
+        self.U_Net_button = tk.Button(self.master, text="U-Net", command=self.U_Net)
+
+        self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.image_label ,self.previous_button, self.next_button, self.U_Net_button, self.deeplearning_back_button]))
 
         """self.image_file_path = 'mytest.png'
         self.image_button = tk.Button(self.master, text="Display Image", command=self.display_file_png)
@@ -407,6 +411,16 @@ class Core:
         self.label = tk.Label(self.master, image=self.image1)
         self.label.place(x=20, y=20)
 
+    def U_Net(self):
+            # Define a dictionary of SimpleITK images (adjust as needed)
+        sitk_images_dict = {
+            "image1": data.get_3d_image("scan1"),
+            "image2": data.get_3d_image("scan2"),
+        }
+
+        # Call the dlAlgorithm function from deep_learning_copy module
+        deep_learning_copy.dlAlgorithm(sitk_images_dict)
+
     def atlas_segment(self):
         print("Atlas Segmentation called")
         #gets selected folder global from core class
@@ -433,17 +447,33 @@ class Core:
         # save dict of sitk images to data global seg results
         data.segmentation_results = seg_results
         # Set a flag to indicate that atlas segmentation has been performed
-        
 
-    """def show_advanced_segmentation_buttons(self):
-        if self.current_page:
-            self.current_page.hide_buttons()
+    def perform_segmentation_and_display(self, coords_dict):
+        results = {}
+        for key, coords in coords_dict.items():
+            image = data.load_image_from_coords(coords)
+            segmentation_result = segmentation.perform_segmentation(image)
+            results[key] = segmentation_result
+            # Display segmentation results
+            print(f"Segmentation results for {key}: {segmentation_result}")
+        data.segmentation_results = results
+        # Optionally, update your GUI with the segmentation results
 
-        # Show the buttons of the new page
-        self.advanced_segmentation_page.show_buttons()
+    def convert_and_save_segmentation_results(self, segmentation_results, output_dir):
+        if not segmentation_results:
+            print("Segmentation results are empty. Perform segmentation first.")
+            return
 
-        # Update the current page
-        self.current_page = self.advanced_segmentation_page"""
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        for key, seg_result in segmentation_results.items():
+            dcm_file_path = os.path.join(output_dir, f"{key}.dcm")
+            png_file_path = os.path.join(output_dir, f"{key}.png")
+            data.save_sitk_3d_img_to_dcm(seg_result, dcm_file_path)
+            data.save_sitk_3d_img_to_png(seg_result, png_file_path)
+    
+    
 
     def open_image_scoring_popup(self):
         image_paths = [
