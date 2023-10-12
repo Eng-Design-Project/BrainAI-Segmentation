@@ -18,6 +18,13 @@ def get_3d_image(directory):
     image = sitk.ReadImage(scan_files)
     return image
 
+# folder of DCM images as input
+def get_3d_array_from_file(folder_path):
+    image_files = [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))] # gather files
+    slices = [pydicom.dcmread(os.path.join(folder_path, f)) for f in image_files] # read each file
+    slices.sort(key=lambda x: float(x.ImagePositionPatient[2])) # sorting and maintaining correct order
+    return np.stack([s.pixel_array for s in slices])
+
 def view_sitk_3d_image(image, numSlices, displayText):
     array = sitk.GetArrayFromImage(image)
 
