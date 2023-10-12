@@ -448,7 +448,7 @@ class Core:
         data.segmentation_results = seg_results
         # Set a flag to indicate that atlas segmentation has been performed
 
-    """def perform_segmentation_and_display(self, coords_dict):
+    def perform_segmentation_and_display(self, coords_dict):
         results = {}
 
         for key, coords in coords_dict.items():
@@ -477,7 +477,7 @@ class Core:
             dcm_file_path = os.path.join(output_dir, f"{key}.dcm")
             png_file_path = os.path.join(output_dir, f"{key}.png")
             data.save_sitk_3d_img_to_dcm(seg_result, dcm_file_path)
-            data.save_sitk_3d_img_to_png(seg_result, png_file_path)"""
+            data.save_sitk_3d_img_to_png(seg_result, png_file_path)
     
     
 

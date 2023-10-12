@@ -240,9 +240,9 @@ class Core:
 
         if source == "file":
             # Add code to get the selected file or folder here and store it
-            selected_folder = self.get_selected_folder()
-            data.set_seg_results(selected_folder)
-            print("Selected file or folder:", selected_folder)
+            self.selected_folder = self.get_selected_folder()
+            data.set_seg_results(self.selected_folder)
+            print("Selected file or folder:", self.selected_folder)
 
             # Logic to perform clustering from a file and set the clustering_results variable
             clustering_results = {}  # Implement file-based clustering logic here
@@ -269,6 +269,17 @@ class Core:
         else:
             self.previous_button.pack_forget()
             self.next_button.pack_forget()
+        
+        folder_path = self.selected_folder # get folder
+        volume = clustering.input_dcm_dict(folder_path) # create 3d volume
+
+        # apply dbscan to 3d and get labels, overall coordinates, and binary masks
+        labeled_volume, cluster_coords, brain_mask, skull_mask = clustering.dbscan_3d(volume)
+
+        # find brain and skull coordinates
+        brain_cluster_coordinates, skull_cluster_coordinates = clustering.cluster_coordinates(cluster_coords, brain_mask, skull_mask)
+
+        clustering.display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
 
     def display_clustering_results(self, algorithm, clustering_results):
         # Create a label or canvas to display the clustering results
