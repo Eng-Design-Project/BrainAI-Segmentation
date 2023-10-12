@@ -83,21 +83,27 @@ def test_scipy_register_images(atlas, image):
 
 #expand region of interest
 #this adds an extra layer of pixels to a segmented image from the original image
-#currently takes 2 3d arrays. Unsure if this will take simpleITK images instead
-def expand_roi(original, segment):
+#takes sitk images now
+def expand_roi(original_sitk, segment_sitk):
+    #convert to 3d arrays for convolution
+    original_arr = sitk.GetArrayFromImage(original_sitk)
+    segment_arr = sitk.GetArrayFromImage(segment_sitk)
+
     # Define a kernel for 3D convolution that checks for 26 neighbors in 3D
     kernel = np.ones((3, 3, 3))
     kernel[1, 1, 1] = 0
     
     # Convolve with the segment to find the boundary of ROI
-    boundary = convolve(segment > 0, kernel) > 0
-    boundary[segment > 0] = 0  # Remove areas that are already part of the segment
+    boundary = convolve(segment_arr > 0, kernel) > 0
+    boundary[segment_arr > 0] = 0  # Remove areas that are already part of the segment
     
     # Create a copy of the segment
-    expanded_segment = segment.copy()
+    expanded_segment_arr = segment_arr.copy()
     
     # Copy pixel values from the original image to the boundary in the expanded segment
-    expanded_segment[boundary] = original[boundary]
+    expanded_segment_arr[boundary] = original_arr[boundary]
+
+    expanded_segment = sitk.GetImageFromArray(expanded_segment_arr)
     
     return expanded_segment
 
@@ -363,28 +369,62 @@ def DCMs_to_sitk_img_dict(directory):
 #interpolator
 #sitk.sitkLinear
 
-def encode_atlas_colors(image_3d: np.ndarray) -> dict:
-    #hard coded colors to region
+#takes 3d array, new version takes list of 2d arrays
+# def encode_atlas_colors(image_3d: np.ndarray) -> dict:
+#     #hard coded colors to region
+#     color_to_region_dict = {
+#         (237, 28, 36): 'Skull',   # Redish
+#         (0, 162, 232): 'Brain',   # Blueish
+#         #... add other colors and regions as required
+#     }
+#     # Initialize the output dictionary with region names as keys and empty lists as values
+#     region_coords_dict = {region: [] for region in color_to_region_dict.values()}
+
+#     # Iterate through the 3D array to get the coordinates and pixel values
+#     for x in range(image_3d.shape[0]):
+#         for y in range(image_3d.shape[1]):
+#             for z in range(image_3d.shape[2]):
+#                 #pixel_color = tuple(image_3d[x, y, z])#note, xyz from 3d arrays
+#                 pixel_color = tuple(image_3d[x, y, :, z])
+#                 if pixel_color != (0, 0, 0):
+#                     print(pixel_color)
+#                 # If the pixel color exists in the dictionary, add its coordinate to the respective list
+#                 if pixel_color in color_to_region_dict:
+#                     region = color_to_region_dict[pixel_color]
+#                     region_coords_dict[region].append([z, y, x])#note zyx for comparison to sitk images
+#                     print(region, + ": ", + pixel_color)
+#     return region_coords_dict
+
+def encode_atlas_colors(image_list: list) -> dict:
+    # Hard-coded colors to region
     color_to_region_dict = {
-        (255, 0, 0): 'Region1',   # Red
-        (0, 0, 255): 'Region2',   # Blue
-        (0, 255, 0): 'Region3',   # Green
-        #... add other colors and regions as required
+        (237, 28, 36): 'Skull',   # Redish
+        (0, 162, 232): 'Brain',   # Blueish
+        # ... add other colors and regions as required
     }
     # Initialize the output dictionary with region names as keys and empty lists as values
     region_coords_dict = {region: [] for region in color_to_region_dict.values()}
 
-    # Iterate through the 3D array to get the coordinates and pixel values
-    for x in range(image_3d.shape[0]):
-        for y in range(image_3d.shape[1]):
-            for z in range(image_3d.shape[2]):
-                pixel_color = tuple(image_3d[x, y, z])#note, xyz from 3d arrays
+    # Iterate through the list of 2D arrays to get the coordinates and pixel values
+    for z, image_2d in enumerate(image_list):
+        for y in range(image_2d.shape[0]):
+            for x in range(image_2d.shape[1]):
+                pixel_color = tuple(image_2d[y, x])  # note, yx from 2d arrays
                 # If the pixel color exists in the dictionary, add its coordinate to the respective list
+                # if pixel_color != (0, 0, 0):
+                #     print(pixel_color)
+                max_channel = max(pixel_color)
+                if max_channel > 100:
+                    if pixel_color.index(max_channel) == 0:  # Red channel is largest
+                        pixel_color = (237, 28, 36)
+                    elif pixel_color.index(max_channel) == 2:  # Blue channel is largest
+                        pixel_color = (0, 162, 232)
                 if pixel_color in color_to_region_dict:
                     region = color_to_region_dict[pixel_color]
-                    region_coords_dict[region].append([z, y, x])#note zyx for comparison to sitk images
-
+                    region_coords_dict[region].append([x, y, z])  # note zyx for comparison to sitk images
+    #print(region_coords_dict["Brain"])
     return region_coords_dict
+
 
 def test_encode_atlas_colors():
     # Define image dimensions
@@ -428,6 +468,38 @@ def test_encode_atlas_colors():
 #RuntimeError: filter weights array has incorrect shape.
 #test_encode_atlas_colors()
 
+#atlas and image are both sitk images, atlas colors is a 3d np array
+def execute_atlas_seg(atlas, atlas_colors, image):
+    print("executing atlas seg")
+    # Convert the SimpleITK Images to NumPy arrays
+    moving_image = sitk.GetArrayFromImage(image)
+    target_image = sitk.GetArrayFromImage(atlas)
+    #register the 3d array to atlas 3d array
+    reg_image_array = scipy_register_images(target_image, moving_image)
+    #convert registered array to sitk image
+    reg_image = array_to_image_with_ref(reg_image_array, image)
+    
+    #coordinates of region based on atlas
+    region_to_coord_dict = encode_atlas_colors(atlas_colors)
+
+    #create image dict from coords dict and sitk_image
+    final_dict = create_seg_images(reg_image, region_to_coord_dict)
+
+    #expand roi
+    for region, segment in final_dict.items():
+        final_dict[region] = expand_roi(reg_image, segment)
+
+    return final_dict
+
+if __name__ == "__main__":
+    atlas_path = data.get_atlas_path()
+    atlas = data.get_3d_image(atlas_path)
+    image = data.get_3d_image("scan1")
+    #color_atlas = data.get_3d_png_array("color atlas")
+    color_atlas = data.get_2d_png_array_list("color atlas")
+    #data.display_array_slices(color_atlas, 10)
+    seg_results = execute_atlas_seg(atlas, color_atlas, image)
+    data.store_seg_img_on_file(seg_results, "seg results test")
 
 
 '''

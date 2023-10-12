@@ -13,13 +13,8 @@ from skimage import measure
 from skimage import feature
 from skimage import exposure
 from skimage.filters import threshold_local
+import data
 
-# folder of DCM images as input
-def input_dcm_dict(folder_path):
-    image_files = [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))] # gather files
-    slices = [pydicom.dcmread(os.path.join(folder_path, f)) for f in image_files] # read each file
-    slices.sort(key=lambda x: float(x.ImagePositionPatient[2])) # sorting and maintaining correct order
-    return np.stack([s.pixel_array for s in slices])
 
 # Gaussian filter 
 # uses the gaussian PDF to smooth/ lower contrast in the roi by blurring and reducing noise
@@ -205,12 +200,16 @@ def display_slices(volume, labels, cluster_coords, brain_mask, skull_mask):
         # display full processed image
         display_rgb_image(rgb_img, z)
 
-def execute_db_clustering(sitk_dict):
+def execute_clustering(sitk_dict, algo):
     output_coords = {} # initialize sitk dictionary to store output
+    algos_dict = {
+        'dbscan_3d': dbscan_3d
+    } 
+
     for key in sitk_dict:
 
         # perform dbscan and get labeled volume, coordinates, and binary masks for each slice in the output dictionary
-        labeled_volume, cluster_coords, brain_mask, skull_mask = dbscan_3d(sitk_dict.key)
+        labeled_volume, cluster_coords, brain_mask, skull_mask = algos_dict[algo](sitk_dict.key)
 
         # determine coordinates
         brain_cluster_coordinates, skull_cluster_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
@@ -225,7 +224,7 @@ def execute_db_clustering(sitk_dict):
 #I'm already working on creating function shortcuts and combining factors for easy use as a sub-module instead.
 if __name__ == "__main__":
     folder_path = input("Enter folder path: ") # get folder
-    volume = input_dcm_dict(folder_path) # create 3d volume
+    volume = data.get_3d_array_from_file(folder_path) # create 3d volume
 
     # apply dbscan to 3d and get labels, overall coordinates, and binary masks
     labeled_volume, cluster_coords, brain_mask, skull_mask = dbscan_3d(volume)

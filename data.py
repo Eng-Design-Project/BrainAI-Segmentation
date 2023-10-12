@@ -7,10 +7,95 @@ import pydicom
 from skimage.transform import resize
 import subprocess
 import sys
-import segmentation
+from PIL import Image
 #from pydicom import dcmread
 
+#tried to use to load color atlas, to hard to parse coords
+def get_3d_png_array(directory):
+    image_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".png")]
+    image_array_list = []
 
+    for image_file in image_files:
+        # Open the image using Pillow
+        img = Image.open(image_file)
+        # Convert the Pillow image to a numpy array
+        img_arr = np.array(img)
+        # Check if the array is already 128x128x3
+        if img_arr.shape == (128, 128, 3):
+            # If it is, use it as is
+            image_array_list.append(img_arr)
+        else:
+            # If it's not, convert the image to RGB
+            rgb_img = img.convert('RGB')
+            # Convert the RGB image to a numpy array and append to the list
+            image_array_list.append(np.array(rgb_img))
+
+    # Stack all the 2D arrays into a single 3D array
+    image_3d_array = np.stack(image_array_list, axis=-1)
+    return image_3d_array
+
+#currently used for loading color atlas
+def get_2d_png_array_list(directory):
+    image_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".png")]
+    image_array_list = []
+
+    for image_file in image_files:
+        # Open the image using Pillow
+        img = Image.open(image_file)
+        # Convert the Pillow image to a numpy array
+        img_arr = np.array(img)
+        # Check if the array is already 128x128x3
+        if img_arr.shape == (128, 128, 3):
+            # If it is, use it as is
+            image_array_list.append(img_arr)
+        else:
+            # If it's not, convert the image to RGB
+            rgb_img = img.convert('RGB')
+            # Convert the RGB image to a numpy array and append to the list
+            image_array_list.append(np.array(rgb_img))
+
+    return image_array_list
+
+def display_3d_array_slices(img_3d, num_slices):
+    print(img_3d.shape)
+    # Ensure that num_slices does not exceed the number of available slices
+    num_slices = min(num_slices, img_3d.shape[2])
+
+    # Calculate grid dimensions
+    cols = int(np.ceil(np.sqrt(num_slices)))
+    rows = int(np.ceil(num_slices / cols))
+    
+    fig, axes = plt.subplots(rows, cols, figsize=(15, 15))
+    
+    for i in range(num_slices):
+        ax = axes.flat[i]
+        ax.imshow(img_3d[:, :, :, i])
+        ax.axis('off')  # Hide the axis
+
+    # Hide any remaining empty subplots
+    for i in range(num_slices, rows * cols):
+        axes.flat[i].axis('off')
+    
+    plt.tight_layout()
+    plt.show()
+
+def save_2d_images_list(image_list, directory):
+    # Ensure the directory exists
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    
+    for i, img_array in enumerate(image_list):
+        # Convert the numpy array to a Pillow Image object
+        img = Image.fromarray(img_array)
+        
+        # Construct a file name for each image
+        file_name = f'image_{i + 1:03d}.png'
+        
+        # Create the full path to the file
+        file_path = os.path.join(directory, file_name)
+        
+        # Save the image
+        img.save(file_path)
 
 def get_3d_image(directory):
     # Get a list of all DICOM files in the directory
@@ -18,6 +103,13 @@ def get_3d_image(directory):
     # Read in the image series
     image = sitk.ReadImage(scan_files)
     return image
+
+# folder of DCM images as input
+def get_3d_array_from_file(folder_path):
+    image_files = [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))] # gather files
+    slices = [pydicom.dcmread(os.path.join(folder_path, f)) for f in image_files] # read each file
+    slices.sort(key=lambda x: float(x.ImagePositionPatient[2])) # sorting and maintaining correct order
+    return np.stack([s.pixel_array for s in slices])
 
 def view_sitk_3d_image(image, numSlices, displayText):
     array = sitk.GetArrayFromImage(image)
@@ -131,10 +223,37 @@ def save_sitk_3d_img_to_dcm(image, new_dir):
 
     print("Saved 3D image to {}".format(new_dir))
 
-#temporarily "scan1" until atlas is complete
-#hard coded, we only have 1 atlas
+#note, this function may have issues -Kevin
+def save_sitk_3d_img_to_png(image, new_dir):
+    # Check if the directory exists, if not, create it
+    if not os.path.exists(new_dir):
+        os.makedirs(new_dir)
+
+    # Get the 3D image size to iterate through the slices
+    size = image.GetSize()
+
+    # Iterate through the slices and save each one as PNG
+    for z in range(size[2]):
+        slice_image = image[:,:,z]
+        slice_image_np = sitk.GetArrayFromImage(slice_image)
+        slice_image_np = np.interp(slice_image_np, (slice_image_np.min(), slice_image_np.max()), (0, 255))
+        slice_image_np = np.uint8(slice_image_np)
+
+        # Create a filename for the slice
+        filename = os.path.join(new_dir, "slice_{:03d}.png".format(z))
+
+        # Save the slice as PNG using PIL (Python Imaging Library)
+        slice_png = Image.fromarray(slice_image_np)
+        slice_png.save(filename)
+
+        print("Saved slice {} to {}".format(z, filename))
+
+    print("Saved 3D image slices as PNG in {}".format(new_dir))
+
+
+#just spits out "atlas"
 def get_atlas_path():
-    atlas_dir = "scan1"
+    atlas_dir = "atlas"
     return atlas_dir
 
 def get_file_path():
@@ -220,6 +339,19 @@ def test_store_seg_img_on_file(new_dir):
     dictionary = {"neocortex":image1, "frontal lobe":image2}
     store_seg_img_on_file(dictionary, new_dir)
 
+#note, this function may have issues, I haven't tested it exetensively -Kevin
+def store_seg_png_on_file(dict, new_dir):
+    # Check if the directory exists, if not, create it (higher level folder)
+    if not os.path.exists(new_dir):
+        os.makedirs(new_dir)
+    
+    for key in dict:
+        # making a sub folder based on the brain region name
+        sub_dir = os.path.join(new_dir, key)
+        os.makedirs(sub_dir)
+
+        save_sitk_3d_img_to_png(dict[key], sub_dir)
+        #print("key:", key)
 
 # first argument should be a higher level folder with brain region subfolders containing DCM files.
 # the output is a dictionary with brain region names as keys and sitk images as values
