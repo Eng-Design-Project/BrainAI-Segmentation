@@ -247,6 +247,48 @@ class Core:
             # Create a button to confirm the selection and execute clustering
             confirm_button = tk.Button(popup_window, text="Execute Clustering", command=lambda: self.handle_clustering_selection(popup_window, algorithm_var.get(), source_var.get()))
             confirm_button.pack(pady=20)
+            """
+            if((self.clustering_algorithm_combobox.get()!="") and (self.selected_folder!="")):
+            data.set_seg_results(self.selected_folder) # this function sets data.segmentation_results
+            self.segmentation_results = data.segmentation_results
+            print("Selected file or folder:", self.selected_folder)
+            # Logic to perform clustering from a file and set the clustering_results variable
+            clustering_results = {}  # Implement file-based clustering logic here
+            algorithm = self.clustering_algorithm_combobox.get()
+            self.display_clustering_results(algorithm, clustering_results)
+            self.results_label = tk.Label(self.master, text=f"Clustering Results for {algorithm}:")
+            #self.results_label.pack()
+            # Set image paths and current image index (replace with your own data)
+            folder_path = "scan1_pngs"
+            self.image_paths = [os.path.join(folder_path, filename) for filename in os.listdir(folder_path) if filename.endswith(".png")]
+            self.current_image_index = 0
+            if self.image_paths:
+                self.show_current_image()
+                self.previous_button.pack(pady=10, anchor="center")
+                self.next_button.pack(pady=10, anchor="center")
+            else:
+                self.previous_button.pack_forget()
+                self.next_button.pack_forget()
+
+        else:
+            # Create a popup window for selecting clustering parameters
+            popup_window = tk.Toplevel(self.master)
+            popup_window.title("Select Clustering Parameters")
+
+            # Create a label to instruct the user
+            label = tk.Label(popup_window, text="Select clustering parameters:")
+            label.pack(pady=10)
+
+            # Create radio buttons for clustering algorithm options
+            algorithm_var = tk.StringVar()
+            algorithm_var.set(None)
+            kmeans_option = tk.Radiobutton(popup_window, text="K-Means", variable=algorithm_var, value="K-Means")
+            kmeans_option.pack()
+            dbscan_option = tk.Radiobutton(popup_window, text="DBSCAN", variable=algorithm_var, value="DBSCAN")
+            dbscan_option.pack()
+            hierarchical_option = tk.Radiobutton(popup_window, text="Hierarchical", variable=algorithm_var, value="Hierarchical")
+            hierarchical_option.pack()
+            """
 
     def handle_clustering_selection(self, popup_window, algorithm, source):
         # Close the popup window
@@ -256,6 +298,7 @@ class Core:
             # Add code to get the selected file or folder here and store it
             selected_folder = self.get_selected_folder()
             data.set_seg_results(selected_folder)
+            self.segmentation_results = data.segmentation_results
             print("Selected file or folder:", selected_folder)
 
             # Logic to perform clustering from a file and set the clustering_results variable
@@ -263,6 +306,7 @@ class Core:
         elif source == "memory":
             # Logic to perform clustering from memory and set the clustering_results variable
             data.set_seg_results()
+            self.segmentation_results = data.segmentation_results
             clustering_results = {}  # Implement memory-based clustering logic here
 
         # Display clustering results within the GUI

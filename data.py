@@ -431,8 +431,7 @@ def set_seg_results(directory = "scan1"):
     print("segmentation results: ",segmentation_results.keys())
 
 # set_seg_results()
-
-   
+  
 # Path to the directory that contains the DICOM files
 #directory1 = "scan1"
 #directory2 = "scan2"
