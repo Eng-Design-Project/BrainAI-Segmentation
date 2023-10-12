@@ -205,12 +205,16 @@ def display_slices(volume, labels, cluster_coords, brain_mask, skull_mask):
         # display full processed image
         display_rgb_image(rgb_img, z)
 
-def execute_db_clustering(sitk_dict):
+def execute_clustering(sitk_dict, algo):
     output_coords = {} # initialize sitk dictionary to store output
+    algos_dict = {
+        'dbscan_3d': dbscan_3d
+    } 
+
     for key in sitk_dict:
 
         # perform dbscan and get labeled volume, coordinates, and binary masks for each slice in the output dictionary
-        labeled_volume, cluster_coords, brain_mask, skull_mask = dbscan_3d(sitk_dict.key)
+        labeled_volume, cluster_coords, brain_mask, skull_mask = algos_dict[algo](sitk_dict.key)
 
         # determine coordinates
         brain_cluster_coordinates, skull_cluster_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)

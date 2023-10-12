@@ -17,7 +17,7 @@ sitk_images_dict = {
     # Add other images...
 }
 
-#normalizes pixel value of 3d array
+#normalizes pixel value of 3d array dict
 def normalizeTF(volume3dDict):
     normalizedDict = {}
     for key, value in volume3dDict.items():
@@ -28,6 +28,9 @@ def normalizeTF(volume3dDict):
         
         # Convert back to numpy and store it in the dictionary
         normalizedDict[key] = normalizedTensor.numpy()
+
+        #note: it would be more optimized to normalize each input window rather than 
+        # normalizing the entire image. Prob doesn't matter
     return normalizedDict
 
 
@@ -48,28 +51,28 @@ def buildModel(inputShape):
     return model
 
 #pix by pix classifier, not built with user score in mind
-def buildPixelModel(input_shape, window_size=3):
-    # Assumes input is a 3D patch of size [window_size, window_size, depth]
+def buildPixelModel(window_size=3):
+    # Assumes input is a 3D patch of size [window_size, window_size, window_size]
     model = tf.keras.Sequential([
-        tf.keras.layers.InputLayer(input_shape=input_shape),
-        tf.keras.layers.Conv2D(32, (window_size, window_size), activation='relu', padding='valid'),
+        tf.keras.layers.InputLayer(input_shape=(window_size, window_size, window_size)),
+        tf.keras.layers.Conv3D(32, (window_size, window_size, window_size), activation='relu', padding='valid'),
         tf.keras.layers.Flatten(),
         tf.keras.layers.Dense(128, activation='relu'),
         tf.keras.layers.Dense(2, activation='softmax')  # Assumes binary classification
     ])
 
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-    return model        
+    return model          
 
-#wrapper for getting the np arrays from sitkimages, normalizing, getting shape,
-# and plugging shape into basic classifier
+#wrapper for getting the np arrays from sitkimages, normalizing, 
+# outputting normalized dict and pixelclassifier model
 def dlAlgorithm(segmentDict):
     numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()}
     normalizedDict = normalizeTF(numpyImagesDict)
 
     """Currently using 3D arrays, might switch to tensors. In such case, the shape might change."""
-    sampleShape = numpyImagesDict[list(numpyImagesDict.keys())[0]].shape
-    model = buildModel((sampleShape[1], sampleShape[2], sampleShape[0]))  # (height, width, channels)
+    model = buildPixelModel()
+    return normalizedDict, model
 
 #finds edges of the image, only need to classify edges, not the entire thing
 def find_boundary(segment):
@@ -79,9 +82,6 @@ def find_boundary(segment):
     
     # Convolve with the segment to find the boundary of ROI
     boundary = convolve(segment > 0, kernel) > 0
-    
-    # Keep only boundary voxels that are non-zero in the original segment
-    boundary = boundary & (segment > 0)
     
     return boundary
 
@@ -100,6 +100,7 @@ def extract_windows(volume, boundary, window_size=3):
         windows.append(window)
         indices.append((z, y, x))
     
+    #does it make sense to convert to arrays?
     return np.array(windows), np.array(indices)
 
 def build_boundary_window_model(window_size=3):
