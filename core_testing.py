@@ -450,14 +450,20 @@ class Core:
 
     def perform_segmentation_and_display(self, coords_dict):
         results = {}
+
         for key, coords in coords_dict.items():
+            # Load the image from coordinates using data.py functions
             image = data.load_image_from_coords(coords)
+
+            # Perform segmentation using your segmentation.py functions
             segmentation_result = segmentation.perform_segmentation(image)
+
+            # Display the segmentation results (you can customize this part)
+            self.display_segmentation_result(segmentation_result, key)
+
             results[key] = segmentation_result
-            # Display segmentation results
-            print(f"Segmentation results for {key}: {segmentation_result}")
+
         data.segmentation_results = results
-        # Optionally, update your GUI with the segmentation results
 
     def convert_and_save_segmentation_results(self, segmentation_results, output_dir):
         if not segmentation_results:
