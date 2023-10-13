@@ -448,38 +448,37 @@ class Core:
         data.segmentation_results = seg_results
         # Set a flag to indicate that atlas segmentation has been performed
 
-    def perform_segmentation_and_display(self, coords_dict):
-        results = {}
-
-        for key, coords in coords_dict.items():
-            # Load the image from coordinates using data.py functions
-            image = data.load_image_from_coords(coords)
-
-            # Perform segmentation using your segmentation.py functions
-            segmentation_result = segmentation.perform_segmentation(image)
-
+    #def perform_segmentation_and_display(self, coords_dict):
+     #   results = {}
+#
+ #       for key, coords in coords_dict.items():
+  #          # Load the image from coordinates using data.py functions
+   #         image = data.load_image_from_coords(coords)
+#
+    #        # Perform segmentation using your segmentation.py functions
+ #           segmentation_result = segmentation.perform_segmentation(image)
+#
             # Display the segmentation results (you can customize this part)
-            self.display_segmentation_result(segmentation_result, key)
+ #           self.display_segmentation_result(segmentation_result, key)
+#
+ #           results[key] = segmentation_result
+#
+ #       data.segmentation_results = results
 
-            results[key] = segmentation_result
-
-        data.segmentation_results = results
-
-    def convert_and_save_segmentation_results(self, segmentation_results, output_dir):
-        if not segmentation_results:
-            print("Segmentation results are empty. Perform segmentation first.")
-            return
-
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-
-        for key, seg_result in segmentation_results.items():
-            dcm_file_path = os.path.join(output_dir, f"{key}.dcm")
-            png_file_path = os.path.join(output_dir, f"{key}.png")
-            data.save_sitk_3d_img_to_dcm(seg_result, dcm_file_path)
-            data.save_sitk_3d_img_to_png(seg_result, png_file_path)
-    
-    
+    #def convert_and_save_segmentation_results(self, segmentation_results, output_dir):
+     #   if not segmentation_results:
+      #      print("Segmentation results are empty. Perform segmentation first.")
+       #     return
+#
+ #       if not os.path.exists(output_dir):
+  #          os.makedirs(output_dir)
+#
+ #       for key, seg_result in segmentation_results.items():
+  #          dcm_file_path = os.path.join(output_dir, f"{key}.dcm")
+   #         png_file_path = os.path.join(output_dir, f"{key}.png")
+    #        data.save_sitk_3d_img_to_dcm(seg_result, dcm_file_path)
+     #       data.save_sitk_3d_img_to_png(seg_result, png_file_path)
+        
 
     def open_image_scoring_popup(self):
         image_paths = [

@@ -3,6 +3,8 @@ from tkinter import filedialog
 from tkinter import ttk
 from tkinter import Canvas, Scrollbar, Frame
 from PIL import Image, ImageTk  # Import PIL for image manipulation
+from tkinter import Toplevel, Radiobutton, Button, StringVar
+
 
 
 #import deep_learning
@@ -138,6 +140,8 @@ class Core:
         self.master = master
         self.current_page = None  # Track the current page being displayed
         self.segmentation_results = {}  # Initialize the segmentation_results variable as an empty dictionary
+        self.popup_window = None  # Add this line to define popup_window
+
 
 
         self.master.title("Image Analysis Tool")
@@ -173,6 +177,9 @@ class Core:
         self.U_Net_button = tk.Button(self.master, text="U-Net", command=self.U_Net)
 
         self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.image_label ,self.previous_button, self.next_button, self.U_Net_button, self.deeplearning_back_button]))
+
+        self.submit_brain_skull_button = tk.Button(self.popup_window, text="Submit", command=self.submit_segmentation_type)
+        
 
         """self.image_file_path = 'mytest.png'
         self.image_button = tk.Button(self.master, text="Display Image", command=self.display_file_png)
@@ -247,6 +254,48 @@ class Core:
             # Create a button to confirm the selection and execute clustering
             confirm_button = tk.Button(popup_window, text="Execute Clustering", command=lambda: self.handle_clustering_selection(popup_window, algorithm_var.get(), source_var.get()))
             confirm_button.pack(pady=20)
+            """
+            if((self.clustering_algorithm_combobox.get()!="") and (self.selected_folder!="")):
+            data.set_seg_results(self.selected_folder) # this function sets data.segmentation_results
+            self.segmentation_results = data.segmentation_results
+            print("Selected file or folder:", self.selected_folder)
+            # Logic to perform clustering from a file and set the clustering_results variable
+            clustering_results = {}  # Implement file-based clustering logic here
+            algorithm = self.clustering_algorithm_combobox.get()
+            self.display_clustering_results(algorithm, clustering_results)
+            self.results_label = tk.Label(self.master, text=f"Clustering Results for {algorithm}:")
+            #self.results_label.pack()
+            # Set image paths and current image index (replace with your own data)
+            folder_path = "scan1_pngs"
+            self.image_paths = [os.path.join(folder_path, filename) for filename in os.listdir(folder_path) if filename.endswith(".png")]
+            self.current_image_index = 0
+            if self.image_paths:
+                self.show_current_image()
+                self.previous_button.pack(pady=10, anchor="center")
+                self.next_button.pack(pady=10, anchor="center")
+            else:
+                self.previous_button.pack_forget()
+                self.next_button.pack_forget()
+
+        else:
+            # Create a popup window for selecting clustering parameters
+            popup_window = tk.Toplevel(self.master)
+            popup_window.title("Select Clustering Parameters")
+
+            # Create a label to instruct the user
+            label = tk.Label(popup_window, text="Select clustering parameters:")
+            label.pack(pady=10)
+
+            # Create radio buttons for clustering algorithm options
+            algorithm_var = tk.StringVar()
+            algorithm_var.set(None)
+            kmeans_option = tk.Radiobutton(popup_window, text="K-Means", variable=algorithm_var, value="K-Means")
+            kmeans_option.pack()
+            dbscan_option = tk.Radiobutton(popup_window, text="DBSCAN", variable=algorithm_var, value="DBSCAN")
+            dbscan_option.pack()
+            hierarchical_option = tk.Radiobutton(popup_window, text="Hierarchical", variable=algorithm_var, value="Hierarchical")
+            hierarchical_option.pack()
+            """
 
     def handle_clustering_selection(self, popup_window, algorithm, source):
         # Close the popup window
@@ -256,6 +305,7 @@ class Core:
             # Add code to get the selected file or folder here and store it
             selected_folder = self.get_selected_folder()
             data.set_seg_results(selected_folder)
+            self.segmentation_results = data.segmentation_results
             print("Selected file or folder:", selected_folder)
 
             # Logic to perform clustering from a file and set the clustering_results variable
@@ -263,6 +313,7 @@ class Core:
         elif source == "memory":
             # Logic to perform clustering from memory and set the clustering_results variable
             data.set_seg_results()
+            self.segmentation_results = data.segmentation_results
             clustering_results = {}  # Implement memory-based clustering logic here
 
         # Display clustering results within the GUI
@@ -447,6 +498,51 @@ class Core:
         # save dict of sitk images to data global seg results
         data.segmentation_results = seg_results
         # Set a flag to indicate that atlas segmentation has been performed
+        # Create a popup window for segmentation type selection
+        popup_window = tk.Toplevel(self.master)
+        popup_window.title("Select Segmentation Type")
+
+        # Create a label to instruct the user
+        label = tk.Label(popup_window, text="Select segmentation type:")
+        label.pack(pady=10)
+
+        # Create a variable to store the selected segmentation type
+        segmentation_type_var = tk.StringVar()
+        segmentation_type_var.set("Brain")  # Default selection
+
+        # Create radio buttons for "Brain" and "Skull" options
+        brain_option = tk.Radiobutton(popup_window, text="Brain", variable=segmentation_type_var, value="Brain")
+        brain_option.pack()
+        skull_option = tk.Radiobutton(popup_window, text="Skull", variable=segmentation_type_var, value="Skull")
+        skull_option.pack()
+
+    # Create the "Submit" button in the popup window
+        submit_brain_skull_button = tk.Button(popup_window, text="Submit", command=self.submit_segmentation_type)
+        submit_brain_skull_button.pack(pady=10)
+
+        self.popup_window = popup_window  # Store the popup window as an instance variable
+    # Create a callback function for the submit button
+    def submit_segmentation_type(self):
+        selected_segmentation_type = self.segmentation_type_var.get()
+        print("Selected Segmentation Type:", selected_segmentation_type)
+
+        # Based on the selected type, display either brain or skull images
+        if selected_segmentation_type == "Brain":
+            # Display brain images
+            self.display_segmentation_results("Brain")
+        elif selected_segmentation_type == "Skull":
+            # Display skull images
+            self.display_segmentation_results("Skull")
+
+        self.popup_window.destroy()
+
+    def display_segmentation_results(self, segmentation_type):
+        # This function will display segmentation results based on the selected type
+        # You can implement your image display logic here
+        print(f"Displaying {segmentation_type} images")
+        # Add code to display the relevant images based on segmentation_type
+        
+
 
     """def perform_segmentation_and_display(self, coords_dict):
         results = {}
