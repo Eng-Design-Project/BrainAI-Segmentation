@@ -507,13 +507,13 @@ class Core:
         label.pack(pady=10)
 
         # Create a variable to store the selected segmentation type
-        segmentation_type_var = tk.StringVar()
-        segmentation_type_var.set("Brain")  # Default selection
+        self.segmentation_type_var = tk.StringVar()
+        self.segmentation_type_var.set("Brain")  # Default selection
 
         # Create radio buttons for "Brain" and "Skull" options
-        brain_option = tk.Radiobutton(popup_window, text="Brain", variable=segmentation_type_var, value="Brain")
+        brain_option = tk.Radiobutton(popup_window, text="Brain", variable=self.segmentation_type_var, value="Brain")
         brain_option.pack()
-        skull_option = tk.Radiobutton(popup_window, text="Skull", variable=segmentation_type_var, value="Skull")
+        skull_option = tk.Radiobutton(popup_window, text="Skull", variable=self.segmentation_type_var, value="Skull")
         skull_option.pack()
 
     # Create the "Submit" button in the popup window
