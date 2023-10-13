@@ -510,29 +510,49 @@ class Core:
         # Initialize variables to keep track of the current index for "Brain" and "Skull"
         brain_index = 0
         skull_index = 0
+        current_segmentation = "Brain"  # Initialize with "Brain" as the default
 
         def update_image():
-            nonlocal brain_index, skull_index
+            nonlocal brain_index, skull_index, current_segmentation
             if current_segmentation == "Brain":
-                image = png_dict['Brain'][brain_index]
+                image_list = png_dict['Brain']
+                index = brain_index
             else:
-                image = png_dict['Skull'][skull_index]
+                image_list = png_dict['Skull']
+                index = skull_index
 
+            image = image_list[index]
             photo = ImageTk.PhotoImage(image)
             image_label.configure(image=photo)
             image_label.image = photo
 
         def handle_brain_skull_selection(segmentation_type):
-            nonlocal brain_index, skull_index
+            nonlocal current_segmentation
             if segmentation_type == "Brain":
-                brain_index += 1
-                if brain_index >= len(png_dict['Brain']):
-                    brain_index = 0
+                if current_segmentation == "Brain":
+                    return  # If already on "Brain," do nothing
+                current_segmentation = "Brain"
+                update_image()
             else:
-                skull_index += 1
-                if skull_index >= len(png_dict['Skull']):
-                    skull_index = 0
+                if current_segmentation == "Skull":
+                    return  # If already on "Skull," do nothing
+                current_segmentation = "Skull"
+                update_image()
 
+        def handle_previous():
+            nonlocal brain_index, skull_index
+            if current_segmentation == "Brain":
+                brain_index = (brain_index - 1) % len(png_dict['Brain'])
+            else:
+                skull_index = (skull_index - 1) % len(png_dict['Skull'])
+            update_image()
+
+        def handle_next():
+            nonlocal brain_index, skull_index
+            if current_segmentation == "Brain":
+                brain_index = (brain_index + 1) % len(png_dict['Brain'])
+            else:
+                skull_index = (skull_index + 1) % len(png_dict['Skull'])
             update_image()
 
         # Create a label to display the image
@@ -540,13 +560,12 @@ class Core:
         image_label.pack()
 
         # Create buttons for "Previous" and "Next" in the popup window
-        previous_button = tk.Button(popup_window, text="Previous", command=lambda: handle_brain_skull_selection(current_segmentation))
+        previous_button = tk.Button(popup_window, text="Previous", command=handle_previous)
         previous_button.pack(pady=10)
-        next_button = tk.Button(popup_window, text="Next", command=lambda: handle_brain_skull_selection(current_segmentation))
+        next_button = tk.Button(popup_window, text="Next", command=handle_next)
         next_button.pack(pady=10)
 
         # Initialize the initial segmentation type to "Brain"
-        current_segmentation = "Brain"
         update_image()
 
         # Create buttons for "Brain" and "Skull" in the popup window
@@ -554,7 +573,7 @@ class Core:
         brain_button.pack(pady=10)
         skull_button = tk.Button(popup_window, text="Skull", command=lambda: handle_brain_skull_selection("Skull"))
         skull_button.pack(pady=10)
-        
+            
 
 
         
