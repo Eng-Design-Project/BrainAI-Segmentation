@@ -177,8 +177,6 @@ class Core:
         self.U_Net_button = tk.Button(self.master, text="U-Net", command=self.U_Net)
 
         self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.image_label ,self.previous_button, self.next_button, self.U_Net_button, self.deeplearning_back_button]))
-
-        self.submit_brain_skull_button = tk.Button(self.popup_window, text="Submit", command=self.submit_segmentation_type)
         
 
         """self.image_file_path = 'mytest.png'
@@ -498,49 +496,55 @@ class Core:
         # save dict of sitk images to data global seg results
         data.segmentation_results = seg_results
         # Set a flag to indicate that atlas segmentation has been performed
-        # Create a popup window for segmentation type selection
+        
+        # Create a popup window for selecting segmentation type
         popup_window = tk.Toplevel(self.master)
         popup_window.title("Select Segmentation Type")
 
-        # Create a label to instruct the user
         label = tk.Label(popup_window, text="Select segmentation type:")
         label.pack(pady=10)
 
-        # Create a variable to store the selected segmentation type
-        segmentation_type_var = tk.StringVar()
-        segmentation_type_var.set("Brain")  # Default selection
+            # Load your image
+        image_path = "scan1_pngs\ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011828_6_S32031_I54071.png"
+        img = tk.PhotoImage(file=image_path)
 
-        # Create radio buttons for "Brain" and "Skull" options
-        brain_option = tk.Radiobutton(popup_window, text="Brain", variable=segmentation_type_var, value="Brain")
-        brain_option.pack()
-        skull_option = tk.Radiobutton(popup_window, text="Skull", variable=segmentation_type_var, value="Skull")
-        skull_option.pack()
+        # Create a label to display the image
+        image_label = tk.Label(popup_window, image=img)
+        image_label.image = img  # Keep a reference to the image to avoid garbage collection
+        image_label.pack()  # You can use pack or grid to position the image label as desired
 
-    # Create the "Submit" button in the popup window
-        submit_brain_skull_button = tk.Button(popup_window, text="Submit", command=self.submit_segmentation_type)
-        submit_brain_skull_button.pack(pady=10)
+        # Create buttons for "Brain" and "Skull" in the popup window
+        brain_button = tk.Button(popup_window, text="Brain", command=lambda: self.handle_brain_skull_selection(popup_window, "Brain"))
+        brain_button.pack(pady=10)
+        skull_button = tk.Button(popup_window, text="Skull", command=lambda: self.handle_brain_skull_selection(popup_window, "Skull"))
+        skull_button.pack(pady=10)
+        
 
-        self.popup_window = popup_window  # Store the popup window as an instance variable
-    # Create a callback function for the submit button
-    def submit_segmentation_type(self):
-        selected_segmentation_type = self.segmentation_type_var.get()
-        print("Selected Segmentation Type:", selected_segmentation_type)
+    # Modify handle_brain_skull_selection method
+    def handle_brain_skull_selection(self, popup_window, selection):
+        
+        # Display sample PNGs based on the segmentation type
+        popup_window.display_sample_pngs(selection)
 
-        # Based on the selected type, display either brain or skull images
-        if selected_segmentation_type == "Brain":
-            # Display brain images
-            self.display_segmentation_results("Brain")
-        elif selected_segmentation_type == "Skull":
-            # Display skull images
-            self.display_segmentation_results("Skull")
+    # Modify display_sample_pngs method to display folders of "Brain" and "Skull" PNGs
+    def display_sample_pngs(self, segmentation_type):
+        # Create a folder path based on the selected type
+        if segmentation_type == "Brain":
+            folder_path = "atl_segmentation_PNGs/Brain"  # Replace with the actual folder path for brain PNGs
+        elif segmentation_type == "":
+            folder_path = "atl_segmentation_PNGs/Skull"  # Replace with the actual folder path for skull PNGs
 
-        self.popup_window.destroy()
+        self.image_paths = [os.path.join(folder_path, filename) for filename in os.listdir(folder_path) if filename.endswith(".png")]
+        self.current_image_index = 0
 
-    def display_segmentation_results(self, segmentation_type):
-        # This function will display segmentation results based on the selected type
-        # You can implement your image display logic here
-        print(f"Displaying {segmentation_type} images")
-        # Add code to display the relevant images based on segmentation_type
+        if self.image_paths:
+            self.show_current_image()
+            self.previous_button.pack(pady=10, anchor="center")
+            self.next_button.pack(pady=10, anchor="center")
+        else:
+            self.previous_button.pack_forget()
+            self.next_button.pack_forget()
+
         
 
 
