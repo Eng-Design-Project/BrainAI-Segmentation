@@ -12,7 +12,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 # Function to split 3D images into smaller sub-arrays
 def split_into_subarrays(img_array, depth=5):
 
-#Splits a 3D image into sub-arrays of given depth.
+    #Splits a 3D image into sub-arrays of given depth.
     total_slices = img_array.shape[0]
     # Create list of sub-arrays
     sub_arrays = [img_array[i:i+depth, :, :] for i in range(0, total_slices, depth) if i+depth <= total_slices]
@@ -23,7 +23,7 @@ def unet(input_size=(5, 128, 128, 1)):
     
     inputs = tf.keras.layers.Input(input_size)# Define input layer
     
-# Encoder layers (convolutions and pooling)
+    # Encoder layers (convolutions and pooling)
     conv1 = tf.keras.layers.Conv3D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(inputs)
     conv1 = tf.keras.layers.Conv3D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv1)
     pool1 = tf.keras.layers.MaxPooling3D(pool_size=(1, 2, 2))(conv1)
