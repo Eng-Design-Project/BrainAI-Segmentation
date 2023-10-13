@@ -3,6 +3,8 @@ from tkinter import filedialog
 from tkinter import ttk
 from tkinter import Canvas, Scrollbar, Frame
 from PIL import Image, ImageTk  # Import PIL for image manipulation
+from tkinter import Toplevel, Radiobutton, Button, StringVar
+
 
 
 #import deep_learning
@@ -138,6 +140,8 @@ class Core:
         self.master = master
         self.current_page = None  # Track the current page being displayed
         self.segmentation_results = {}  # Initialize the segmentation_results variable as an empty dictionary
+        self.popup_window = None  # Add this line to define popup_window
+
 
 
         self.master.title("Image Analysis Tool")
@@ -173,6 +177,9 @@ class Core:
         self.U_Net_button = tk.Button(self.master, text="U-Net", command=self.U_Net)
 
         self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.image_label ,self.previous_button, self.next_button, self.U_Net_button, self.deeplearning_back_button]))
+
+        self.submit_brain_skull_button = tk.Button(self.popup_window, text="Submit", command=self.submit_segmentation_type)
+        
 
         """self.image_file_path = 'mytest.png'
         self.image_button = tk.Button(self.master, text="Display Image", command=self.display_file_png)
@@ -482,26 +489,6 @@ class Core:
         color_atlas = data.get_2d_png_array_list("color atlas")
         # call execute atlas seg, passing image, atlas and atlas colors as args
         seg_results = segmentation.execute_atlas_seg(atlas, color_atlas, image)
-        #I want a function that converts the sitk image dicts to dicts with pngs
-        png_dict = data.sitk_dict_to_png_dict(seg_results)
-
-        # Choose a key and z value to display (you can modify these values)
-        display_key = 'Brain'
-        display_z = 5 # valid from 0 to 45
-
-        # Check if the chosen key and z value exist in the png_dict
-        if display_key in png_dict and display_z in png_dict[display_key]:
-            photo = ImageTk.PhotoImage(png_dict[display_key][display_z])
-            self.image_label.config(image=photo)
-            self.image_label.photo = photo
-            self.image_label.pack()
-
-        else:
-            label = tk.Label(root, text="Image not found")
-            label.pack()
-        print(png_dict)
-
-
         # returns dict of simple itk images
         # save them as dcms to the nested folder
         data.store_seg_img_on_file(seg_results, "atl_segmentation_DCMs")
@@ -511,6 +498,51 @@ class Core:
         # save dict of sitk images to data global seg results
         data.segmentation_results = seg_results
         # Set a flag to indicate that atlas segmentation has been performed
+        # Create a popup window for segmentation type selection
+        popup_window = tk.Toplevel(self.master)
+        popup_window.title("Select Segmentation Type")
+
+        # Create a label to instruct the user
+        label = tk.Label(popup_window, text="Select segmentation type:")
+        label.pack(pady=10)
+
+        # Create a variable to store the selected segmentation type
+        segmentation_type_var = tk.StringVar()
+        segmentation_type_var.set("Brain")  # Default selection
+
+        # Create radio buttons for "Brain" and "Skull" options
+        brain_option = tk.Radiobutton(popup_window, text="Brain", variable=segmentation_type_var, value="Brain")
+        brain_option.pack()
+        skull_option = tk.Radiobutton(popup_window, text="Skull", variable=segmentation_type_var, value="Skull")
+        skull_option.pack()
+
+    # Create the "Submit" button in the popup window
+        submit_brain_skull_button = tk.Button(popup_window, text="Submit", command=self.submit_segmentation_type)
+        submit_brain_skull_button.pack(pady=10)
+
+        self.popup_window = popup_window  # Store the popup window as an instance variable
+    # Create a callback function for the submit button
+    def submit_segmentation_type(self):
+        selected_segmentation_type = self.segmentation_type_var.get()
+        print("Selected Segmentation Type:", selected_segmentation_type)
+
+        # Based on the selected type, display either brain or skull images
+        if selected_segmentation_type == "Brain":
+            # Display brain images
+            self.display_segmentation_results("Brain")
+        elif selected_segmentation_type == "Skull":
+            # Display skull images
+            self.display_segmentation_results("Skull")
+
+        self.popup_window.destroy()
+
+    def display_segmentation_results(self, segmentation_type):
+        # This function will display segmentation results based on the selected type
+        # You can implement your image display logic here
+        print(f"Displaying {segmentation_type} images")
+        # Add code to display the relevant images based on segmentation_type
+        
+
 
     """def perform_segmentation_and_display(self, coords_dict):
         results = {}
