@@ -353,6 +353,26 @@ def store_seg_png_on_file(dict, new_dir):
         save_sitk_3d_img_to_png(dict[key], sub_dir)
         #print("key:", key)
 
+# img_dict is a dictionary whose keys are string, and values are sITK 3d images
+def sitk_dict_to_png_dict(img_dict):
+    png_dict = {} # this will be the dict of PNGs
+    for key in img_dict:
+        # Create a new nested dictionary for the key
+        png_dict[key] = {}
+        # Get the 3D image size to iterate through the slices
+        size = img_dict[key].GetSize()
+            # Iterate through the slices and save each one as PNG
+        for z in range(size[2]):
+            slice_image = img_dict[key][:,:,z]
+            slice_image_np = sitk.GetArrayFromImage(slice_image)
+            slice_image_np = np.interp(slice_image_np, (slice_image_np.min(), slice_image_np.max()), (0, 255))
+            slice_image_np = np.uint8(slice_image_np)
+
+            slice_png = Image.fromarray(slice_image_np)
+            png_dict[key][z] = slice_png
+    print("PNG DICTIONARY HAS BEEN GENERATED")       
+    return png_dict
+
 # first argument should be a higher level folder with brain region subfolders containing DCM files.
 # the output is a dictionary with brain region names as keys and sitk images as values
 def subfolders_to_dictionary(directory):

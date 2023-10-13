@@ -482,6 +482,26 @@ class Core:
         color_atlas = data.get_2d_png_array_list("color atlas")
         # call execute atlas seg, passing image, atlas and atlas colors as args
         seg_results = segmentation.execute_atlas_seg(atlas, color_atlas, image)
+        #I want a function that converts the sitk image dicts to dicts with pngs
+        png_dict = data.sitk_dict_to_png_dict(seg_results)
+
+        # Choose a key and z value to display (you can modify these values)
+        display_key = 'Brain'
+        display_z = 5 # valid from 0 to 45
+
+        # Check if the chosen key and z value exist in the png_dict
+        if display_key in png_dict and display_z in png_dict[display_key]:
+            photo = ImageTk.PhotoImage(png_dict[display_key][display_z])
+            self.image_label.config(image=photo)
+            self.image_label.photo = photo
+            self.image_label.pack()
+
+        else:
+            label = tk.Label(root, text="Image not found")
+            label.pack()
+        print(png_dict)
+
+
         # returns dict of simple itk images
         # save them as dcms to the nested folder
         data.store_seg_img_on_file(seg_results, "atl_segmentation_DCMs")
