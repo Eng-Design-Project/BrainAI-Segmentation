@@ -489,6 +489,12 @@ class Core:
         seg_results = segmentation.execute_atlas_seg(atlas, color_atlas, image)
         # returns dict of simple itk images
         # save them as dcms to the nested folder
+
+        #I want a function that converts the sitk image dicts to dicts with pngs
+        png_dict = data.sitk_dict_to_png_dict(seg_results)
+
+
+
         data.store_seg_img_on_file(seg_results, "atl_segmentation_DCMs")
         # save as pngs in nested folder by region structure
         data.store_seg_png_on_file(seg_results, "atl_segmentation_PNGs")
@@ -501,40 +507,55 @@ class Core:
         popup_window = tk.Toplevel(self.master)
         popup_window.title("Select Segmentation Type")
 
-        label = tk.Label(popup_window, text="Select segmentation type:")
-        label.pack(pady=10)
+        # Initialize variables to keep track of the current index for "Brain" and "Skull"
+        brain_index = 0
+        skull_index = 0
+
+        def update_image():
+            nonlocal brain_index, skull_index
+            if current_segmentation == "Brain":
+                image = png_dict['Brain'][brain_index]
+            else:
+                image = png_dict['Skull'][skull_index]
+
+            photo = ImageTk.PhotoImage(image)
+            image_label.configure(image=photo)
+            image_label.image = photo
+
+        def handle_brain_skull_selection(segmentation_type):
+            nonlocal brain_index, skull_index
+            if segmentation_type == "Brain":
+                brain_index += 1
+                if brain_index >= len(png_dict['Brain']):
+                    brain_index = 0
+            else:
+                skull_index += 1
+                if skull_index >= len(png_dict['Skull']):
+                    skull_index = 0
+
+            update_image()
+
+        # Create a label to display the image
+        image_label = tk.Label(popup_window)
+        image_label.pack()
+
+        # Create buttons for "Previous" and "Next" in the popup window
+        previous_button = tk.Button(popup_window, text="Previous", command=lambda: handle_brain_skull_selection(current_segmentation))
+        previous_button.pack(pady=10)
+        next_button = tk.Button(popup_window, text="Next", command=lambda: handle_brain_skull_selection(current_segmentation))
+        next_button.pack(pady=10)
+
+        # Initialize the initial segmentation type to "Brain"
+        current_segmentation = "Brain"
+        update_image()
 
         # Create buttons for "Brain" and "Skull" in the popup window
-        brain_button = tk.Button(popup_window, text="Brain", command=lambda: self.handle_brain_skull_selection(popup_window, "Brain"))
+        brain_button = tk.Button(popup_window, text="Brain", command=lambda: handle_brain_skull_selection("Brain"))
         brain_button.pack(pady=10)
-        skull_button = tk.Button(popup_window, text="Skull", command=lambda: self.handle_brain_skull_selection(popup_window, "Skull"))
+        skull_button = tk.Button(popup_window, text="Skull", command=lambda: handle_brain_skull_selection("Skull"))
         skull_button.pack(pady=10)
         
 
-    # Modify handle_brain_skull_selection method
-    def handle_brain_skull_selection(self, popup_window, selection):
-        
-        # Display sample PNGs based on the segmentation type
-        self.display_sample_pngs(selection)
-
-    # Modify display_sample_pngs method to display folders of "Brain" and "Skull" PNGs
-    def display_sample_pngs(self, segmentation_type):
-        # Create a folder path based on the selected type
-        if segmentation_type == "Brain":
-            folder_path = "atl_segmentation_PNGs/Brain"  # Replace with the actual folder path for brain PNGs
-        elif segmentation_type == "":
-            folder_path = "atl_segmentation_PNGs/Skull"  # Replace with the actual folder path for skull PNGs
-
-        self.image_paths = [os.path.join(folder_path, filename) for filename in os.listdir(folder_path) if filename.endswith(".png")]
-        self.current_image_index = 0
-
-        if self.image_paths:
-            self.show_current_image()
-            self.previous_button.pack(pady=10, anchor="center")
-            self.next_button.pack(pady=10, anchor="center")
-        else:
-            self.previous_button.pack_forget()
-            self.next_button.pack_forget()
 
         
 
