@@ -429,6 +429,9 @@ def set_seg_results(directory = "scan1"):
     global segmentation_results
     segmentation_results = DCMs_to_sitk_img_dict(directory)
     print("segmentation results: ",segmentation_results.keys())
+    #note: the function DCMs_to_etc, is a dummy function that grabs a single scan from memory and then 
+    # splits it into a dict. We don't need this at all. We should assume this function is 
+    # passed the segment results dict, and then it removes the skull with del seg_results["Skull"]
 
 # set_seg_results()
 
