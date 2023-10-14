@@ -223,7 +223,6 @@ def save_sitk_3d_img_to_dcm(image, new_dir):
 
     print("Saved 3D image to {}".format(new_dir))
 
-#note, this function may have issues -Kevin
 def save_sitk_3d_img_to_png(image, new_dir):
     # Check if the directory exists, if not, create it
     if not os.path.exists(new_dir):
