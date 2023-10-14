@@ -12,9 +12,19 @@ def print_hello():
 
 #dummy input data
 sitk_images_dict = {
-    "image1": data.get_3d_image("scan1"),
+    "image1": data.get_3d_image("scan1"), # gets 3d sitk image from a folder of DCM images
     "image2": data.get_3d_image("scan2"),   
     # Add other images...
+}
+
+#for the dummyDL functiom
+numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in sitk_images_dict.items()}
+
+#for the dummyDL function
+dummyLabels = {
+    "image1": 1,
+    "image2": 2
+    # Add more labels...
 }
 
 #normalizes pixel value of 3d array dict
@@ -64,15 +74,7 @@ def buildPixelModel(window_size=3):
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     return model          
 
-#wrapper for getting the np arrays from sitkimages, normalizing, 
-# outputting normalized dict and pixelclassifier model
-def dlAlgorithm(segmentDict):
-    numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()}
-    normalizedDict = normalizeTF(numpyImagesDict)
 
-    """Currently using 3D arrays, might switch to tensors. In such case, the shape might change."""
-    model = buildPixelModel()
-    return normalizedDict, model
 
 #finds edges of the image, only need to classify edges, not the entire thing
 def find_boundary(segment):
@@ -103,6 +105,7 @@ def extract_windows(volume, boundary, window_size=3):
     #does it make sense to convert to arrays?
     return np.array(windows), np.array(indices)
 
+
 def build_boundary_window_model(window_size=3):
     model = tf.keras.models.Sequential([
         tf.keras.layers.Conv3D(16, (3, 3, 3), activation='relu', input_shape=(window_size, window_size, window_size, 1)),
@@ -117,6 +120,17 @@ def build_boundary_window_model(window_size=3):
 def train_model(model, windows, labels, success_metric):
     # Simple example, you might want to adjust training based on the success metric
     model.fit(windows, labels, epochs=int(success_metric * 10))  # Hypothetical usage of success_metric
+
+
+#wrapper for getting the np arrays from sitkimages, normalizing, 
+# outputting normalized dict and pixelclassifier model
+def dlAlgorithm(segmentDict):
+    numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()}
+    normalizedDict = normalizeTF(numpyImagesDict)
+
+    """Currently using 3D arrays, might switch to tensors. In such case, the shape might change."""
+    model = buildPixelModel()
+    return normalizedDict, model
 
 def classify_voxels(segment_volume, success_metric, window_size=3):
     boundary = find_boundary(segment_volume)
@@ -134,6 +148,23 @@ def classify_voxels(segment_volume, success_metric, window_size=3):
     
     classified_indices = indices[predicted_labels == 1]
     return classified_indices.tolist()
+
+# not tested yet -Kevin
+def dummyDL(dict_of_np_arrays, user_score=0, model=build_boundary_window_model()):
+    normalized_data = normalizeTF(dict_of_np_arrays)
+    model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics = ["accuracy"])
+    #train model on on dict of np arrays,
+        # Dummy labels for demonstration; replace with actual labels if available
+    success_metric = 0.8
+    train_model(model, normalized_data, dummyLabels, success_metric)
+    #return segmentation attempts (dictionary of coordinates)
+    #return model
+    return dict_of_np_arrays, model
+
+    #segmentation attemps displayed by core, user score collected
+    #this function called again, passing the model back, and passing in user score
+    #dummyDL is run on a loop, probably in core?
+
 def test_classify_voxels():
     boundary_volume = np.random.randint(0, 2, (128, 128, 128))  # Replace with your actual boundary volume
     success_metric = 0.8  # Replace with your actual success metric
@@ -141,8 +172,8 @@ def test_classify_voxels():
     print(classified_indices)
 
     
-#if __name__ == '__main__':
- #   test_classify_voxels()
+# if __name__ == '__main__':
+#    test_classify_voxels()
 
 
 '''

@@ -3,12 +3,16 @@ from tkinter import filedialog
 from tkinter import ttk
 from tkinter import Canvas, Scrollbar, Frame
 from PIL import Image, ImageTk  # Import PIL for image manipulation
+from tkinter import Toplevel, Radiobutton, Button, StringVar
+
+
 
 #import deep_learning
 #import clustering
 import segmentation
 import data
 import os
+import deep_learning_copy
 
 
 """class AdvancedSegmentationPage:
@@ -136,6 +140,8 @@ class Core:
         self.master = master
         self.current_page = None  # Track the current page being displayed
         self.segmentation_results = {}  # Initialize the segmentation_results variable as an empty dictionary
+        self.popup_window = None  # Add this line to define popup_window
+
 
 
         self.master.title("Image Analysis Tool")
@@ -155,20 +161,23 @@ class Core:
         self.image_scoring_button = tk.Button(self.master, text="Score Images", command=self.open_image_scoring_popup)
         self.image_scoring_button.pack(pady=20)
 
-        self.advanced_segmentation_button = tk.Button(self.master, text="Advanced Segmentation", command=lambda: self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button], [self.advanced_segmentation_button, self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button,self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button]))
+        self.advanced_segmentation_button = tk.Button(self.master, text="Advanced Segmentation", command=lambda: self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button], [self.advanced_segmentation_button, self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button, self.execute_clustering_button]))
         self.advanced_segmentation_button.pack(pady=20)
 
-        self.clustering_button = tk.Button(self.master, text="Clustering", command=lambda:self.change_buttons([self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button, self.clustering_back_button],[self.advanced_segmentation_button, self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
+        self.clustering_button = tk.Button(self.master, text="Clustering", command=lambda:self.change_buttons([self.execute_clustering_button, self.clustering_back_button],[self.advanced_segmentation_button, self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
 
-        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:self.change_buttons([self.execute_deep_learning, self.deeplearning_back_button],[self.deep_learning_button, self.clustering_button,self.clustering_algorithm_label, self.clustering_algorithm_combobox, self.execute_clustering_button, self.advanced_back_button]))
+        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:self.change_buttons([self.U_Net_button, self.execute_deep_learning, self.deeplearning_back_button],[self.deep_learning_button, self.clustering_button, self.execute_clustering_button, self.advanced_back_button]))
 
         self.execute_deep_learning = tk.Button(self.master, text="Execute Deep Learning", command=self.execute_deep_learning_click)
 
         self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.advanced_segmentation_button, self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button],[self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
 
-        self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.results_label, self.clustering_algorithm_combobox, self.execute_clustering_button, self.clustering_algorithm_label, self.image_label, self.previous_button, self.next_button, self.clustering_back_button]))
+        self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.results_label, self.execute_clustering_button, self.image_label, self.previous_button, self.next_button, self.clustering_back_button]))
 
-        self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.image_label ,self.previous_button, self.next_button, self.deeplearning_back_button]))
+        self.U_Net_button = tk.Button(self.master, text="U-Net", command=self.U_Net)
+
+        self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.image_label ,self.previous_button, self.next_button, self.U_Net_button, self.deeplearning_back_button]))
+        
 
         """self.image_file_path = 'mytest.png'
         self.image_button = tk.Button(self.master, text="Display Image", command=self.display_file_png)
@@ -185,10 +194,7 @@ class Core:
         #self.advanced_segmentation_button = tk.Button(self.master, text="Advanced Segmentation", command=lambda: self.change_buttons([], [self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button]))
         #self.advanced_segmentation_button.pack(pady=20)
 
-        self.clustering_algorithm_label = tk.Label(self.master, text="Select Clustering Algorithm:")
-        #self.clustering_algorithm_label.pack(pady=10)
-        self.clustering_algorithm_combobox = ttk.Combobox(self.master, values=["K-Means", "DBSCAN", "Hierarchical", "Other"])
-        #self.clustering_algorithm_combobox.pack()
+        
 
         # Add a button to execute clustering
         self.execute_clustering_button = tk.Button(self.master, text="Execute Clustering", command=self.execute_clustering)
@@ -202,38 +208,92 @@ class Core:
         self.next_button = tk.Button(self.master, text="Next", command=self.show_next_image)
 
         self.image_label = tk.Label(self.master)
-
-        
+    
     def execute_clustering(self):
-        # Create a popup window for selecting clustering parameters
-        popup_window = tk.Toplevel(self.master)
-        popup_window.title("Select Clustering Parameters")
+        selected_segmentation_method = self.get_selected_segmentation_method()
 
-        # Create a label to instruct the user
-        label = tk.Label(popup_window, text="Select clustering parameters:")
-        label.pack(pady=10)
+        if selected_segmentation_method == "atlas_segmentation":
+            self.atlas_segment()
+        else:
+            if not data.segmentation_results:
+                self.atlas_segment()
+            self.open_clustering_options_popup()
 
-        # Create radio buttons for clustering algorithm options
-        algorithm_var = tk.StringVar()
-        algorithm_var.set(None)
-        kmeans_option = tk.Radiobutton(popup_window, text="K-Means", variable=algorithm_var, value="K-Means")
-        kmeans_option.pack()
-        dbscan_option = tk.Radiobutton(popup_window, text="DBSCAN", variable=algorithm_var, value="DBSCAN")
-        dbscan_option.pack()
-        hierarchical_option = tk.Radiobutton(popup_window, text="Hierarchical", variable=algorithm_var, value="Hierarchical")
-        hierarchical_option.pack()
+    def open_clustering_options_popup(self):
+        if self.get_selected_segmentation_method() == "atlas_segmentation" and not data.segmentation_results:
+            self.select_folder()
+        else:
+            # Create a popup window for clustering options
+            popup_window = tk.Toplevel(self.master)
+            popup_window.title("Select Clustering Parameters")
 
-        # Create radio buttons for data source options
-        source_var = tk.StringVar()
-        source_var.set(None)  # Set an initial value that does not correspond to any option
-        file_option = tk.Radiobutton(popup_window, text="From File", variable=source_var, value="file")
-        file_option.pack()
-        memory_option = tk.Radiobutton(popup_window, text="From Memory", variable=source_var, value="memory")
-        memory_option.pack()
+            # Create a label to instruct the user
+            label = tk.Label(popup_window, text="Select clustering parameters:")
+            label.pack(pady=10)
 
-        # Create a button to confirm the selection and execute clustering
-        confirm_button = tk.Button(popup_window, text="Execute Clustering", command=lambda: self.handle_clustering_selection(popup_window, algorithm_var.get(), source_var.get()))
-        confirm_button.pack(pady=20)
+            # Create radio buttons for clustering algorithm options
+            algorithm_var = tk.StringVar()
+            algorithm_var.set(None)
+            kmeans_option = tk.Radiobutton(popup_window, text="K-Means", variable=algorithm_var, value="K-Means")
+            kmeans_option.pack()
+            dbscan_option = tk.Radiobutton(popup_window, text="DBSCAN", variable=algorithm_var, value="DBSCAN")
+            dbscan_option.pack()
+            hierarchical_option = tk.Radiobutton(popup_window, text="Hierarchical", variable=algorithm_var, value="Hierarchical")
+            hierarchical_option.pack()
+
+            # Create radio buttons for data source options
+            source_var = tk.StringVar()
+            source_var.set(None)  # Set an initial value that does not correspond to any option
+            file_option = tk.Radiobutton(popup_window, text="From File", variable=source_var, value="file")
+            file_option.pack()
+            memory_option = tk.Radiobutton(popup_window, text="From Memory", variable=source_var, value="memory")
+            memory_option.pack()
+
+            # Create a button to confirm the selection and execute clustering
+            confirm_button = tk.Button(popup_window, text="Execute Clustering", command=lambda: self.handle_clustering_selection(popup_window, algorithm_var.get(), source_var.get()))
+            confirm_button.pack(pady=20)
+            """
+            if((self.clustering_algorithm_combobox.get()!="") and (self.selected_folder!="")):
+            data.set_seg_results(self.selected_folder) # this function sets data.segmentation_results
+            self.segmentation_results = data.segmentation_results
+            print("Selected file or folder:", self.selected_folder)
+            # Logic to perform clustering from a file and set the clustering_results variable
+            clustering_results = {}  # Implement file-based clustering logic here
+            algorithm = self.clustering_algorithm_combobox.get()
+            self.display_clustering_results(algorithm, clustering_results)
+            self.results_label = tk.Label(self.master, text=f"Clustering Results for {algorithm}:")
+            #self.results_label.pack()
+            # Set image paths and current image index (replace with your own data)
+            folder_path = "scan1_pngs"
+            self.image_paths = [os.path.join(folder_path, filename) for filename in os.listdir(folder_path) if filename.endswith(".png")]
+            self.current_image_index = 0
+            if self.image_paths:
+                self.show_current_image()
+                self.previous_button.pack(pady=10, anchor="center")
+                self.next_button.pack(pady=10, anchor="center")
+            else:
+                self.previous_button.pack_forget()
+                self.next_button.pack_forget()
+
+        else:
+            # Create a popup window for selecting clustering parameters
+            popup_window = tk.Toplevel(self.master)
+            popup_window.title("Select Clustering Parameters")
+
+            # Create a label to instruct the user
+            label = tk.Label(popup_window, text="Select clustering parameters:")
+            label.pack(pady=10)
+
+            # Create radio buttons for clustering algorithm options
+            algorithm_var = tk.StringVar()
+            algorithm_var.set(None)
+            kmeans_option = tk.Radiobutton(popup_window, text="K-Means", variable=algorithm_var, value="K-Means")
+            kmeans_option.pack()
+            dbscan_option = tk.Radiobutton(popup_window, text="DBSCAN", variable=algorithm_var, value="DBSCAN")
+            dbscan_option.pack()
+            hierarchical_option = tk.Radiobutton(popup_window, text="Hierarchical", variable=algorithm_var, value="Hierarchical")
+            hierarchical_option.pack()
+            """
 
     def handle_clustering_selection(self, popup_window, algorithm, source):
         # Close the popup window
@@ -243,6 +303,7 @@ class Core:
             # Add code to get the selected file or folder here and store it
             selected_folder = self.get_selected_folder()
             data.set_seg_results(selected_folder)
+            self.segmentation_results = data.segmentation_results
             print("Selected file or folder:", selected_folder)
 
             # Logic to perform clustering from a file and set the clustering_results variable
@@ -250,6 +311,7 @@ class Core:
         elif source == "memory":
             # Logic to perform clustering from memory and set the clustering_results variable
             data.set_seg_results()
+            self.segmentation_results = data.segmentation_results
             clustering_results = {}  # Implement memory-based clustering logic here
 
         # Display clustering results within the GUI
@@ -299,28 +361,39 @@ class Core:
             self.show_current_image()
 
     def execute_deep_learning_click(self):
+        selected_segmentation_method = self.get_selected_segmentation_method()
+
+        if selected_segmentation_method == "atlas_segmentation":
+            self.atlas_segment()
+        else:
+            if not data.segmentation_results:
+                self.atlas_segment()
+            self.open_segmentation_selection_popup()
+
+
+    def open_segmentation_selection_popup(self):
         #wrap all of this in an if statement that checks if data.segmentation results is empty ( and run the logic)
         #then we call the deep learning function with the segmentation results passed as a parameter
     #if (data.segmentation_results=={}):
         # Create a popup window for selecting segmentation results
-        popup_window = tk.Toplevel(self.master)
-        popup_window.title("Select Segmentation Results")
+        if self.get_selected_segmentation_method() == "atlas_segmentation" and not data.segmentation_results:
+            self.select_folder()
+        else:
+            popup_window = tk.Toplevel(self.master)
+            popup_window.title("Select Segmentation Results")
 
-        # Create a label to instruct the user
-        label = tk.Label(popup_window, text="Select segmentation results source:")
-        label.pack(pady=10)
+            label = tk.Label(popup_window, text="Select segmentation results source:")
+            label.pack(pady=10)
 
-        # Create radio buttons for file and memory options
-        selection_var = tk.StringVar()
-        selection_var.set(None)  # Set an initial value that does not correspond to any option
-        file_option = tk.Radiobutton(popup_window, text="From File", variable=selection_var, value="file")
-        file_option.pack()
-        memory_option = tk.Radiobutton(popup_window, text="From Memory", variable=selection_var, value="memory")
-        memory_option.pack()
+            selection_var = tk.StringVar()
+            selection_var.set(None)
+            file_option = tk.Radiobutton(popup_window, text="From File", variable=selection_var, value="file")
+            file_option.pack()
+            memory_option = tk.Radiobutton(popup_window, text="From Memory", variable=selection_var, value="memory")
+            memory_option.pack()
 
-        # Create a button to confirm the selection
-        confirm_button = tk.Button(popup_window, text="Confirm", command=lambda: self.handle_segmentation_selection(popup_window, selection_var.get()))
-        confirm_button.pack(pady=20)
+            confirm_button = tk.Button(popup_window, text="Confirm", command=lambda: self.handle_segmentation_selection(popup_window, selection_var.get()))
+            confirm_button.pack(pady=20)
 
         #if seg results loaded from file, have to convert nested folder directory to dict of sitk images
         #alternative is running atlas seg
@@ -335,28 +408,17 @@ class Core:
         popup_window.destroy()
 
         if selection == "file":
-            # Add code to get the selected folder here and store it
             selected_folder = self.get_selected_folder()
             data.set_seg_results(selected_folder)
             print("Selected folder:", selected_folder)
-            # Logic to select segmentation results from a file and set the variable
-            # You can use file dialogs to allow the user to choose a file
-            self.segmentation_results = {}  # Implement file selection logic here
         elif selection == "memory":
             data.set_seg_results()
-            # Logic to select segmentation results from memory and set the variable
-            # You can populate segmentation_results with data from memory
-            self.segmentation_results = {}  # Implement memory selection logic here
-
-        # Now you have the segmentation_results variable with the selected data
-        # You can use it for deep learning or any other processing
-        print("Selected segmentation results:", self.segmentation_results)
+            self.segmentation_results = {}
 
         folder_path = "scan1_pngs"
         self.image_paths = [os.path.join(folder_path, filename) for filename in os.listdir(folder_path) if filename.endswith(".png")]
         self.current_image_index = 0
 
-        # Show or hide "Previous" and "Next" buttons based on whether images are available
         if self.image_paths:
             self.show_current_image()
             self.previous_button.pack(pady=10, anchor="center")
@@ -364,6 +426,16 @@ class Core:
         else:
             self.previous_button.pack_forget()
             self.next_button.pack_forget()
+
+    def get_selected_segmentation_method(self):
+        if self.atlas_segment_button.cget('state') == 'active':
+            return "atlas_segmentation"
+        elif self.clustering_button.cget('state') == 'active':
+            return "clustering"
+        elif self.deep_learning_button.cget('state') == 'active':
+            return "deep_learning"
+        else:
+            return "default_method"        
         
     def show_main_window(self):
         self.master.deiconify()  # Show the main window
@@ -388,6 +460,16 @@ class Core:
         self.label = tk.Label(self.master, image=self.image1)
         self.label.place(x=20, y=20)
 
+    def U_Net(self):
+            # Define a dictionary of SimpleITK images (adjust as needed)
+        sitk_images_dict = {
+            "image1": data.get_3d_image("scan1"),
+            "image2": data.get_3d_image("scan2"),
+        }
+
+        # Call the dlAlgorithm function from deep_learning_copy module
+        deep_learning_copy.dlAlgorithm(sitk_images_dict)
+
     def atlas_segment(self):
         print("Atlas Segmentation called")
         #gets selected folder global from core class
@@ -407,22 +489,128 @@ class Core:
         seg_results = segmentation.execute_atlas_seg(atlas, color_atlas, image)
         # returns dict of simple itk images
         # save them as dcms to the nested folder
+
+        #I want a function that converts the sitk image dicts to dicts with pngs
+        png_dict = data.sitk_dict_to_png_dict(seg_results)
+
+
+
         data.store_seg_img_on_file(seg_results, "atl_segmentation_DCMs")
         # save as pngs in nested folder by region structure
         data.store_seg_png_on_file(seg_results, "atl_segmentation_PNGs")
         # display pngs in gui
         # save dict of sitk images to data global seg results
-        data.set_seg_results = seg_results 
+        data.segmentation_results = seg_results
+        # Set a flag to indicate that atlas segmentation has been performed
+        
+        # Create a popup window for selecting segmentation type
+        popup_window = tk.Toplevel(self.master)
+        popup_window.title("Select Segmentation Type")
 
-    """def show_advanced_segmentation_buttons(self):
-        if self.current_page:
-            self.current_page.hide_buttons()
+        # Initialize variables to keep track of the current index for "Brain" and "Skull"
+        brain_index = 0
+        skull_index = 0
+        current_segmentation = "Brain"  # Initialize with "Brain" as the default
 
-        # Show the buttons of the new page
-        self.advanced_segmentation_page.show_buttons()
+        def update_image():
+            nonlocal brain_index, skull_index, current_segmentation
+            if current_segmentation == "Brain":
+                image_list = png_dict['Brain']
+                index = brain_index
+            else:
+                image_list = png_dict['Skull']
+                index = skull_index
 
-        # Update the current page
-        self.current_page = self.advanced_segmentation_page"""
+            image = image_list[index]
+            photo = ImageTk.PhotoImage(image)
+            image_label.configure(image=photo)
+            image_label.image = photo
+
+        def handle_brain_skull_selection(segmentation_type):
+            nonlocal current_segmentation
+            if segmentation_type == "Brain":
+                if current_segmentation == "Brain":
+                    return  # If already on "Brain," do nothing
+                current_segmentation = "Brain"
+                update_image()
+            else:
+                if current_segmentation == "Skull":
+                    return  # If already on "Skull," do nothing
+                current_segmentation = "Skull"
+                update_image()
+
+        def handle_previous():
+            nonlocal brain_index, skull_index
+            if current_segmentation == "Brain":
+                brain_index = (brain_index - 1) % len(png_dict['Brain'])
+            else:
+                skull_index = (skull_index - 1) % len(png_dict['Skull'])
+            update_image()
+
+        def handle_next():
+            nonlocal brain_index, skull_index
+            if current_segmentation == "Brain":
+                brain_index = (brain_index + 1) % len(png_dict['Brain'])
+            else:
+                skull_index = (skull_index + 1) % len(png_dict['Skull'])
+            update_image()
+
+        # Create a label to display the image
+        image_label = tk.Label(popup_window)
+        image_label.pack()
+
+        # Create buttons for "Previous" and "Next" in the popup window
+        previous_button = tk.Button(popup_window, text="Previous", command=handle_previous)
+        previous_button.pack(pady=10)
+        next_button = tk.Button(popup_window, text="Next", command=handle_next)
+        next_button.pack(pady=10)
+
+        # Initialize the initial segmentation type to "Brain"
+        update_image()
+
+        # Create buttons for "Brain" and "Skull" in the popup window
+        brain_button = tk.Button(popup_window, text="Brain", command=lambda: handle_brain_skull_selection("Brain"))
+        brain_button.pack(pady=10)
+        skull_button = tk.Button(popup_window, text="Skull", command=lambda: handle_brain_skull_selection("Skull"))
+        skull_button.pack(pady=10)
+            
+
+
+        
+
+
+    """def perform_segmentation_and_display(self, coords_dict):
+        results = {}
+
+        for key, coords in coords_dict.items():
+            # Load the image from coordinates using data.py functions
+            image = data.load_image_from_coords(coords)
+
+            # Perform segmentation using your segmentation.py functions
+            segmentation_result = segmentation.perform_segmentation(image)
+
+            # Display the segmentation results (you can customize this part)
+            self.display_segmentation_result(segmentation_result, key)
+
+            results[key] = segmentation_result
+
+        data.segmentation_results = results
+
+    def convert_and_save_segmentation_results(self, segmentation_results, output_dir):
+        if not segmentation_results:
+            print("Segmentation results are empty. Perform segmentation first.")
+            return
+
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        for key, seg_result in segmentation_results.items():
+            dcm_file_path = os.path.join(output_dir, f"{key}.dcm")
+            png_file_path = os.path.join(output_dir, f"{key}.png")
+            data.save_sitk_3d_img_to_dcm(seg_result, dcm_file_path)
+            data.save_sitk_3d_img_to_png(seg_result, png_file_path)"""
+    
+    
 
     def open_image_scoring_popup(self):
         image_paths = [

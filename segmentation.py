@@ -408,7 +408,7 @@ def DCMs_to_sitk_img_dict(directory):
 #         #... add other colors and regions as required
 #     }
 #     # Initialize the output dictionary with region names as keys and empty lists as values
-#     region_coords_dict = {region: [] for region in color_to_region_dict.values()}
+"""#     region_coords_dict = {region: [] for region in color_to_region_dict.values()}
 
 #     # Iterate through the 3D array to get the coordinates and pixel values
 #     for x in range(image_3d.shape[0]):
@@ -423,7 +423,7 @@ def DCMs_to_sitk_img_dict(directory):
 #                     region = color_to_region_dict[pixel_color]
 #                     region_coords_dict[region].append([z, y, x])#note zyx for comparison to sitk images
 #                     print(region, + ": ", + pixel_color)
-#     return region_coords_dict
+#     return region_coords_dict"""
 
 def encode_atlas_colors(image_list: list) -> dict:
     # Hard-coded colors to region
