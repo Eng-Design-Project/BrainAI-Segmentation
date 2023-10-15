@@ -4,12 +4,13 @@
 # All additional necessary libraries are in requirements.txt
 import numpy as np
 import matplotlib.pyplot as plt
-import os
 import pydicom
+import os
 from sklearn.cluster import DBSCAN
-from scipy.ndimage import gaussian_filter
 from sklearn.cluster import SpectralClustering
-
+from sklearn.metrics.pairwise import euclidean_distances
+from sklearn.metrics.pairwise import rbf_kernel
+from scipy.ndimage import gaussian_filter
 from skimage import morphology
 from skimage import measure
 from skimage import feature
@@ -249,7 +250,7 @@ if __name__ == "__main__":
 # THE CODES RUN BUT ARE STILL IN THE EDITING PHASE SO THERE AREN'T ANY COMMENTS. 
 # LMK IF YOU HAVE QUESTIONS.
  
-# DBSCAN WITH ATLAS:
+###DBSCAN WITH ATLAS:###
 
 # temp directory upload function till initial testing is complete
 def upload_segments(directory):
@@ -321,7 +322,7 @@ if __name__ == "__main__":
         print()  
         
 
-# SPECTRAL WITH RBF
+###SPECTRAL WITH RBF###
 # SPECTRAL ALGOS REQUIRE A LOT OF RAM, BE CAREFUL RUNNING IT
 
 def upload_segments(directory):
@@ -396,7 +397,7 @@ if __name__ == "__main__":
 
 
 
-# SPECTRAL WITHOUT RBF
+###SPECTRAL WITH EUCLEDIAN DISTANCE###
 
 
 def upload_segments(directory):
