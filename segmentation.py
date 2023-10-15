@@ -300,7 +300,7 @@ def display_regions_from_dict(region_images):
         plt.title(f"Region: {region_name}")
         plt.show()
 
-def create_seg_images(image, region_dict):
+def create_seg_images_from_image(image, region_dict):
     output_images = {}
     for region_name, coordinates_list in region_dict.items():
         blank_image = create_black_copy(image)
@@ -320,6 +320,36 @@ def create_seg_images(image, region_dict):
 
     return output_images
 
+#this would take a dict of atlas segmented images, and then further refine them with coordinates output by an 
+# Advanced Segmentation algo, with corresponding region names
+def create_seg_images_from_dict(images_dict, coords_dict):
+    output_images = {}
+
+    for region_name, coordinates_list in coords_dict.items():
+        # Ensure that the region_name exists in the images_dict
+        if region_name not in images_dict:
+            print(f"Warning: No image found for region {region_name}")
+            continue
+
+        current_image = images_dict[region_name]
+        blank_image = create_black_copy(current_image)
+
+        for coordinates in coordinates_list:
+            x, y, z = coordinates
+            if (0 <= x < current_image.GetSize()[0]) and \
+               (0 <= y < current_image.GetSize()[1]) and \
+               (0 <= z < current_image.GetSize()[2]):
+                pixel_value = current_image[x, y, z]
+                blank_image[x, y, z] = pixel_value
+
+        # Append the finished blank_image to the output_images dictionary
+        output_images[region_name] = blank_image
+
+    print(f"Size of output images:  {len(output_images)}")
+
+    return output_images
+
+
 # takes a directory of DCMs, outputs a dictionary with region names as keys and sitk images as the values
 def DCMs_to_sitk_img_dict(directory):
     image = data.get_3d_image(directory)
@@ -337,7 +367,7 @@ def DCMs_to_sitk_img_dict(directory):
     
     # Define your regions and their coordinates here
     region_dict = generate_regions()
-    region_images = create_seg_images(image, region_dict)
+    region_images = create_seg_images_from_image(image, region_dict)
     #display_regions_from_dict(region_images)
     data.display_seg_images(region_images)
     
@@ -434,9 +464,9 @@ def test_encode_atlas_colors():
     # Create an empty RGB 3D image
     image_3d = np.zeros((depth, height, width, 3), dtype=np.uint8)
     # Fill the left with red
-    image_3d[:, :, :width//3] = [255, 0, 0]
+    image_3d[:, :, :width//3] = [237, 28, 36]
     # Fill the middle with blue
-    image_3d[:, :, width//3:2*width//3] = [0, 0, 255]
+    image_3d[:, :, width//3:2*width//3] = [0, 162, 232]
     # Fill the right with green
     image_3d[:, :, 2*width//3:] = [0, 255, 0]
     #get a dict of regions and coords
@@ -447,7 +477,7 @@ def test_encode_atlas_colors():
     data.view_sitk_3d_image(sitk_image, 5, "redbluegreen")
 
     #create image dict from coords dict and sitk_image
-    final_dict = create_seg_images(sitk_image, region_to_coord_dict)
+    final_dict = create_seg_images_from_image(sitk_image, region_to_coord_dict)
 
     #test expand_roi()
     np_original = sitk.GetArrayFromImage(sitk_image)
@@ -466,9 +496,9 @@ def test_encode_atlas_colors():
     np_image = sitk.GetArrayFromImage(final_dict["Region1"])
     print(np_image.shape)
 #RuntimeError: filter weights array has incorrect shape.
-#test_encode_atlas_colors()
 
-#atlas and image are both sitk images, atlas colors is a 3d np array
+
+#atlas and image are both sitk images, atlas colors is a list of 2d np arrays
 def execute_atlas_seg(atlas, atlas_colors, image):
     print("executing atlas seg")
     # Convert the SimpleITK Images to NumPy arrays
@@ -483,7 +513,7 @@ def execute_atlas_seg(atlas, atlas_colors, image):
     region_to_coord_dict = encode_atlas_colors(atlas_colors)
 
     #create image dict from coords dict and sitk_image
-    final_dict = create_seg_images(reg_image, region_to_coord_dict)
+    final_dict = create_seg_images_from_image(reg_image, region_to_coord_dict)
 
     #expand roi
     for region, segment in final_dict.items():
@@ -495,12 +525,19 @@ if __name__ == "__main__":
     atlas_path = data.get_atlas_path()
     atlas = data.get_3d_image(atlas_path)
     image = data.get_3d_image("scan1")
-    #color_atlas = data.get_3d_png_array("color atlas")
+    
     color_atlas = data.get_2d_png_array_list("color atlas")
     #data.display_array_slices(color_atlas, 10)
     seg_results = execute_atlas_seg(atlas, color_atlas, image)
-    data.store_seg_img_on_file(seg_results, "seg results test")
+    #data.store_seg_img_on_file(seg_results, "seg results test")
+    
+    #test_encode_atlas_colors()
 
+    coords_dict = {
+    "Brain": [(x, y, z) for x in range(64) for y in range(128) for z in range(46)]
+    }
+    seg_dict_from_seg_dict = create_seg_images_from_dict(seg_results, coords_dict)
+    data.store_seg_img_on_file(seg_dict_from_seg_dict, "seg from seg test")
 
 '''
 # Replace 'image.dcm' with the path to your DICOM file
