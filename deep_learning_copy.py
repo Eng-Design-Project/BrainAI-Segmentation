@@ -1,4 +1,3 @@
-# Import relevant modules
 import SimpleITK as sitk  # Medical imaging
 import tensorflow as tf  # Deep learning
 import numpy as np  # Numerical operations
@@ -19,9 +18,10 @@ def split_into_subarrays(img_array, depth=5):
     return sub_arrays
 
 # Function to create a U-Net model for 3D image segmentation
-def unet(input_size=(5, 128, 128, 1)):
+def unet(input_size=(5, 128, 128, 2)):  # Notice the change in the last dimension
     
-    inputs = tf.keras.layers.Input(input_size)# Define input layer
+    inputs = tf.keras.layers.Input(input_size)  # Define input layer
+
     
 # Encoder layers (convolutions and pooling)
     conv1 = tf.keras.layers.Conv3D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(inputs)
@@ -67,8 +67,8 @@ def unet(input_size=(5, 128, 128, 1)):
     # Compile and return the model
     model = tf.keras.models.Model(inputs=[inputs], outputs=[outputs])
     model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-    
     return model
+
 
 
 def get_surrounding_slices(original_slice, sub_arrays, slice_index, depth):
@@ -120,10 +120,12 @@ def show_slices(slices):
     plt.show()
 
 
-def dlAlgorithm(segmentDict, depth=5, epochs=3):
+def dlAlgorithm(segmentDict, atlasDict, depth=5, epochs=3):
     numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()}
     normalizedDict = normalizeTF(numpyImagesDict)
-    model = unet(input_size=(depth, 128, 128, 1))
+    atlasDict = normalizeTF(atlasDict)  # Assuming you also normalize atlas images
+    
+    model = unet(input_size=(depth, 128, 128, 2))  # Now expects 2 channels: atlas and target
     
     loss_list = []
     accumulated_slices = []
@@ -133,59 +135,58 @@ def dlAlgorithm(segmentDict, depth=5, epochs=3):
         
         for scan_name, img_array in normalizedDict.items():
             print(f"Processing {scan_name}...")
-            sub_arrays = split_into_subarrays(img_array, depth)
-             
-            for sub_img_array in sub_arrays:
+            
+            target_sub_arrays = split_into_subarrays(img_array, depth)
+            atlas_sub_arrays = split_into_subarrays(atlasDict[scan_name], depth)  # Assuming corresponding atlas exists
+            
+            for sub_img_array, atlas_sub_array in zip(target_sub_arrays, atlas_sub_arrays):
                 sub_boundary_array = find_boundary(sub_img_array)
                 
-                sub_img_array_exp = np.expand_dims(np.expand_dims(sub_img_array, axis=0), axis=-1)
+                combined_slices = np.stack((atlas_sub_array, sub_img_array), axis=-1)
+                combined_slices_exp = np.expand_dims(combined_slices, axis=0)
                 sub_boundary_array_exp = np.expand_dims(np.expand_dims(sub_boundary_array, axis=0), axis=-1)
                 
-                loss = model.train_on_batch(sub_img_array_exp, sub_boundary_array_exp)
+                loss = model.train_on_batch(combined_slices_exp, sub_boundary_array_exp)
                 loss_list.append(loss)
                 
-                prediction = model.predict(sub_img_array_exp)
+                prediction = model.predict(combined_slices_exp)
                 prediction = (prediction[0, :, :, :, 0] > 0.5).astype(np.uint8)
                 
                 slice_index = depth // 2
-                
                 accumulated_slices.append((sub_img_array[slice_index], prediction[slice_index]))
                 
                 if len(accumulated_slices) == 3:
                     show_slices(accumulated_slices)
-                
-                    while True:  # Loop until the user finds the batch acceptable
+                    
+                    while True:
                         feedback = input("Is this batch acceptable? (y/n): ")
                         
                         if feedback.lower() == 'y':
-                            accumulated_slices = [] # Clear the accumulated slices
+                            accumulated_slices = []
                             break
-                        
-                        elif feedback.lower() == 'n':  
-                            retrained_slices = []  # Create a list to hold the retrained slices
+                            
+                        elif feedback.lower() == 'n':
+                            retrained_slices = []
                             
                             for original_slice, _ in accumulated_slices:
-                                surrounding_slices = get_surrounding_slices(original_slice, sub_arrays, slice_index, depth)
-                                sub_boundary_array = find_boundary(surrounding_slices)
+                                surrounding_slices = get_surrounding_slices(original_slice, target_sub_arrays, slice_index, depth)
+                                atlas_slices = get_surrounding_slices(original_slice, atlas_sub_arrays, slice_index, depth)
                                 
-                                surrounding_slices_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
+                                combined_slices = np.stack((atlas_slices, surrounding_slices), axis=-1)
+                                combined_slices_exp = np.expand_dims(combined_slices, axis=0)
+                                sub_boundary_array = find_boundary(surrounding_slices)
                                 sub_boundary_array_exp = np.expand_dims(np.expand_dims(sub_boundary_array, axis=0), axis=-1)
                                 
-                                model.train_on_batch(surrounding_slices_exp, sub_boundary_array_exp)
+                                model.train_on_batch(combined_slices_exp, sub_boundary_array_exp)
                                 
-                                # Repredict the slice and add to retrained_slices
-                                sub_img_array_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
-                                new_prediction = model.predict(sub_img_array_exp)
+                                new_prediction = model.predict(combined_slices_exp)
                                 new_prediction = (new_prediction[0, :, :, :, 0] > 0.5).astype(np.uint8)
                                 new_slice_index = depth // 2
                                 retrained_slices.append((surrounding_slices[new_slice_index], new_prediction[new_slice_index]))
                             
-                            # Clear the accumulated slices and replace with retrained_slices for re-display
                             accumulated_slices = retrained_slices
+                            show_slices(accumulated_slices)
                             
-                            show_slices(accumulated_slices)  # Re-display the slices
-
-
         proceed = input("Would you like to proceed to the next epoch? (y/n): ")
         if proceed.lower() != 'y':
             break    
@@ -199,6 +200,7 @@ def dlAlgorithm(segmentDict, depth=5, epochs=3):
     plt.ylabel('Loss')
     plt.xlabel('Batch')
     plt.show()
+
 
 
 if __name__ == "__main__":
