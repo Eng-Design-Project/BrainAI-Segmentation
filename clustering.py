@@ -8,6 +8,8 @@ import os
 import pydicom
 from sklearn.cluster import DBSCAN
 from scipy.ndimage import gaussian_filter
+from sklearn.cluster import SpectralClustering
+
 from skimage import morphology
 from skimage import measure
 from skimage import feature
@@ -239,3 +241,238 @@ if __name__ == "__main__":
 
     print("3D Skull Cluster Coordinates:")
     print(skull_cluster_coordinates) 
+
+
+
+
+
+# THE CODES RUN BUT ARE STILL IN THE EDITING PHASE SO THERE AREN'T ANY COMMENTS. 
+# LMK IF YOU HAVE QUESTIONS.
+ 
+# DBSCAN WITH ATLAS:
+
+# temp directory upload function till initial testing is complete
+def upload_segments(directory):
+    segments = []
+    for s in os.listdir(directory):
+        filepath = os.path.join(directory, s)
+        if os.path.isfile(filepath):  # Ensure the path is a file
+            dataset = pydicom.dcmread(filepath)
+            segments.append(dataset)
+    return segments
+
+def pixel_data(segments):
+    return np.stack([s.pixel_array for s in segments])
+
+def preprocess_seg(images):
+    return gaussian_filter(images, sigma=1)
+
+def apply_thresholding(image):
+    block_size = 35
+    adaptive_thresh = threshold_local(image, block_size, offset=5)
+    binary_adaptive = image > adaptive_thresh
+    return binary_adaptive
+
+def dbscan_with_atlas(image):
+    coords = np.column_stack(np.where(image > 0))
+    db_atl = DBSCAN(eps=5, min_samples=18).fit(coords)
+    return db_atl
+
+def get_coordinates(db_atl, labels):
+    cluster_coords = []
+    n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
+    for i in range(n_clusters):
+        coord = np.where(db_atl.labels_ == i)
+        cluster_coords.append(coord)
+    return cluster_coords
+
+def main(brain_directory, skull_directory):
+    # Process brain
+    brain_segments = upload_segments(brain_directory)
+    brain_images = pixel_data(brain_segments)
+    preprocessed_brain = preprocess_seg(brain_images)
+    thresholded_brain = apply_thresholding(preprocessed_brain)
+    db_brain = dbscan_with_atlas(thresholded_brain)
+    brain_cluster_coordinates = get_coordinates(db_brain, db_brain.labels_)
+    
+    # Process skull
+    skull_segments = upload_segments(skull_directory)
+    skull_images = pixel_data(skull_segments)
+    preprocessed_skull = preprocess_seg(skull_images)
+    thresholded_skull = apply_thresholding(preprocessed_skull)
+    db_skull = dbscan_with_atlas(thresholded_skull)
+    skull_cluster_coordinates = get_coordinates(db_skull, db_skull.labels_)
+    
+    return brain_cluster_coordinates, skull_cluster_coordinates
+
+if __name__ == "__main__":
+    brain_directory =  "brain_seg_path"
+    skull_directory =  "skull_seg_path"
+    brain_coords, skull_coords = main(brain_directory, skull_directory)
+    
+    print("Brain Cluster Coordinates:")
+    for idx, cluster in enumerate(brain_coords, start=1):
+        print(f"Cluster {idx}:", cluster)
+        print()  
+
+    print("\nSkull Cluster Coordinates:")
+    for idx, cluster in enumerate(skull_coords, start=1):
+        print(f"Cluster {idx}:", cluster)
+        print()  
+        
+
+# SPECTRAL WITH RBF
+# SPECTRAL ALGOS REQUIRE A LOT OF RAM, BE CAREFUL RUNNING IT
+
+def upload_segments(directory):
+    segments = []
+    for s in os.listdir(directory):
+        filepath = os.path.join(directory, s)
+        if os.path.isfile                                                           (filepath):
+            dataset = pydicom.dcmread(filepath)
+            segments.append(dataset)
+    return segments
+
+def pixel_data(segments):
+    return np.stack([s.pixel_array for s in segments])
+
+def preprocess_seg(images):
+    return gaussian_filter(images, sigma=1)
+
+def apply_thresholding(image):
+    block_size = 35
+    adaptive_thresh = threshold_local(image, block_size, offset=10)
+    binary_adaptive = image > adaptive_thresh
+    return binary_adaptive
+
+def contruct_rbf(image, gamma=1):
+    coords = np.column_stack(np.where(image > 0))
+    affinity_matrix = rbf_kernel(coords, coords, gamma=gamma)
+    return affinity_matrix, coords
+
+def spectral_rbf_(affinity_matrix, n_clusters=3):
+    sc = SpectralClustering(n_clusters=n_clusters, affinity='precomputed')
+    labels = sc.fit_predict(affinity_matrix)
+    return labels
+
+def get_cluster_coordinates(labels, coords):
+    unique_labels = np.unique(labels)
+    cluster_coords = {label: coords[labels == label] for label in unique_labels}
+    return cluster_coords
+
+def main_rbf(brain_directory, skull_directory):
+    brain_segments = upload_segments(brain_directory)
+    brain_images = pixel_data(brain_segments)
+    preprocessed_brain = preprocess_seg(brain_images)
+    thresholded_brain = apply_thresholding(preprocessed_brain)
+    affinity_brain, coords_brain = construct_rbf(thresholded_brain)
+    labels_brain = spectral_rbf(affinity_brain)
+    brain_cluster_coords = get_cluster_coordinates(labels_brain, coords_brain)
+
+    skull_segments = upload_segments(skull_directory)
+    skull_images = pixel_data(skull_segments)
+    preprocessed_skull = preprocess_seg(skull_images)
+    thresholded_skull = apply_thresholding(preprocessed_skull)
+    affinity_skull, coords_skull = construct_rbf(thresholded_skull)
+    labels_skull = spectral_cluster_rbf(affinity_skull)
+    skull_cluster_coords = get_cluster_coordinates(labels_skull, coords_skull)
+
+    return brain_cluster_coords, skull_cluster_coords
+
+if __name__ == "__main__":
+    brain_directory =  "brain_seg_path"
+    skull_directory =  "skull_seg_path"
+    brain_cluster_coords, skull_cluster_coords = main_rbf(brain_directory, skull_directory)
+
+    print("Brain Coordinates:")
+    for label, coords in brain_cluster_coords.items():
+        print(f"Cluster {label}:")
+        print(coords)
+
+    print("\nSkull Coordinates:")
+    for label, coords in skull_cluster_coords.items():
+        print(f"Cluster {label}:")
+        print(coords)
+
+
+
+# SPECTRAL WITHOUT RBF
+
+
+def upload_segments(directory):
+    segments = []
+    for s in os.listdir(directory):
+        filepath = os.path.join(directory, s)
+        if os.path.isfile(filepath): 
+            dataset = pydicom.dcmread(filepath)
+            segments.append(dataset)
+    return segments
+
+
+def pixel_data(segments):
+    return np.stack([s.pixel_array for s in segments])
+
+def preprocess_seg(images):
+    return gaussian_filter(images, sigma=1)
+
+def apply_thresholding(image):
+    block_size = 35
+    adaptive_thresh = threshold_local(image, block_size, offset=10)
+    binary_adaptive = image > adaptive_thresh
+    return binary_adaptive
+
+def construct_affinity_matrix(image, gamma=1):
+    coords = np.column_stack(np.where(image > 0))
+    pairwise_dists = euclidean_distances(coords, coords)
+    affinity_matrix = np.exp(-gamma * pairwise_dists)
+    return affinity_matrix, coords
+
+def spectral_cluster(affinity_matrix, n_clusters=3):
+    sc = SpectralClustering(n_clusters=n_clusters, affinity='precomputed')
+    labels = sc.fit_predict(affinity_matrix)
+    return labels
+
+def get_cluster_coordinates(labels, coords):
+    unique_labels = np.unique(labels)
+    cluster_coords = {label: coords[labels == label] for label in unique_labels}
+    return cluster_coords
+
+def main(brain_directory, skull_directory):
+    brain_segments = upload_segments(brain_directory)
+    brain_images = pixel_data(brain_segments)
+    preprocessed_brain = preprocess_seg(brain_images)
+    thresholded_brain = apply_thresholding(preprocessed_brain)
+    affinity_brain, coords_brain = construct_affinity_matrix(thresholded_brain)
+    labels_brain = spectral_cluster(affinity_brain)
+    brain_cluster_coords = get_cluster_coordinates(labels_brain, coords_brain)
+
+    skull_segments = upload_segments(skull_directory)
+    skull_images = pixel_data(skull_segments)
+    preprocessed_skull = preprocess_seg(skull_images)
+    thresholded_skull = apply_thresholding(preprocessed_skull)
+    affinity_skull, coords_skull = construct_affinity_matrix(thresholded_skull)
+    labels_skull = spectral_cluster(affinity_skull)
+    skull_cluster_coords = get_cluster_coordinates(labels_skull, coords_skull)
+
+    return brain_cluster_coords, skull_cluster_coords
+
+if __name__ == "__main__":
+    brain_directory =  "brain_seg_path"
+    skull_directory =  "skull_seg_path"
+    brain_cluster_coords, skull_cluster_coords = main(brain_directory, skull_directory)
+
+    print("Brain Coordinates:")
+    for label, coords in brain_cluster_coords.items():
+        print(f"Cluster {label}:")
+        print(coords)
+
+    print("\nSkull Coordinates:")
+    for label, coords in skull_cluster_coords.items():
+        print(f"Cluster {label}:")
+        print(coords)
+
+
+
+
+
+
