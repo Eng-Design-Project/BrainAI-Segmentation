@@ -84,15 +84,15 @@ def get_surrounding_slices(original_slice, sub_arrays, slice_index, depth):
     return surrounding_slices
 
 
-def normalizeTF(volume3dDict):
-    normalizedDict = {}
+def standardizeTF(volume3dDict):
+    standardizedDict = {}
     for key, value in volume3dDict.items():
         tensor = tf.convert_to_tensor(value, dtype=tf.float32)
-        minVal = tf.reduce_min(tensor)
-        maxVal = tf.reduce_max(tensor)
-        normalizedTensor = (tensor - minVal) / (maxVal - minVal)
-        normalizedDict[key] = normalizedTensor.numpy()
-    return normalizedDict
+        mean, stddev = tf.nn.moments(tensor, axes=[0, 1, 2])  # Compute mean and stddev
+        standardizedTensor = (tensor - mean) / tf.sqrt(stddev)
+        standardizedDict[key] = standardizedTensor.numpy()
+    return standardizedDict
+
 
 def find_boundary(segment):
     kernel = np.ones((3, 3, 3))
@@ -114,7 +114,7 @@ def show_slices(triplets):
 
 def dlAlgorithm(segmentDict, depth=5, epochs=3):
     numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()}
-    normalizedDict = normalizeTF(numpyImagesDict)
+    normalizedDict = standardizeTF(numpyImagesDict)
     model = unet(input_size=(depth, 128, 128, 1))
 
     # Callbacks
