@@ -454,7 +454,66 @@ def set_seg_results(directory = "scan1"):
     # passed the segment results dict, and then it removes the skull with del seg_results["Skull"]
 
 # set_seg_results()
-  
+
+def is_segment_results_dir(directory):
+    """
+    Validates if a given directory matches the specified structure and format.
+    :param directory: The directory to validate.
+    :return: True if the directory matches the format, False otherwise.
+    """
+    
+    # Check if top-level directory contains only directories and no files
+    if any(os.path.isfile(os.path.join(directory, entry)) for entry in os.listdir(directory)):
+        print("input dir contains a file")
+        return False
+    
+    # Walk through the directory
+    for dirpath, dirnames, filenames in os.walk(directory):
+
+        # In the top-level folder, we expect only directories (subfolders for each 3D image)
+        if dirpath == directory:
+            continue
+
+        # For each subfolder (3D image set), it should contain only .dcm files and no subfolders
+        for dirname in dirnames:
+            print("dir found in subdir, should only be files")
+            return False  # If we find any directory inside a subfolder, it's invalid
+        
+        for filename in filenames:
+            if not filename.endswith('.dcm'):
+                print("found non-dcm")
+                return False
+
+    return True
+
+
+def contains_only_dcms(directory):
+    """
+    Validates if a given directory contains only .dcm files and no subdirectories.
+    :param directory: The directory to validate.
+    :return: True if the directory contains only .dcm files, False otherwise.
+    """
+    
+    for dirpath, dirnames, filenames in os.walk(directory):
+        # If there are any subdirectories, return False
+        if dirnames:
+            return False
+        
+        # Check if all files have the .dcm extension
+        for filename in filenames:
+            if not filename.endswith('.dcm'):
+                return False
+
+    return True
+
+
+if __name__ == "__main__":
+    print(is_segment_results_dir("atl_segmentation_DCMs"))
+    print(is_segment_results_dir("atl_segmentation_PNGs"))
+    print(is_segment_results_dir("atlas"))
+    print(is_segment_results_dir("atlas_pngs"))
+    print(contains_only_dcms("atlas"))
+
 # Path to the directory that contains the DICOM files
 #directory1 = "scan1"
 #directory2 = "scan2"
