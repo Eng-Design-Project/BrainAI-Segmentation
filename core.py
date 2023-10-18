@@ -217,7 +217,8 @@ class Core:
         else:
             if not data.segmentation_results:
                 self.atlas_segment()
-            self.open_clustering_options_popup()
+            else:
+                self.open_clustering_options_popup()
 
     def open_clustering_options_popup(self):
         if self.get_selected_segmentation_method() == "atlas_segmentation" and not data.segmentation_results:
