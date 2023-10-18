@@ -177,8 +177,6 @@ class Core:
         self.U_Net_button = tk.Button(self.master, text="U-Net", command=self.U_Net)
 
         self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.image_label ,self.previous_button, self.next_button, self.U_Net_button, self.deeplearning_back_button]))
-
-        self.submit_brain_skull_button = tk.Button(self.popup_window, text="Submit", command=self.submit_segmentation_type)
         
 
         """self.image_file_path = 'mytest.png'
@@ -219,7 +217,8 @@ class Core:
         else:
             if not data.segmentation_results:
                 self.atlas_segment()
-            self.open_clustering_options_popup()
+            else:
+                self.open_clustering_options_popup()
 
     def open_clustering_options_popup(self):
         if self.get_selected_segmentation_method() == "atlas_segmentation" and not data.segmentation_results:
@@ -491,6 +490,12 @@ class Core:
         seg_results = segmentation.execute_atlas_seg(atlas, color_atlas, image)
         # returns dict of simple itk images
         # save them as dcms to the nested folder
+
+        #I want a function that converts the sitk image dicts to dicts with pngs
+        png_dict = data.sitk_dict_to_png_dict(seg_results)
+
+
+
         data.store_seg_img_on_file(seg_results, "atl_segmentation_DCMs")
         # save as pngs in nested folder by region structure
         data.store_seg_png_on_file(seg_results, "atl_segmentation_PNGs")
@@ -498,49 +503,84 @@ class Core:
         # save dict of sitk images to data global seg results
         data.segmentation_results = seg_results
         # Set a flag to indicate that atlas segmentation has been performed
-        # Create a popup window for segmentation type selection
+        
+        # Create a popup window for selecting segmentation type
         popup_window = tk.Toplevel(self.master)
         popup_window.title("Select Segmentation Type")
 
-        # Create a label to instruct the user
-        label = tk.Label(popup_window, text="Select segmentation type:")
-        label.pack(pady=10)
+        # Initialize variables to keep track of the current index for "Brain" and "Skull"
+        brain_index = 0
+        skull_index = 0
+        current_segmentation = "Brain"  # Initialize with "Brain" as the default
 
-        # Create a variable to store the selected segmentation type
-        self.segmentation_type_var = tk.StringVar()
-        self.segmentation_type_var.set("Brain")  # Default selection
+        def update_image():
+            nonlocal brain_index, skull_index, current_segmentation
+            if current_segmentation == "Brain":
+                image_list = png_dict['Brain']
+                index = brain_index
+            else:
+                image_list = png_dict['Skull']
+                index = skull_index
 
-        # Create radio buttons for "Brain" and "Skull" options
-        brain_option = tk.Radiobutton(popup_window, text="Brain", variable=self.segmentation_type_var, value="Brain")
-        brain_option.pack()
-        skull_option = tk.Radiobutton(popup_window, text="Skull", variable=self.segmentation_type_var, value="Skull")
-        skull_option.pack()
+            image = image_list[index]
+            photo = ImageTk.PhotoImage(image)
+            image_label.configure(image=photo)
+            image_label.image = photo
 
-    # Create the "Submit" button in the popup window
-        submit_brain_skull_button = tk.Button(popup_window, text="Submit", command=self.submit_segmentation_type)
-        submit_brain_skull_button.pack(pady=10)
+        def handle_brain_skull_selection(segmentation_type):
+            nonlocal current_segmentation
+            if segmentation_type == "Brain":
+                if current_segmentation == "Brain":
+                    return  # If already on "Brain," do nothing
+                current_segmentation = "Brain"
+                update_image()
+            else:
+                if current_segmentation == "Skull":
+                    return  # If already on "Skull," do nothing
+                current_segmentation = "Skull"
+                update_image()
 
-        self.popup_window = popup_window  # Store the popup window as an instance variable
-    # Create a callback function for the submit button
-    def submit_segmentation_type(self):
-        selected_segmentation_type = self.segmentation_type_var.get()
-        print("Selected Segmentation Type:", selected_segmentation_type)
+        def handle_previous():
+            nonlocal brain_index, skull_index
+            if current_segmentation == "Brain":
+                brain_index = (brain_index - 1) % len(png_dict['Brain'])
+            else:
+                skull_index = (skull_index - 1) % len(png_dict['Skull'])
+            update_image()
 
-        # Based on the selected type, display either brain or skull images
-        if selected_segmentation_type == "Brain":
-            # Display brain images
-            self.display_segmentation_results("Brain")
-        elif selected_segmentation_type == "Skull":
-            # Display skull images
-            self.display_segmentation_results("Skull")
+        def handle_next():
+            nonlocal brain_index, skull_index
+            if current_segmentation == "Brain":
+                brain_index = (brain_index + 1) % len(png_dict['Brain'])
+            else:
+                skull_index = (skull_index + 1) % len(png_dict['Skull'])
+            update_image()
 
-        self.popup_window.destroy()
+        # Create a label to display the image
+        image_label = tk.Label(popup_window)
+        image_label.pack()
 
-    def display_segmentation_results(self, segmentation_type):
-        # This function will display segmentation results based on the selected type
-        # You can implement your image display logic here
-        print(f"Displaying {segmentation_type} images")
-        # Add code to display the relevant images based on segmentation_type
+        # Create a frame for the "Previous" and "Next" buttons
+        button_frame = tk.Frame(popup_window)
+        button_frame.pack()
+
+        # Create buttons for "Previous" and "Next" in the popup window
+        previous_button = tk.Button(button_frame, text="Previous", command=handle_previous)
+        next_button = tk.Button(button_frame, text="Next", command=handle_next)
+        previous_button.pack(side="left", padx=10)
+        next_button.pack(side="right", padx=10)
+
+        # Create buttons for "Brain" and "Skull" in the popup window
+        brain_button = tk.Button(popup_window, text="Brain", command=lambda: handle_brain_skull_selection("Brain"))
+        skull_button = tk.Button(popup_window, text="Skull", command=lambda: handle_brain_skull_selection("Skull"))
+        brain_button.pack(pady=10)
+        skull_button.pack(pady=10)
+
+        # Initialize the initial segmentation type to "Brain"
+        update_image()
+                
+
+
         
 
 
