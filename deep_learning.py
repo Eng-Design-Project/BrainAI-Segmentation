@@ -5,11 +5,6 @@ import numpy as np
 from scipy.ndimage import convolve
 import data
 
-
-def print_hello():
-    print(" Entered deep learning ")
-
-
 #dummy input data
 sitk_images_dict = {
     "image1": data.get_3d_image("scan1"), # gets 3d sitk image from a folder of DCM images
@@ -21,14 +16,17 @@ sitk_images_dict = {
 numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in sitk_images_dict.items()}
 
 #for the dummyDL function
+#labeled data is tricky, because it should probably be in the same format as the input data + a 1 or 0 label
+#dictionary makes sense, but the input data is a 3x3x3 (unless we pass a window size other than default) np array,
+# or rather, a stack of 3x3x3 arrays inside another array, because that's more optimized
 dummyLabels = {
     "image1": 1,
-    "image2": 2
+    "image2": 0
     # Add more labels...
 }
 
 #normalizes pixel value of 3d array dict
-def normalizeTF(volume3dDict):
+def normalize_np_dict(volume3dDict):
     normalizedDict = {}
     for key, value in volume3dDict.items():
         tensor = tf.convert_to_tensor(value, dtype=tf.float32)
@@ -43,22 +41,6 @@ def normalizeTF(volume3dDict):
         # normalizing the entire image. Prob doesn't matter
     return normalizedDict
 
-
-#standard binary classifier, probably not useful for our use-case
-def buildModel(inputShape):
-    model = tf.keras.Sequential([
-        tf.keras.layers.InputLayer(input_shape=inputShape),  # Corrected here
-        tf.keras.layers.Conv2D(32, (3, 3), activation='relu'),
-        tf.keras.layers.MaxPooling2D(2, 2),
-        tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
-        tf.keras.layers.MaxPooling2D(2, 2),
-        tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(128, activation='relu'),
-        tf.keras.layers.Dense(2, activation='softmax')  # Assumes binary classification
-    ])
-
-    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-    return model
 
 #pix by pix classifier, not built with user score in mind
 def buildPixelModel(window_size=3):
@@ -88,7 +70,8 @@ def find_boundary(segment):
     return boundary
 
 #takes boundary (edges), and gets 3d windows around each boundary voxel. These are inputs to the model
-def extract_windows(volume, boundary, window_size=3):
+def extract_windows(volume, window_size=3):
+    boundary = find_boundary(volume)
     padding = window_size // 2
     padded_volume = np.pad(volume, ((padding, padding), (padding, padding), (padding, padding)), mode='constant')
     windows = []
@@ -106,74 +89,85 @@ def extract_windows(volume, boundary, window_size=3):
     return np.array(windows), np.array(indices)
 
 
-def build_boundary_window_model(window_size=3):
-    model = tf.keras.models.Sequential([
-        tf.keras.layers.Conv3D(16, (3, 3, 3), activation='relu', input_shape=(window_size, window_size, window_size, 1)),
-        tf.keras.layers.MaxPooling3D(),
-        tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(32, activation='relu'),
-        tf.keras.layers.Dense(2, activation='softmax')  # Assuming binary classification (0 or 1)
-    ])
-    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-    return model
-
-def train_model(model, windows, labels, success_metric):
-    # Simple example, you might want to adjust training based on the success metric
-    model.fit(windows, labels, epochs=int(success_metric * 10))  # Hypothetical usage of success_metric
-
-
-#wrapper for getting the np arrays from sitkimages, normalizing, 
-# outputting normalized dict and pixelclassifier model
-def dlAlgorithm(segmentDict):
-    numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()}
-    normalizedDict = normalizeTF(numpyImagesDict)
-
-    """Currently using 3D arrays, might switch to tensors. In such case, the shape might change."""
-    model = buildPixelModel()
-    return normalizedDict, model
-
-def classify_voxels(segment_volume, success_metric, window_size=3):
-    boundary = find_boundary(segment_volume)
-    windows, indices = extract_windows(segment_volume, boundary)
-    windows = windows[..., np.newaxis]  # Adding a channel dimension
-    model = build_boundary_window_model(window_size=window_size)
-    
-    # Dummy labels for demonstration; replace with actual labels if available
-    labels = np.random.randint(0, 2, size=len(windows))  
-    
-    train_model(model, windows, labels, success_metric)
-    
-    predictions = model.predict(windows)
-    predicted_labels = np.argmax(predictions, axis=1)
-    
-    classified_indices = indices[predicted_labels == 1]
-    return classified_indices.tolist()
+def train_model(model, windows, user_score, labels=None):
+    model.fit(windows, labels, epochs= 20 - int(user_score * 10)) 
 
 # not tested yet -Kevin
-def dummyDL(dict_of_np_arrays, user_score=0, model=build_boundary_window_model()):
-    normalized_data = normalizeTF(dict_of_np_arrays)
+def executeDL(dict_of_np_arrays, user_score=0, model=buildPixelModel()):
+    
+    #should only have to normalize data once?
+    normalized_data = normalize_np_dict(dict_of_np_arrays)
+
+    #should only have to compile once?
     model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics = ["accuracy"])
+    
     #train model on on dict of np arrays,
         # Dummy labels for demonstration; replace with actual labels if available
-    success_metric = 0.8
-    train_model(model, normalized_data, dummyLabels, success_metric)
+    #need to run for each key/value?
+    classification_dict = {}
+    for region, seg_volume in normalized_data.items():
+        windows, indices = extract_windows(seg_volume)
+        windows = windows[..., np.newaxis]  # Adding a channel dimension
+        
+        train_model(model, windows, dummyLabels, user_score)
+        
+        predictions = model.predict(windows)
+        predicted_labels = np.argmax(predictions, axis=1)
+    
+        classified_indices = indices[predicted_labels == 1]
+        classification_dict[region] = classified_indices
+
     #return segmentation attempts (dictionary of coordinates)
     #return model
-    return dict_of_np_arrays, model
+    return normalized_data, model, classification_dict
 
     #segmentation attemps displayed by core, user score collected
     #this function called again, passing the model back, and passing in user score
     #dummyDL is run on a loop, probably in core?
 
-def test_classify_voxels():
-    boundary_volume = np.random.randint(0, 2, (128, 128, 128))  # Replace with your actual boundary volume
-    success_metric = 0.8  # Replace with your actual success metric
-    classified_indices = classify_voxels(boundary_volume, success_metric)
-    print(classified_indices)
+#class version of executeDL: no need to output and reinput things other than user_score
+#Notes: labeled data could be a bunch of 'windows', labeled 0 or 1
+#   should windows also be a class attribute? why extract windows many times
+#   if windows are a class attribute, than we wouldn't need to keep the entire image in memory
+class CustomClassifier:
+    def __init__(self, initial_model=None, labeled_data=None):
+        self.model = initial_model if initial_model else self.buildPixelModel()
+        self.classification_dict = {}
+        self.normalized_data = None
+        self.labeled_data = labeled_data
 
-    
-# if __name__ == '__main__':
-#    test_classify_voxels()
+
+    def executeDL(self, dict_of_np_arrays, user_score=0):
+        self.normalized_data = normalize_np_dict(dict_of_np_arrays)
+
+        # No need to compile multiple times, so we check if it's compiled.
+        if not hasattr(self.model, 'optimizer'):
+            self.model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+
+        for region, seg_volume in self.normalized_data.items():
+            windows, indices = extract_windows(seg_volume)
+            windows = windows[..., np.newaxis]  # Adding a channel dimension
+
+            # Using the labeled_data for the specific region if available
+            region_labels = self.labeled_data.get(region) if self.labeled_data else None
+            #labeled data needs to be redone, to fit with the input data expected
+
+
+            train_model(self.model, windows, user_score, region_labels)
+            
+            predictions = self.model.predict(windows)
+            predicted_labels = np.argmax(predictions, axis=1)
+
+            classified_indices = indices[predicted_labels == 1]
+            self.classification_dict[region] = classified_indices
+
+        return self.classification_dict
+
+
+
+if __name__ == '__main__':
+   print("running dl module")
+   classifier = CustomClassifier()
 
 
 '''
@@ -217,3 +211,21 @@ def get_user_score(x1, x2):
     print("score 1 is: ", user_score1)
     print("score 2 is: ", user_score2)
 '''
+
+
+'''
+#had two models that essentially did the same thing, 
+#idk what the difference between them is. 
+#moved the second here to avoid confusion
+def build_boundary_window_model(window_size=3):
+    model = tf.keras.models.Sequential([
+        tf.keras.layers.Conv3D(16, (3, 3, 3), activation='relu', input_shape=(window_size, window_size, window_size, 1)),
+        tf.keras.layers.MaxPooling3D(),
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(32, activation='relu'),
+        tf.keras.layers.Dense(2, activation='softmax')  # Assuming binary classification (0 or 1)
+    ])
+    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    return model
+'''
+

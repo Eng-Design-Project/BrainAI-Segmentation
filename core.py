@@ -217,7 +217,8 @@ class Core:
         else:
             if not data.segmentation_results:
                 self.atlas_segment()
-            self.open_clustering_options_popup()
+            else:
+                self.open_clustering_options_popup()
 
     def open_clustering_options_popup(self):
         if self.get_selected_segmentation_method() == "atlas_segmentation" and not data.segmentation_results:
@@ -559,21 +560,25 @@ class Core:
         image_label = tk.Label(popup_window)
         image_label.pack()
 
-        # Create buttons for "Previous" and "Next" in the popup window
-        previous_button = tk.Button(popup_window, text="Previous", command=handle_previous)
-        previous_button.pack(pady=10)
-        next_button = tk.Button(popup_window, text="Next", command=handle_next)
-        next_button.pack(pady=10)
+        # Create a frame for the "Previous" and "Next" buttons
+        button_frame = tk.Frame(popup_window)
+        button_frame.pack()
 
-        # Initialize the initial segmentation type to "Brain"
-        update_image()
+        # Create buttons for "Previous" and "Next" in the popup window
+        previous_button = tk.Button(button_frame, text="Previous", command=handle_previous)
+        next_button = tk.Button(button_frame, text="Next", command=handle_next)
+        previous_button.pack(side="left", padx=10)
+        next_button.pack(side="right", padx=10)
 
         # Create buttons for "Brain" and "Skull" in the popup window
         brain_button = tk.Button(popup_window, text="Brain", command=lambda: handle_brain_skull_selection("Brain"))
-        brain_button.pack(pady=10)
         skull_button = tk.Button(popup_window, text="Skull", command=lambda: handle_brain_skull_selection("Skull"))
+        brain_button.pack(pady=10)
         skull_button.pack(pady=10)
-            
+
+        # Initialize the initial segmentation type to "Brain"
+        update_image()
+                
 
 
         
