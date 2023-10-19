@@ -210,18 +210,22 @@ class Core:
         self.image_label = tk.Label(self.master)
     
     def execute_clustering(self):
+        # Get the selected segmentation method
         selected_segmentation_method = self.get_selected_segmentation_method()
 
         if selected_segmentation_method == "atlas_segmentation":
+            # If the selected method is "atlas_segmentation," call the atlas_segment function
             self.atlas_segment()
         else:
             if not data.segmentation_results:
+                # If segmentation results are not available, call atlas_segment
                 self.atlas_segment()
-            else:
-                self.open_clustering_options_popup()
+            # Open a clustering options popup
+            self.open_clustering_options_popup()
 
     def open_clustering_options_popup(self):
         if self.get_selected_segmentation_method() == "atlas_segmentation" and not data.segmentation_results:
+            # If the selected method is "atlas_segmentation" and segmentation results are not available, select a folder
             self.select_folder()
         else:
             # Create a popup window for clustering options
@@ -362,13 +366,17 @@ class Core:
             self.show_current_image()
 
     def execute_deep_learning_click(self):
+        # Get the selected segmentation method
         selected_segmentation_method = self.get_selected_segmentation_method()
 
         if selected_segmentation_method == "atlas_segmentation":
+            # If the selected method is "atlas_segmentation," call the atlas_segment function
             self.atlas_segment()
         else:
             if not data.segmentation_results:
+                # If segmentation results are not available, call atlas_segment
                 self.atlas_segment()
+                # Open a segmentation selection popup
             self.open_segmentation_selection_popup()
 
 
@@ -378,6 +386,7 @@ class Core:
     #if (data.segmentation_results=={}):
         # Create a popup window for selecting segmentation results
         if self.get_selected_segmentation_method() == "atlas_segmentation" and not data.segmentation_results:
+            # If the selected method is "atlas_segmentation" and segmentation results are not available, select a folder
             self.select_folder()
         else:
             popup_window = tk.Toplevel(self.master)
@@ -409,10 +418,12 @@ class Core:
         popup_window.destroy()
 
         if selection == "file":
+            # Get the selected folder and set segmentation results
             selected_folder = self.get_selected_folder()
             data.set_seg_results(selected_folder)
             print("Selected folder:", selected_folder)
         elif selection == "memory":
+            # Set segmentation results from memory
             data.set_seg_results()
             self.segmentation_results = {}
 
@@ -429,6 +440,7 @@ class Core:
             self.next_button.pack_forget()
 
     def get_selected_segmentation_method(self):
+        # Determine the selected segmentation method based on button states
         if self.atlas_segment_button.cget('state') == 'active':
             return "atlas_segmentation"
         elif self.clustering_button.cget('state') == 'active':
