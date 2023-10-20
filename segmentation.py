@@ -35,6 +35,7 @@ def array_to_image_with_ref(data: np.ndarray, reference_image: sitk.Image) -> si
 
     return new_image
 
+#this is the currently used
 def scipy_register_images(target, moving):
     """
     Register the moving image to the target image using cross-correlation and return the transformed image.
@@ -113,7 +114,7 @@ def expand_roi(original_sitk, segment_sitk):
 # segment[4:7, 4:7, 4:7] = 1
 # result = expand_roi(original, segment)
 
-
+#NOT CURRENTLY USED
 def atlas_segment(atlas, image, 
                   simMetric="MeanSquares", optimizer="GradientDescent", 
                   interpolator="Linear", samplerInterpolator="Linear"):
