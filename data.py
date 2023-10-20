@@ -8,7 +8,7 @@ from skimage.transform import resize
 import subprocess
 import sys
 from PIL import Image
-#from pydicom import dcmread
+from pydicom import dcmread
 
 #tried to use to load color atlas, to hard to parse coords
 def get_3d_png_array(directory):
@@ -97,11 +97,21 @@ def save_2d_images_list(image_list, directory):
         # Save the image
         img.save(file_path)
 
+# SITK TO PYDICOM - MD
+# original:
+'''
 def get_3d_image(directory):
     # Get a list of all DICOM files in the directory
     scan_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")]
     # Read in the image series
     image = sitk.ReadImage(scan_files)
+    return image
+'''
+def get_3d_image(directory):
+    # Get a list of all DICOM files in the directory
+    scan_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")]
+    # Read in the image series
+    image = pydicom.dcmread(scan_files[0]) 
     return image
 
 # folder of DCM images as input
@@ -111,6 +121,9 @@ def get_3d_array_from_file(folder_path):
     slices.sort(key=lambda x: float(x.ImagePositionPatient[2])) # sorting and maintaining correct order
     return np.stack([s.pixel_array for s in slices])
 
+# SITK TO PYDICOM - MD
+# original:
+'''
 def view_sitk_3d_image(image, numSlices, displayText):
     array = sitk.GetArrayFromImage(image)
 
@@ -130,21 +143,57 @@ def view_sitk_3d_image(image, numSlices, displayText):
         axes[i].imshow(slice, cmap='gray')
         axes[i].axis('off')
     plt.show()
+'''
+def view_sitk_3d_image(image, numSlices, displayText):
+    array = image.pixel_array
 
+    # Calculate the step size
+    step = array.shape[0] // numSlices
+    
+    # Generate the slices
+    slices = [array[i*step, :, :] for i in range(numSlices)]
+
+    #display the slices
+    fig, axes = plt.subplots(1, numSlices, figsize=(18, 18))
+
+    # Set the title for the plot
+    fig.suptitle(displayText, fontsize=16)
+
+    for i, slice in enumerate(slices):
+        axes[i].imshow(slice, cmap='gray')
+        axes[i].axis('off')
+    plt.show()
+
+# SITK TO PYDICOM - MD
+# original:
+'''
 def display_seg_images(image_dict):
     for region, sitk_image in image_dict.items():
         view_sitk_3d_image(sitk_image, 5, region)
+'''
+def display_seg_images(image_dict):
+    for region, dicom_image in image_dict.items():
+        view_sitk_3d_image(dicom_image, 5, region)
 
-#note: simple ITK does not get all metadata, only most useful metadata for registration
+# SITK TO PYDICOM - MD
+# original:
+'''
 def view_slice_metadata_from_directory(directory):
     scan_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")]
     for filename in scan_files:
         image = sitk.ReadImage(filename)
         print(image.GetMetaData("0020|0032"))
-
-#takes all the dcm files in a directory, and returns a list of numpy pixel arrays of dimensions 224x224
-#note, image registration (for the atlas segmentation) cannot be done
-#  after an image has been converted to an array: the meta data used by sitk is lost
+'''
+#note: simple ITK does not get all metadata, only most useful metadata for registration
+def view_slice_metadata_from_directory(directory):
+    scan_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")]
+    for filename in scan_files:
+        image = pydicom.dcmread(filename)
+        print(image.ImagePositionPatient)
+        
+# SITK TO PYDICOM - MD
+# original:
+'''
 def resize_and_convert_to_3d_image(directory):
     image=get_3d_image(directory)
     array = sitk.GetArrayFromImage(image)
@@ -152,8 +201,21 @@ def resize_and_convert_to_3d_image(directory):
     for i in range(0, array.shape[0]):
         new_images.append(resize(array[i,:,:], (224, 224), anti_aliasing=True))
     return new_images
+'''
+#takes all the dcm files in a directory, and returns a list of numpy pixel arrays of dimensions 224x224
+#note, image registration (for the atlas segmentation) cannot be done
+#  after an image has been converted to an array: the meta data used by sitk is lost
+def resize_and_convert_to_3d_image(directory):
+    image=get_3d_image(directory)
+    array = image.pixel_array
+    new_images = []
+    for i in range(0, array.shape[0]):
+        new_images.append(resize(array[i,:,:], (224, 224), anti_aliasing=True))
+    return new_images
 
-#takes all of the dcm files in a directory, and saves them as png files in (string)new_dir
+# SITK TO PYDICOM - MD
+# original:
+'''
 def save_dcm_dir_to_png_dir(directory, new_dir):
     #create a directory called new_dir
     if not os.path.exists(new_dir):
@@ -165,6 +227,22 @@ def save_dcm_dir_to_png_dir(directory, new_dir):
     for i in range(0, len(scan_files)):
         image = sitk.ReadImage(scan_files[i])
         png_file = sitk.GetArrayFromImage(image)[0,:,:]
+        output_file = os.path.basename(scan_files[i]).split(".")[0] + ".png"
+        output_file_path = os.path.join(new_dir, output_file)
+        plt.imsave(output_file_path, png_file, cmap='gray')
+'''
+#takes all of the dcm files in a directory, and saves them as png files in (string)new_dir
+def save_dcm_dir_to_png_dir(directory, new_dir):
+    #create a directory called new_dir
+    if not os.path.exists(new_dir):
+        os.mkdir(new_dir)
+
+    # Get a list of all DICOM files in the directory
+    scan_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")]
+    # convert each file to a PNG and save it to the directory
+    for i in range(0, len(scan_files)):
+        image = pydicom.dcmread(scan_files[i])
+        png_file = image.pixel_array
         output_file = os.path.basename(scan_files[i]).split(".")[0] + ".png"
         output_file_path = os.path.join(new_dir, output_file)
         plt.imsave(output_file_path, png_file, cmap='gray')
@@ -180,7 +258,10 @@ def get_filepath(directory, index):
     else:
         return None
 
-#takes sitk image and saves to directory as dcm files
+# SITK TO PYDICOM - MD
+# i'm not too confident about this one, please review.
+# original:
+'''
 def save_sitk_3d_img_to_dcm(image, new_dir):
     # Check if the directory exists, if not, create it
     if not os.path.exists(new_dir):
@@ -199,12 +280,6 @@ def save_sitk_3d_img_to_dcm(image, new_dir):
         slice_image = image[:,:,z]
         slice_image = sitk.Cast(slice_image, sitk.sitkInt32)
 
-        # Set the metadata attributes
-        # slice_image.SetMetaData('0020|000D', 'registered scans') # Study Instance UID
-        # slice_image.SetMetaData('0020|000E', 'registered scan') # Series Instance UID
-        # slice_image.SetMetaData('0020|0011', str(z))    # Series Number
-        # slice_image.SetMetaData('0020|0013', str(z))    # Instance Number
-
         # Create a filename for the slice
         filename = os.path.join(new_dir, "slice_{:03d}.dcm".format(z))
 
@@ -222,7 +297,46 @@ def save_sitk_3d_img_to_dcm(image, new_dir):
         print("Saved slice {} to {}".format(z, filename))
 
     print("Saved 3D image to {}".format(new_dir))
+'''
+#takes sitk image and saves to directory as dcm files
+def save_sitk_3d_img_to_dcm(array, template_path, new_dir):
+    # Check if the directory exists, if not, create it
+    if not os.path.exists(new_dir):
+        os.makedirs(new_dir)
 
+    # Iterate through the slices and save each one
+    for z in range(array.shape[2]):
+        
+        # extract slice from 3d array
+        slice_arr = array[:,:,z]
+
+        # get and load template file for current slice
+        atlas_dir = get_atlas_path()
+        template_path = get_filepath(atlas, dir, z)
+        template = pydicom.dcmread(template_path)
+
+        # use template metadata to create new dicom dataset
+        ds = Dataset(template)
+
+        # assigns a slice's pixel data to dicom dataset
+        ds.PixelData = slice_arr.tobytes()
+
+        # updating tags
+        ds.Rows, ds.Columns = slice_arr.shape
+        ds.SliceLocation = str(z) 
+        ds.InstanceNumber = str(z)
+
+        # Create a filename for the slice
+        filename = os.path.join(new_dir, "slice_{:03d}.dcm".format(z))
+
+        # Save the DICOM slice to file
+        dcmwrite(filename, ds)
+
+        print("Saved slice {} to {}".format(z, filename))
+
+    print("Saved 3D image to {}".format(new_dir))
+
+#note, this function may have issues -Kevin
 def save_sitk_3d_img_to_png(image, new_dir):
     # Check if the directory exists, if not, create it
     if not os.path.exists(new_dir):
