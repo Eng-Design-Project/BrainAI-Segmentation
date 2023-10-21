@@ -67,9 +67,17 @@ def display_3d_array_slices(img_3d, num_slices):
     
     fig, axes = plt.subplots(rows, cols, figsize=(15, 15))
     
+    # Ensure axes is an array
+    if rows == 1 and cols == 1:
+        axes = np.array([[axes]])
+    elif rows == 1:
+        axes = np.array([axes])
+    elif cols == 1:
+        axes = np.array([list(axes)])
+    
     for i in range(num_slices):
         ax = axes.flat[i]
-        ax.imshow(img_3d[:, :, :, i])
+        ax.imshow(img_3d[:, :, i])
         ax.axis('off')  # Hide the axis
 
     # Hide any remaining empty subplots
@@ -78,6 +86,7 @@ def display_3d_array_slices(img_3d, num_slices):
     
     plt.tight_layout()
     plt.show()
+
 
 def save_2d_images_list(image_list, directory):
     # Ensure the directory exists
@@ -508,11 +517,18 @@ def contains_only_dcms(directory):
 
 
 if __name__ == "__main__":
-    print(is_segment_results_dir("atl_segmentation_DCMs"))
-    print(is_segment_results_dir("atl_segmentation_PNGs"))
-    print(is_segment_results_dir("atlas"))
-    print(is_segment_results_dir("atlas_pngs"))
-    print(contains_only_dcms("atlas"))
+    test_dir = "scan1"
+    test_pydicom_arr = get_3d_array_from_file(test_dir)
+    test_sitk_image = get_3d_image(test_dir)
+    test_sitk_arr = sitk.GetArrayFromImage(test_sitk_image)
+    display_3d_array_slices(test_pydicom_arr, 10)
+    display_3d_array_slices(test_sitk_arr, 10)
+    
+    # print(is_segment_results_dir("atl_segmentation_DCMs"))
+    # print(is_segment_results_dir("atl_segmentation_PNGs"))
+    # print(is_segment_results_dir("atlas"))
+    # print(is_segment_results_dir("atlas_pngs"))
+    # print(contains_only_dcms("atlas"))
 
 # Path to the directory that contains the DICOM files
 #directory1 = "scan1"

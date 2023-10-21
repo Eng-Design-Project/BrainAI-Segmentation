@@ -198,10 +198,7 @@ def train_with_user_feedback(self, windows, user_score):
 if __name__ == '__main__':
    print("running dl module")
    #classifier = CustomClassifier()
-   #test_dir = "scan1"
-   #test_input = data.get_3d_array_from_file(test_dir)
    
-   #data.display_3d_array_slices(test_input, 20)
 
 '''
 #class not needed
