@@ -152,28 +152,54 @@ class CustomClassifier:
             region_labels = self.labeled_data.get(region) if self.labeled_data else None
             #labeled data needs to be redone, to fit with the input data expected
 
-
             train_model(self.model, windows, user_score, region_labels)
             
+            #make predictions
             predictions = self.model.predict(windows)
+
+            #average predicted probability for positive class
+            avg_prediction = np.mean(predictions[:, 1])
+
+            #what datastruct is predictions? does this round or just make things 1? Find the highest preds?
             predicted_labels = np.argmax(predictions, axis=1)
 
             classified_indices = indices[predicted_labels == 1]
             self.classification_dict[region] = classified_indices
 
         return self.classification_dict
-
+    
+def train_with_user_feedback(self, windows, user_score):
+        # Step 1: Predict with current model
+        predictions = self.model.predict(windows)
+        
+        # Step 2: Compute average predicted probability for positive class
+        avg_prediction = np.mean(predictions[:, 1])
+        
+        # Step 3: Define a loss based on the user's score
+        # We can use mean squared error here, but other choices might be appropriate depending on the problem
+        loss = (avg_prediction - user_score) ** 2
+        
+        # Step 4: Update the model
+        # This part is tricky without labeled data; we need a way to compute gradients
+        # One option is to use a library like TensorFlow's 'tape' mechanism
+        with tf.GradientTape() as tape:
+            tape.watch(self.model.trainable_variables)
+            # Repredict to get the model's outputs as TensorFlow tensors
+            predictions_tf = self.model(windows, training=True)
+            avg_prediction_tf = tf.reduce_mean(predictions_tf[:, 1])
+            loss_tf = (avg_prediction_tf - user_score) ** 2
+        grads = tape.gradient(loss_tf, self.model.trainable_variables)
+        optimizer = tf.keras.optimizers.Adam()
+        optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
 
 
 if __name__ == '__main__':
    print("running dl module")
-   classifier = CustomClassifier()
-#    test_dir = "scan1"
-#    test_input = data.get_3d_array_from_file(test_dir)
-#    print(np.shape(test_input))
-#    windows, indices = extract_windows(test_input)S
-#    windows = windows[..., np.newaxis]
-#    print(np.shape(windows))
+   #classifier = CustomClassifier()
+   #test_dir = "scan1"
+   #test_input = data.get_3d_array_from_file(test_dir)
+   
+   #data.display_3d_array_slices(test_input, 20)
 
 '''
 #class not needed
