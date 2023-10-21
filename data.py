@@ -560,14 +560,16 @@ def sitk_dict_to_png_dict(img_dict):
         png_dict[key] = {}
 
         dcm_data = pydicom.dcmread(img_dict[key])
-        
-        slice_image_np = dcm_data.pixel_array
-        slice_image_np = np.interp(slice_image_np, (slice_image_np.min(), slice_image_np.max()), (0, 255))
-        slice_image_np = np.uint8(slice_image_np)
 
-        slice_png = Image.fromarray(slice_image_np)
+        full_image_np = dcm_data.pixel_array
 
-        png_dict[key] = slice_png
+        for z in range(full_image_np.shape[0]):
+            slice_image_np = full_image_np[z,:,:]
+            slice_image_np = np.interp(slice_image_np, (slice_image_np.min(), slice_image_np.max()), (0, 255))
+            slice_image_np = np.uint8(slice_image_np)
+
+            slice_png = Image.fromarray(slice_image_np)
+            png_dict[key][z] = slice_png
 
     #print("PNG DICTIONARY HAS BEEN GENERATED")       
     return png_dict
