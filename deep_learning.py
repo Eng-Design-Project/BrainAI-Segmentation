@@ -131,7 +131,7 @@ def executeDL(dict_of_np_arrays, user_score=0, model=buildPixelModel()):
 #   if windows are a class attribute, than we wouldn't need to keep the entire image in memory
 class CustomClassifier:
     def __init__(self, initial_model=None, labeled_data=None):
-        self.model = initial_model if initial_model else self.buildPixelModel()
+        self.model = initial_model if initial_model else buildPixelModel()
         self.classification_dict = {}
         self.normalized_data = None
         self.labeled_data = labeled_data
@@ -197,7 +197,7 @@ def train_with_user_feedback(self, windows, user_score):
 
 if __name__ == '__main__':
    print("running dl module")
-   #classifier = CustomClassifier()
+   classifier = CustomClassifier()
    
 
 '''
