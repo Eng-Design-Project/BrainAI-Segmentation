@@ -529,6 +529,9 @@ def store_seg_png_on_file(img_dict, new_dir):
         save_sitk_3d_img_to_png(img_dict[key], sub_dir)
         #print("key:", key)
 
+# SITK TO PYDICOM - MD
+# original:
+'''
 # the function below takes a dictionary of sitk images and returns an equivalent dict of png images
 # img_dict parameter is a dictionary whose keys are strings, and values are sITK 3d images
 def sitk_dict_to_png_dict(img_dict):
@@ -547,6 +550,25 @@ def sitk_dict_to_png_dict(img_dict):
 
             slice_png = Image.fromarray(slice_image_np)
             png_dict[key][z] = slice_png
+    #print("PNG DICTIONARY HAS BEEN GENERATED")       
+    return png_dict
+'''
+def sitk_dict_to_png_dict(img_dict):
+    png_dict = {} # this will be the dict of PNGs
+    for key in img_dict:
+        # Create a new nested dictionary for the keya
+        png_dict[key] = {}
+
+        dcm_data = pydicom.dcmread(img_dict[key])
+        
+        slice_image_np = dcm_data.pixel_array
+        slice_image_np = np.interp(slice_image_np, (slice_image_np.min(), slice_image_np.max()), (0, 255))
+        slice_image_np = np.uint8(slice_image_np)
+
+        slice_png = Image.fromarray(slice_image_np)
+
+        png_dict[key] = slice_png
+
     #print("PNG DICTIONARY HAS BEEN GENERATED")       
     return png_dict
 
