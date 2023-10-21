@@ -5,42 +5,64 @@ import numpy as np
 import matplotlib.pyplot as plt
 import SimpleITK as sitk
 import data
-
-import numpy as np
+import pydicom
 from scipy.ndimage import affine_transform
 from scipy.signal import fftconvolve
-import SimpleITK as sitk
-
-def create_black_copy(image: sitk.Image) -> sitk.Image:
-    # Create a copy of the input image
-    black_image = sitk.Image(image.GetSize(), image.GetPixelID())
-    black_image.SetOrigin(image.GetOrigin())
-    black_image.SetSpacing(image.GetSpacing())
-    black_image.SetDirection(image.GetDirection())
-
-    # All pixel values are already set to 0 (black) upon initialization
-    return black_image
-
 #for expand region of interest
 from scipy.ndimage import convolve
+from pydicom.uid import ExplicitVRLittleEndian  # or another transfer syntax UID
 
-def array_to_image_with_ref(data: np.ndarray, reference_image: sitk.Image) -> sitk.Image:
-    # Convert the numpy array to a SimpleITK image
-    new_image = sitk.GetImageFromArray(data)
+#Converted to pydicom
+def create_black_copy(ds_ref: pydicom.Dataset) -> pydicom.Dataset:
+    # Create a deep copy of the reference DICOM dataset
+    ds_new = pydicom.dcmread("black_image_template.dcm")
+    
+    # Copy spatial information and other relevant metadata from ds_ref to ds_new
+    ds_new.PixelSpacing = ds_ref.PixelSpacing
+    ds_new.ImagePositionPatient = ds_ref.ImagePositionPatient
+    ds_new.ImageOrientationPatient = ds_ref.ImageOrientationPatient
+    # Add other DICOM tags that you want to keep the same
+    
+    # Create a numpy array of zeros with the same shape as ds_ref's pixel array
+    zero_pixel_array = np.zeros(ds_ref.pixel_array.shape, dtype=ds_ref.pixel_array.dtype)
+    
+    # Convert the numpy array to bytes and store in PixelData
+    ds_new.PixelData = zero_pixel_array.tobytes()
+    
+    return ds_new
+
+#converted to pydicom
+def array_to_image_with_ref(data: np.ndarray, reference_image: pydicom.Dataset) -> pydicom.Dataset:
+    # Convert the numpy array to a pydicom Dataset
+    new_image = pydicom.dcmread("black_image_template.dcm")  # Start with a template
+    
+    # Update pixel data
+    new_image.PixelData = data.tobytes()
+    
+    # Update dimensions based on the numpy array shape
+    new_image.Rows, new_image.Columns = data.shape
     
     # Set the spatial information from the reference_image
-    new_image.SetSpacing(reference_image.GetSpacing())
-    new_image.SetOrigin(reference_image.GetOrigin())
-    new_image.SetDirection(reference_image.GetDirection())
+    new_image.PixelSpacing = reference_image.PixelSpacing
+    new_image.ImagePositionPatient = reference_image.ImagePositionPatient
+    new_image.ImageOrientationPatient = reference_image.ImageOrientationPatient
+    
+    # Update other necessary DICOM tags
+    new_image.SamplesPerPixel = 1
+    new_image.PhotometricInterpretation = "MONOCHROME2"
+    new_image.BitsAllocated = 16  # Assuming the numpy array is np.int16
+    new_image.BitsStored = 16
+    new_image.HighBit = 15
+    new_image.TransferSyntaxUID = ExplicitVRLittleEndian
 
     return new_image
 
 #this is the currently used
-def scipy_register_images(target, moving):
+#Converted to pydicom
+def scipy_register_images(target: np.ndarray, moving: np.ndarray) -> np.ndarray:
     """
     Register the moving image to the target image using cross-correlation and return the transformed image.
     """
-    
     # Calculate the cross-correlation in 3D
     cross_correlation = fftconvolve(target, moving[::-1, ::-1, ::-1], mode='same')
     
@@ -55,41 +77,42 @@ def scipy_register_images(target, moving):
     
     return registered_image
 
-def test_scipy_register_images(atlas, image):
+def test_scipy_register_images(atlas: pydicom.Dataset, image: pydicom.Dataset):
     print("testing scipy image reg")
-    #get sitk images
-    sitk_moving_image = data.get_3d_image(image)
-    sitk_target_image = data.get_3d_image(atlas)
-    # Convert the SimpleITK Images to NumPy arrays
-    moving_image = sitk.GetArrayFromImage(sitk_moving_image)
-    target_image = sitk.GetArrayFromImage(sitk_target_image)
-    #register the 3d array to atlas 3d array
+
+    ds_moving_image = image  # Assuming this is already a pydicom dataset
+    ds_target_image = atlas  # Assuming this is already a pydicom dataset
+
+    moving_image = ds_moving_image.pixel_array
+    target_image = ds_target_image.pixel_array
+
     reg_image = scipy_register_images(target_image, moving_image)
-    #convert registered array to sitk image
-    reg_image = array_to_image_with_ref(reg_image, sitk_moving_image)
-    #save registered image as dcm first, then as png
-    data.save_sitk_3d_img_to_dcm(reg_image, "scipy_reg_image_dcm")
-    data.save_dcm_dir_to_png_dir("scipy_reg_image_dcm", "scipy_reg_png")
+
+    # Create a new DICOM dataset for the registered image
+    ds_reg_image = pydicom.dcmread("template.dcm")  # Assuming you have a template DICOM file to clone
+    ds_reg_image.PixelData = reg_image.tobytes()
+    ds_reg_image.Rows, ds_reg_image.Columns = reg_image.shape[:2]
+
+    # Copy relevant metadata
+    ds_reg_image.ImagePositionPatient = ds_moving_image.ImagePositionPatient
+    ds_reg_image.ImageOrientationPatient = ds_moving_image.ImageOrientationPatient
+    ds_reg_image.PixelSpacing = ds_moving_image.PixelSpacing
+
+    data.save_pydicom_3d_img_to_dcm(ds_reg_image, "scipy_reg_image_dcm")  # Assume this function now saves a pydicom dataset
+    data.save_dcm_dir_to_png_dir("scipy_reg_image_dcm", "scipy_reg_png")  
 
     #note: the problem may be with sitk registration where the dcm's have different values 
     # for metadata like spacing
 #test_scipy_register_images("atlas", "scan2")
 
-# Example usage
-#target_image = np.random.rand(100, 100, 100)
-#moving_image = np.roll(target_image, shift=5, axis=0)  # Let's shift target image by 5 pixels in x-direction
-#registered_image = scipy_register_images(target_image, moving_image)
-# Now, the 'registered_image' should be closely aligned with 'target_image'
-
-
 #expand region of interest
 #this adds an extra layer of pixels to a segmented image from the original image
-#takes sitk images now
-def expand_roi(original_sitk, segment_sitk):
-    #convert to 3d arrays for convolution
-    original_arr = sitk.GetArrayFromImage(original_sitk)
-    segment_arr = sitk.GetArrayFromImage(segment_sitk)
-
+#converted to pydicom
+def expand_roi(original_dcm: pydicom.Dataset, segment_dcm: pydicom.Dataset) -> pydicom.Dataset:
+    # Convert to 3D arrays for convolution
+    original_arr = original_dcm.pixel_array
+    segment_arr = segment_dcm.pixel_array
+    
     # Define a kernel for 3D convolution that checks for 26 neighbors in 3D
     kernel = np.ones((3, 3, 3))
     kernel[1, 1, 1] = 0
@@ -104,9 +127,22 @@ def expand_roi(original_sitk, segment_sitk):
     # Copy pixel values from the original image to the boundary in the expanded segment
     expanded_segment_arr[boundary] = original_arr[boundary]
 
-    expanded_segment = sitk.GetImageFromArray(expanded_segment_arr)
+    # Create a new DICOM dataset for the expanded segment
+    ds_expanded_segment = pydicom.dcmread("template.dcm")  # Assuming you have a template DICOM file to clone
+    ds_expanded_segment.PixelData = expanded_segment_arr.tobytes()
+    ds_expanded_segment.Rows, ds_expanded_segment.Columns = expanded_segment_arr.shape[:2]
     
-    return expanded_segment
+    # Copy relevant metadata
+    ds_expanded_segment.ImagePositionPatient = segment_dcm.ImagePositionPatient
+    ds_expanded_segment.ImageOrientationPatient = segment_dcm.ImageOrientationPatient
+    ds_expanded_segment.PixelSpacing = segment_dcm.PixelSpacing
+
+    #ChatGPT mentioned that these metadata fields may be necessary, but I am unconvinced so I am leaving them here, commented out, for now.
+    #ds_expanded_segment.SliceThickness = segment_dcm.SliceThickness
+    #ds_expanded_segment.SeriesInstanceUID = segment_dcm.SeriesInstanceUID
+    #ds_expanded_segment.StudyInstanceUID = segment_dcm.StudyInstanceUID
+    
+    return ds_expanded_segment
 
 # Example usage:
 # original = np.random.rand(10, 10, 10)
@@ -138,19 +174,7 @@ def atlas_segment(atlas, image,
         registration_method.SetOptimizerAsGradientDescent(learningRate=1.0, numberOfIterations=100, convergenceMinimumValue=1e-6, convergenceWindowSize=10)
         registration_method.SetOptimizerScalesFromPhysicalShift()
 
-    #initial transform
-    #initial_transform = sitk.TranslationTransform(atlas.GetDimension())
-        #transforms only translation? affline instead?
-    #Rigid Transform (Rotation + Translation):
-    #initial_transform = sitk.Euler3DTransform()
-    #Similarity Transform (Rigid + isotropic scaling):
-    #initial_transform = sitk.Similarity3DTransform()
-    #Affine Transform (includes rotations, translations, scaling, and shearing):
     initial_transform = sitk.AffineTransform(atlas.GetDimension())
-    #BSpline Transform (a non-rigid, deformable transform): *DOES NOT CURRENTLY WORK*
-    #order_x, order_y, order_z = 5, 5, 5
-    #initial_transform = sitk.BSplineTransformInitializer(atlas, [order_x, order_y, order_z])
-
 
     registration_method.SetInitialTransform(initial_transform)
 
@@ -183,6 +207,48 @@ def atlas_segment(atlas, image,
     registered_image = resampler.Execute(image)
     return registered_image
 
+#This is some of what chatGPT has provided with regards to the atlas segment definition. 
+#pydicom does not have image registration functionality like SimpleITK does. More work will be needed in this regard.
+''' def atlas_segment_pydicom(atlas_file, image_file, simMetric="MeanSquares", optimizer="GradientDescent", interpolator="Linear", samplerInterpolator="Linear"):
+    
+    # Read DICOM files
+    atlas_dcm = pydicom.dcmread(atlas_file)
+    image_dcm = pydicom.dcmread(image_file)
+    
+    # Get the pixel arrays as numpy arrays
+    atlas = atlas_dcm.pixel_array
+    image = image_dcm.pixel_array
+    
+    # Here, add your registration method to compute the final affine transform
+    # This will replace SimpleITK's registration functionality
+    # final_affine_transform = some_registration_method(atlas, image, ...)
+    
+    # If your final affine transform is a scipy-compatible array,
+    # you can use scipy.ndimage.affine_transform to apply it:
+    if interpolator == "Linear":
+        mode = 'linear'
+    else:
+        print("Default interpolator: Linear")
+        mode = 'linear'
+    
+    # Assuming final_affine_transform is set and is a 2D matrix
+    # registered_image = affine_transform(image, final_affine_transform, mode=mode)
+    
+    # Create a new DICOM file for the registered image
+    # You should copy most metadata from the original image
+    registered_dcm = pydicom.dcmread(image_file)
+    
+    # Update the pixel array with the registered image
+    # Assuming registered_image is a numpy array
+    # registered_dcm.PixelData = registered_image.tobytes()
+    
+    return registered_dcm  # This would be your registered DICOM image
+
+# You would call the function like this:
+# registered_dcm = atlas_segment("atlas.dcm", "image.dcm")
+# registered_dcm.save_as("registered.dcm")
+'''
+
 def test_atlas_segment_hardcoded():
     # Path to the directory that contains the DICOM files
     atlas_dir = "scan1"
@@ -207,87 +273,74 @@ def test_atlas_segment_hardcoded():
     data.save_dcm_dir_to_png_dir("registered", "reg pngs")
 #test_atlas_segment_hardcoded()
 
+
+# Converted to pydicom. Another image registration method will be required, though, 
+# because pydicom does not contain an image registration method like the demons registration method that SimpleITK does.
 def initial_segment_test():
     # Load DICOM filepaths
     dicom_path1 = "scan2/ADNI_003_S_1059_PT_adni2__br_raw_20071211125948781_11_S43552_I84553.dcm"
     dicom_path2 = "scan2/ADNI_003_S_1059_PT_adni2__br_raw_20071211125949312_18_S43552_I84553.dcm"
+    dicom1 = pydicom.dcmread(dicom_path1)
+    dicom2 = pydicom.dcmread(dicom_path2)
 
-    # get sitk images
-    image1 = sitk.ReadImage(dicom_path1, sitk.sitkFloat32)
-    image2 = sitk.ReadImage(dicom_path2, sitk.sitkFloat32)
+    # Convert to numpy arrays
+    image1 = dicom1.pixel_array
+    image2 = dicom2.pixel_array
 
-    # Convert SimpleITK images to numpy arrays for displaying
-    pixel_array1 = sitk.GetArrayFromImage(image1)
-    pixel_array2 = sitk.GetArrayFromImage(image2)
-
-    # Print the dimensions of image1 and image2 before registration
+    # Print dimensions before registration
     print("Image 1 - Before Registration:")
-    print("Size:", image1.GetSize())
-    print("Spacing:", image1.GetSpacing())
-    print("Direction:", image1.GetDirection())
+    print("Shape:", image1.shape)
     print()
 
     print("Image 2 - Before Registration:")
-    print("Size:", image2.GetSize())
-    print("Spacing:", image2.GetSpacing())
-    print("Direction:", image2.GetDirection())
+    print("Shape:", image2.shape)
     print()
 
-    # Perform image registration using Demons registration filter
-    demons_registration_filter = sitk.DemonsRegistrationFilter()
-    final_transform = demons_registration_filter.Execute(image1, image2)
+    # Assume a transformation has been calculated (this is a placeholder)
+    # final_affine_transform = calculate_your_transform_here(image1, image2)
 
-    # Explicitly set the transformation type to DisplacementFieldTransform
-    final_transform = sitk.DisplacementFieldTransform(final_transform)
+    # Apply transformation to image2 to register it to image1
+    # Here, we're using scipy.ndimage.affine_transform as a placeholder
+    registered_image = affine_transform(image2, np.eye(2), offset=[0,0])
 
-    # Apply the final transformation to image2 (moving image)
-    registered_image = sitk.Resample(image2, image1, final_transform, sitk.sitkLinear, 0.0, sitk.sitkFloat32)
-
-    # Convert SimpleITK images to numpy arrays for displaying
-    pixel_array3 = sitk.GetArrayFromImage(image1)
-    pixel_array4 = sitk.GetArrayFromImage(image2)
-    registered_array = sitk.GetArrayFromImage(registered_image)
-
-    # Plot the original and registered images
+    # Plot images
     plt.figure(figsize=(20, 5))
 
     # Plot Image 1 - Before Registration
     plt.subplot(151)
-    plt.imshow(pixel_array1.squeeze(), cmap='gray')
+    plt.imshow(image1, cmap='gray')
     plt.title("Image 1 - Before Registration")
     plt.axis('off')
 
     # Plot Image 2 - Before Registration
     plt.subplot(152)
-    plt.imshow(pixel_array2.squeeze(), cmap='gray')
+    plt.imshow(image2, cmap='gray')
     plt.title("Image 2 - Before Registration")
     plt.axis('off')
 
-    # Plot Image 1 - After Registration
+    # Plot Image 1 - After Registration (should be same as before)
     plt.subplot(153)
-    plt.imshow(pixel_array3.squeeze(), cmap='gray')
+    plt.imshow(image1, cmap='gray')
     plt.title("Image 1 - After Registration")
     plt.axis('off')
 
-    # Plot Image 2 - After Registration
-    plt.subplot(154)
-    plt.imshow(pixel_array4.squeeze(), cmap='gray')
-    plt.title("Image 2 - After Registration")
-    plt.axis('off')
-
     # Plot Registered Image
-    plt.subplot(155)
-    plt.imshow(registered_array.squeeze(), cmap='gray')
+    plt.subplot(154)
+    plt.imshow(registered_image, cmap='gray')
     plt.title("Registered Image")
     plt.axis('off')
 
     plt.show()
+
+# Run the function
+#initial_segment_test()
 
 #data.save_dcm_dir_to_png_dir("atlas", "atlas pngs")
 #data.save_dcm_dir_to_png_dir("registered", "reg pngs")
 
 #THIS FUNCTION WILL BE DEPRECATED SOON, AS THERE IS A FUNCTION IN THE DATA MODULE THAT DOES IT MORE SIMPLY
 #given a dictionary with region names as keys and sitk images as values, this funciton displays them
+#I have not any changes to this function because the above comments suggest that this function should be deleted anyway
 def display_regions_from_dict(region_images):
     for region_name, region_image in region_images.items():
         print(region_name)
@@ -301,16 +354,24 @@ def display_regions_from_dict(region_images):
         plt.title(f"Region: {region_name}")
         plt.show()
 
-def create_seg_images_from_image(image, region_dict):
+#converted to pydicom
+def create_seg_images_from_image(dicom_file, region_dict):
+    # Read DICOM file and get pixel array
+    dicom_data = pydicom.dcmread(dicom_file)
+    image = dicom_data.pixel_array
+    
     output_images = {}
     for region_name, coordinates_list in region_dict.items():
         blank_image = create_black_copy(image)
         
+        # Get image dimensions
+        x_size, y_size, z_size = image.shape
+        
         for coordinates in coordinates_list:
             x, y, z = coordinates
-            if (0 <= x < image.GetSize()[0]) and \
-               (0 <= y < image.GetSize()[1]) and \
-               (0 <= z < image.GetSize()[2]):
+            if (0 <= x < x_size) and \
+               (0 <= y < y_size) and \
+               (0 <= z < z_size):
                 pixel_value = image[x, y, z]
                 blank_image[x, y, z] = pixel_value
                 
@@ -318,11 +379,13 @@ def create_seg_images_from_image(image, region_dict):
         output_images[region_name] = blank_image
 
     print(f"Size of output images:  {len(output_images)}")
-
+    
     return output_images
 
 #this would take a dict of atlas segmented images, and then further refine them with coordinates output by an 
 # Advanced Segmentation algo, with corresponding region names
+
+#converted to pydicom 
 def create_seg_images_from_dict(images_dict, coords_dict):
     output_images = {}
 
@@ -333,15 +396,26 @@ def create_seg_images_from_dict(images_dict, coords_dict):
             continue
 
         current_image = images_dict[region_name]
+        
+        # Extract the numpy array from the current DICOM dataset
+        current_pixel_array = current_image.pixel_array
+
+        # Create a black copy of the current image
         blank_image = create_black_copy(current_image)
+
+        # Extract the numpy array from the blank DICOM dataset
+        blank_pixel_array = blank_image.pixel_array
 
         for coordinates in coordinates_list:
             x, y, z = coordinates
-            if (0 <= x < current_image.GetSize()[0]) and \
-               (0 <= y < current_image.GetSize()[1]) and \
-               (0 <= z < current_image.GetSize()[2]):
-                pixel_value = current_image[x, y, z]
-                blank_image[x, y, z] = pixel_value
+            if (0 <= x < current_pixel_array.shape[0]) and \
+               (0 <= y < current_pixel_array.shape[1]) and \
+               (0 <= z < current_pixel_array.shape[2]):
+                pixel_value = current_pixel_array[x, y, z]
+                blank_pixel_array[x, y, z] = pixel_value
+
+        # Update the pixel data in the blank_image DICOM dataset
+        blank_image.PixelData = blank_pixel_array.tobytes()
 
         # Append the finished blank_image to the output_images dictionary
         output_images[region_name] = blank_image
@@ -351,64 +425,26 @@ def create_seg_images_from_dict(images_dict, coords_dict):
     return output_images
 
 
-# takes a directory of DCMs, outputs a dictionary with region names as keys and sitk images as the values
-def DCMs_to_sitk_img_dict(directory):
-    image = data.get_3d_image(directory)
-
-    #this part of the function could be expanded to have more regions
-    def generate_regions(): 
+def DCMs_to_pydicom_img_dict(directory):
+    image = data.get_3d_image(directory)  # Assuming this function now returns a 3D NumPy array
+    
+    def generate_regions():
         region1 = [[x, y, z] for x in range(0, 51) for y in range(0, 51) for z in range(0, 51)]
         region2 = [[x, y, z] for x in range(50, 101) for y in range(50, 101) for z in range(0, 50)]
-
+        
         region_dict = {
             "Region1": region1,
             "Region2": region2
         }
+        
         return region_dict
     
-    # Define your regions and their coordinates here
     region_dict = generate_regions()
-    region_images = create_seg_images_from_image(image, region_dict)
-    #display_regions_from_dict(region_images)
-    data.display_seg_images(region_images)
+    region_images = create_seg_images_from_image(image, region_dict)  # Assuming this function now accepts 3D NumPy arrays
+    data.display_seg_images(region_images)  # Assuming this function now accepts 3D NumPy arrays
+
     
-#DCMs_to_sitk_img_dict("scan1")
 
-#extra pixel layer algo
-#takes the registered scan, a brain region scan
-#for all non-black voxels, note coordinates of adjacent black voxels
-#copy pixel data at those coordinates from the registered image 
-# to a copy of brain region image
-#return 'blurred' brain region image
-
-
-#registration testing
-#get two similar images
-#register one to the other
-#display both original and new for comparison
-
-#optimizers
-#gradient descent-based methods and LBFGS 
-# Gradient Descent Optimizer and its variants like 
-# Gradient Descent Line Search, Regular Step Gradient Descent,
-#  and Conjugate Gradient are often used.
-
-#similarity metrics
-#start with mean squares or normalized cross-correlation. 
-# If these do not give satisfactory results, you may try mutual information.
-
-#interpolator
-#sitk.sitkLinear
-
-#takes 3d array, new version takes list of 2d arrays
-# def encode_atlas_colors(image_3d: np.ndarray) -> dict:
-#     #hard coded colors to region
-#     color_to_region_dict = {
-#         (237, 28, 36): 'Skull',   # Redish
-#         (0, 162, 232): 'Brain',   # Blueish
-#         #... add other colors and regions as required
-#     }
-#     # Initialize the output dictionary with region names as keys and empty lists as values
 """#     region_coords_dict = {region: [] for region in color_to_region_dict.values()}
 
 #     # Iterate through the 3D array to get the coordinates and pixel values
@@ -427,34 +463,31 @@ def DCMs_to_sitk_img_dict(directory):
 #     return region_coords_dict"""
 
 def encode_atlas_colors(image_list: list) -> dict:
-    # Hard-coded colors to region
     color_to_region_dict = {
-        (237, 28, 36): 'Skull',   # Redish
-        (0, 162, 232): 'Brain',   # Blueish
-        # ... add other colors and regions as required
+        (237, 28, 36): 'Skull',
+        (0, 162, 232): 'Brain',
     }
-    # Initialize the output dictionary with region names as keys and empty lists as values
+
     region_coords_dict = {region: [] for region in color_to_region_dict.values()}
 
-    # Iterate through the list of 2D arrays to get the coordinates and pixel values
     for z, image_2d in enumerate(image_list):
         for y in range(image_2d.shape[0]):
             for x in range(image_2d.shape[1]):
-                pixel_color = tuple(image_2d[y, x])  # note, yx from 2d arrays
-                # If the pixel color exists in the dictionary, add its coordinate to the respective list
-                # if pixel_color != (0, 0, 0):
-                #     print(pixel_color)
+                pixel_color = tuple(image_2d[y, x])
                 max_channel = max(pixel_color)
+                
                 if max_channel > 100:
-                    if pixel_color.index(max_channel) == 0:  # Red channel is largest
+                    if pixel_color.index(max_channel) == 0:
                         pixel_color = (237, 28, 36)
-                    elif pixel_color.index(max_channel) == 2:  # Blue channel is largest
+                    elif pixel_color.index(max_channel) == 2:
                         pixel_color = (0, 162, 232)
+                        
                 if pixel_color in color_to_region_dict:
                     region = color_to_region_dict[pixel_color]
-                    region_coords_dict[region].append([x, y, z])  # note zyx for comparison to sitk images
-    #print(region_coords_dict["Brain"])
+                    region_coords_dict[region].append([x, y, z])
+    
     return region_coords_dict
+
 
 
 def test_encode_atlas_colors():
