@@ -46,7 +46,7 @@ def normalize_np_dict(volume3dDict):
 def buildPixelModel(window_size=3):
     # Assumes input is a 3D patch of size [window_size, window_size, window_size]
     model = tf.keras.Sequential([
-        tf.keras.layers.InputLayer(input_shape=(window_size, window_size, window_size)),
+        tf.keras.layers.InputLayer(input_shape=(window_size, window_size, window_size, 1)),
         tf.keras.layers.Conv3D(32, (window_size, window_size, window_size), activation='relu', padding='valid'),
         tf.keras.layers.Flatten(),
         tf.keras.layers.Dense(128, activation='relu'),
@@ -131,12 +131,12 @@ def executeDL(dict_of_np_arrays, user_score=0, model=buildPixelModel()):
 #   if windows are a class attribute, than we wouldn't need to keep the entire image in memory
 class CustomClassifier:
     def __init__(self, initial_model=None, labeled_data=None):
-        self.model = initial_model if initial_model else self.buildPixelModel()
+        self.model = initial_model if initial_model else buildPixelModel()
         self.classification_dict = {}
         self.normalized_data = None
         self.labeled_data = labeled_data
 
-
+    
     def executeDL(self, dict_of_np_arrays, user_score=0):
         self.normalized_data = normalize_np_dict(dict_of_np_arrays)
 
@@ -168,7 +168,12 @@ class CustomClassifier:
 if __name__ == '__main__':
    print("running dl module")
    classifier = CustomClassifier()
-
+#    test_dir = "scan1"
+#    test_input = data.get_3d_array_from_file(test_dir)
+#    print(np.shape(test_input))
+#    windows, indices = extract_windows(test_input)
+#    windows = windows[..., np.newaxis]
+#    print(np.shape(windows))
 
 '''
 #class not needed
