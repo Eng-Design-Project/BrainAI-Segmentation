@@ -46,7 +46,7 @@ def normalize_np_dict(volume3dDict):
 def buildPixelModel(window_size=3):
     # Assumes input is a 3D patch of size [window_size, window_size, window_size]
     model = tf.keras.Sequential([
-        tf.keras.layers.InputLayer(input_shape=(window_size, window_size, window_size)),
+        tf.keras.layers.InputLayer(input_shape=(window_size, window_size, window_size, 1)),
         tf.keras.layers.Conv3D(32, (window_size, window_size, window_size), activation='relu', padding='valid'),
         tf.keras.layers.Flatten(),
         tf.keras.layers.Dense(128, activation='relu'),
