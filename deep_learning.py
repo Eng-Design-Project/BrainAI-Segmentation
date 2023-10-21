@@ -12,8 +12,14 @@ sitk_images_dict = {
     # Add other images...
 }
 
+# SITK TO PYDICOM - MD
+# original:
+'''
 #for the dummyDL functiom
 numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in sitk_images_dict.items()}
+'''
+#for the dummyDL functiom
+numpyImagesDict = images.dict
 
 #for the dummyDL function
 #labeled data is tricky, because it should probably be in the same format as the input data + a 1 or 0 label
