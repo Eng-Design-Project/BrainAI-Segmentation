@@ -135,18 +135,20 @@ class CustomClassifier:
         self.classification_dict = {}
         self.normalized_data = None
         self.labeled_data = labeled_data
+        self.windows = None
 
-
-    def executeDL(self, dict_of_np_arrays, user_score=0):
-        self.normalized_data = normalize_np_dict(dict_of_np_arrays)
+    def executeDL(self, dict_of_np_arrays=None, user_score=0):
+        if self.normalized_data == None:
+            self.normalized_data = normalize_np_dict(dict_of_np_arrays)
 
         # No need to compile multiple times, so we check if it's compiled.
         if not hasattr(self.model, 'optimizer'):
             self.model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
 
         for region, seg_volume in self.normalized_data.items():
-            windows, indices = extract_windows(seg_volume)
-            windows = windows[..., np.newaxis]  # Adding a channel dimension
+            if self.windows == None:
+                windows, indices = extract_windows(seg_volume)
+                self.windows = windows[..., np.newaxis]  # Adding a channel dimension
 
             # Using the labeled_data for the specific region if available
             region_labels = self.labeled_data.get(region) if self.labeled_data else None
