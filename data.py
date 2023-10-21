@@ -5,6 +5,7 @@ import skimage
 from skimage.transform import resize
 import os
 import subprocess
+import scipy
 import sys
 from PIL import Image
 import pydicom
@@ -112,9 +113,9 @@ def get_3d_image(directory):
 '''
 def get_3d_image(directory):
     # Get a list of all DICOM files in the directory
-    scan_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")]
-    # Read in the image series
-    image = pydicom.dcmread(scan_files[0]) 
+    scan_files = sorted([os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")])
+    slices = [pydicom.dcmread(s).pixel_array for s in scan_files]    
+    image = np.stack(slices, axis=0) 
     return image
 
 # folder of DCM images as input
@@ -123,7 +124,6 @@ def get_3d_array_from_file(folder_path):
     slices = [pydicom.dcmread(os.path.join(folder_path, f)) for f in image_files] # read each file
     slices.sort(key=lambda x: float(x.ImagePositionPatient[2])) # sorting and maintaining correct order
     return np.stack([s.pixel_array for s in slices])
-
 # SITK TO PYDICOM - MD
 # original:
 '''
@@ -215,7 +215,7 @@ def resize_and_convert_to_3d_image(directory):
     for i in range(0, array.shape[0]):
         new_images.append(resize(array[i,:,:], (224, 224), anti_aliasing=True))
     return new_images
-
+    
 # SITK TO PYDICOM - MD
 # original:
 '''
@@ -260,6 +260,7 @@ def get_filepath(directory, index):
         return os.path.join(directory, filenames[index])
     else:
         return None
+
 
 # SITK TO PYDICOM - MD
 # i'm not too confident about this one, please review.
@@ -308,31 +309,18 @@ def save_sitk_3d_img_to_dcm(array, template_path, new_dir):
         os.makedirs(new_dir)
 
     # Iterate through the slices and save each one
-    for z in range(array.shape[2]):
-        
-        # extract slice from 3d array
-        slice_arr = array[:,:,z]
+    for z in range(array.shape[0]):
+        slice_arr = array[z,:,:]
 
-        # get and load template file for current slice
-        atlas_dir = get_atlas_path()
-        template_path = get_filepath(atlas, dir, z)
         template = pydicom.dcmread(template_path)
-
-        # use template metadata to create new dicom dataset
         ds = Dataset(template)
 
-        # assigns a slice's pixel data to dicom dataset
         ds.PixelData = slice_arr.tobytes()
-
-        # updating tags
         ds.Rows, ds.Columns = slice_arr.shape
         ds.SliceLocation = str(z) 
         ds.InstanceNumber = str(z)
 
-        # Create a filename for the slice
         filename = os.path.join(new_dir, "slice_{:03d}.dcm".format(z))
-
-        # Save the DICOM slice to file
         dcmwrite(filename, ds)
 
         print("Saved slice {} to {}".format(z, filename))
@@ -395,6 +383,9 @@ def open_folder_dialog():
     else:
         print("Unsupported platform")
 
+# SITK TO PYDICOM - MD
+# original:
+'''
 def rescale_image(input_image):
     """
     Rescale the input image to have a size of 128x128 in width and height
@@ -421,14 +412,39 @@ def rescale_image(input_image):
                                     input_image.GetPixelID())
 
     return resampled_image
+'''
+def rescale_image(input_image_np):
+    """
+    Rescale the input image to have a size of 128x128 in width and height
+    while keeping the depth the same.
+    """
+    original_size = input_image_np.shape
 
+    # New size (keeping the depth the same)
+    new_size = [original_size[2], 128, 128]
+
+    resampled_image_np = scipy.ndimage.zoom(input_image_np, (original_size[0]/new_size[0], original_size[1]/new_size[1], 1))
+
+    return resampled_image_np
+
+# SITK TO PYDICOM - MD
+# original:
+'''
 def rescale_image_test(orig_dir):
     orig_img = get_3d_image(orig_dir)
     new_img = rescale_image(orig_img)
     save_sitk_3d_img_to_dcm(new_img, "rescaled test")
+'''
+def rescale_image_test(orig_dir):
+    orig_img_np = get_3d_image(orig_dir)
+    new_img_np = rescale_image(orig_img_np)
+    save_sitk_3d_img_to_dcm(new_img_np, "rescaled test")
 
 #rescale_image_test("registered")
 
+# SITK TO PYDICOM - MD
+# original:
+'''
 # this function takes a dictionary as input - with the keys being brain region names and 
 # the values being sitk images, then converts the sitk image to dcm and stores it in
 # a subfolder based on the key (brain region name) which in turn is stored in a higher
@@ -445,7 +461,23 @@ def store_seg_img_on_file(dict, new_dir):
 
         save_sitk_3d_img_to_dcm(dict[key], sub_dir)
         #print("key:", key)
+'''
 
+def store_seg_img_on_file(img_dict, new_dir):
+    # Check if the directory exists, if not, create it (higher level folder)
+    if not os.path.exists(new_dir):
+        os.makedirs(new_dir)
+    
+    for key in img_dict:
+        # making a sub folder based on the brain region name
+        sub_dir = os.path.join(new_dir, key)
+        os.makedirs(sub_dir)
+
+        save_sitk_3d_img_to_dcm(img_dict[key], sub_dir)
+
+# SITK TO PYDICOM - MD
+# original:
+'''
 def test_store_seg_img_on_file(new_dir):
     ## the following code tests the "store_sec_img_on_file()"" functions
     directory1 = "scan1"
@@ -454,7 +486,20 @@ def test_store_seg_img_on_file(new_dir):
     image2 = get_3d_image(directory2)
     dictionary = {"neocortex":image1, "frontal lobe":image2}
     store_seg_img_on_file(dictionary, new_dir)
+'''
+def test_store_seg_img_on_file(new_dir):
+    ## the following code tests the "store_sec_img_on_file()"" functions
+    directory1 = "scan1"
+    directory2 = "scan2"
+    image1 = get_3d_image(directory1)
+    image2 = get_3d_image(directory2)
+    img_dict = {"neocortex":image1, "frontal lobe":image2}
+    store_seg_img_on_file(img_dict, new_dir)
 
+
+# SITK TO PYDICOM - MD
+# original:
+'''
 #note, this function may have issues, I haven't tested it exetensively -Kevin
 def store_seg_png_on_file(dict, new_dir):
     # Check if the directory exists, if not, create it (higher level folder)
@@ -467,6 +512,21 @@ def store_seg_png_on_file(dict, new_dir):
         os.makedirs(sub_dir)
 
         save_sitk_3d_img_to_png(dict[key], sub_dir)
+        #print("key:", key)
+'''
+
+#note, this function may have issues, I haven't tested it exetensively -Kevin
+def store_seg_png_on_file(img_dict, new_dir):
+    # Check if the directory exists, if not, create it (higher level folder)
+    if not os.path.exists(new_dir):
+        os.makedirs(new_dir)
+    
+    for key in img_dict:
+        # making a sub folder based on the brain region name
+        sub_dir = os.path.join(new_dir, key)
+        os.makedirs(sub_dir)
+
+        save_sitk_3d_img_to_png(img_dict[key], sub_dir)
         #print("key:", key)
 
 # the function below takes a dictionary of sitk images and returns an equivalent dict of png images
@@ -501,6 +561,9 @@ def subfolders_to_dictionary(directory):
 
     return region_dict
 
+# SITK TO PYDICOM - MD
+# original:
+'''
     # function copied from segmentation 
 def create_seg_images(image, region_dict):
     output_images = {}
@@ -519,7 +582,29 @@ def create_seg_images(image, region_dict):
         output_images[region_name] = blank_image
     #print(f"Size of output images:  {len(output_images)}")
     return output_images
+'''
+def create_seg_images(image_np, region_dict):
+    output_images_np = {}
+    for region_name, coordinates_list in region_dict.items():
+        blank_image_np = np.zeros_like(image_np)
+        
+        for coordinates in coordinates_list:
+            x, y, z = coordinates
+            if (0 <= x < image_np.shape[1]) and \
+               (0 <= y < image_np.shape[0]) and \
+               (0 <= z < image_np.shape[2]):
+                pixel_value = image_np[y, x, z]
+                blank_image_np[y, x, z] = pixel_value
+                
+        # Append the finished blank_image to the output_images dictionary
+        output_images_np[region_name] = blank_image_np
+    #print(f"Size of output images:  {len(output_images)}")
+    return output_images_np
     
+
+# SITK TO PYDICOM - MD
+# original:
+'''
 # function copied from segmentation
 def DCMs_to_sitk_img_dict(directory):
     image = get_3d_image(directory)
@@ -537,6 +622,22 @@ def DCMs_to_sitk_img_dict(directory):
     #display_regions_from_dict(region_images)
     display_seg_images(region_images)
     return region_images
+'''
+def DCMs_to_sitk_img_dict(directory):
+    image_np = get_3d_image(directory)
+    def generate_regions(): 
+        region1 = [[x, y, z] for x in range(0, 51) for y in range(0, 51) for z in range(0, 51)]
+        region2 = [[x, y, z] for x in range(50, 101) for y in range(50, 101) for z in range(0, 50)]
+        region_dict = {
+            "Region1": region1,
+            "Region2": region2
+        }
+        return region_dict
+    region_dict = generate_regions()
+    region_images = create_seg_images(image_np, region_dict)
+    display_seg_images(region_images)
+    return region_images
+    
 
 # the following code tests the "subfolders_to_dictionary()" function
 def test_subfolders_to_dictionary(directory):
@@ -546,6 +647,10 @@ def test_subfolders_to_dictionary(directory):
 #test_store_seg_img_on_file("brain1")
 #test_subfolders_to_dictionary("brain1")
 
+# SITK TO PYDICOM - MD
+# i had chatgpt help with this one, not sure if it even makes sense tbh. please review
+# original:
+'''
 # function copied from segmentation
 def create_black_copy(image: sitk.Image) -> sitk.Image:
     # Create a copy of the input image
@@ -556,6 +661,9 @@ def create_black_copy(image: sitk.Image) -> sitk.Image:
 
     # All pixel values are already set to 0 (black) upon initialization
     return black_image
+'''
+def create_black_copy(image_np):
+    return np.zeros_like(image_np)
 
 #global variable
 segmentation_results= None
