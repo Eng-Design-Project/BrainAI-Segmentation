@@ -135,6 +135,22 @@ class ImageScoringPopup:
             # Handle invalid input (e.g., non-numeric input)
             print("Invalid input. Please enter numeric scores.")
 
+#how UX for exec clustering or exec dl should go:
+    #user selects options: algorithm, full scan or pre atlas seg
+    #if (full scan selected):
+    #   while (self.selected_folder != dcm folder):
+    #       popup says "select a folder containing dcms"
+    #       select folder
+    #   exec_full_scan_clustering(self.selected_folder, algo)
+    #   
+    #else if (pre_atlas_seg selected):
+    #   while (self.selected_folder != seg folder):
+    #          popup says "select a segmented dcm folder"
+    #          select folder
+    #          if (self.selected_folder == dcm folder):
+    #               run atlas_seg(self.selected_folder)
+    #   exec_seg_clustering(self.selected_folder, algo)
+    #
 class Core:
     def __init__(self, master):
         self.master = master
@@ -209,6 +225,7 @@ class Core:
 
         self.image_label = tk.Label(self.master)
     
+
     def execute_clustering(self):
         selected_segmentation_method = self.get_selected_segmentation_method()
 
@@ -216,9 +233,6 @@ class Core:
             self.atlas_segment()
         else:
             if not data.segmentation_results:
-                #instead of running atl_seg automatically, user should be able to choose a folder. 
-                # Now we have checkers if it's a single scan, or a atl-seg results folder
-                # and some clust algos can take a full scan, so maybe we should just jump straight to the popup
                 self.atlas_segment()
 
             
