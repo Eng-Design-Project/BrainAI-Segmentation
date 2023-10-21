@@ -2,13 +2,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import SimpleITK as sitk
 import skimage
-import os
-import pydicom
 from skimage.transform import resize
+import os
 import subprocess
 import sys
 from PIL import Image
+import pydicom
+from pydicom import Dataset
+from pydicom import dcmwrite
 from pydicom import dcmread
+
 
 #tried to use to load color atlas, to hard to parse coords
 def get_3d_png_array(directory):
