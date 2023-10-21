@@ -59,7 +59,10 @@ def get_2d_png_array_list(directory):
 def display_3d_array_slices(img_3d, num_slices):
     print(img_3d.shape)
     # Ensure that num_slices does not exceed the number of available slices
-    num_slices = min(num_slices, img_3d.shape[2])
+    num_slices = min(num_slices, img_3d.shape[0])
+
+    # Calculate indices for evenly spaced slices
+    indices = np.linspace(0, img_3d.shape[0] - 1, num_slices).astype(int)
 
     # Calculate grid dimensions
     cols = int(np.ceil(np.sqrt(num_slices)))
@@ -67,18 +70,11 @@ def display_3d_array_slices(img_3d, num_slices):
     
     fig, axes = plt.subplots(rows, cols, figsize=(15, 15))
     
-    # Ensure axes is an array
-    if rows == 1 and cols == 1:
-        axes = np.array([[axes]])
-    elif rows == 1:
-        axes = np.array([axes])
-    elif cols == 1:
-        axes = np.array([list(axes)])
-    
-    for i in range(num_slices):
+    for i, index in enumerate(indices):
         ax = axes.flat[i]
-        ax.imshow(img_3d[:, :, i])
+        ax.imshow(img_3d[index, :, :], cmap='gray')
         ax.axis('off')  # Hide the axis
+        ax.set_title(f'Slice {index}')
 
     # Hide any remaining empty subplots
     for i in range(num_slices, rows * cols):
@@ -86,7 +82,6 @@ def display_3d_array_slices(img_3d, num_slices):
     
     plt.tight_layout()
     plt.show()
-
 
 def save_2d_images_list(image_list, directory):
     # Ensure the directory exists
@@ -521,8 +516,8 @@ if __name__ == "__main__":
     test_pydicom_arr = get_3d_array_from_file(test_dir)
     test_sitk_image = get_3d_image(test_dir)
     test_sitk_arr = sitk.GetArrayFromImage(test_sitk_image)
-    display_3d_array_slices(test_pydicom_arr, 10)
-    display_3d_array_slices(test_sitk_arr, 10)
+    display_3d_array_slices(test_pydicom_arr, 20)
+    display_3d_array_slices(test_sitk_arr, 20)
     
     # print(is_segment_results_dir("atl_segmentation_DCMs"))
     # print(is_segment_results_dir("atl_segmentation_PNGs"))
