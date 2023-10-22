@@ -15,6 +15,7 @@ from skimage import morphology
 from skimage import measure
 from skimage import feature
 from skimage import exposure
+from skimage.filters import sobel
 from skimage.filters import threshold_local
 import data
 
@@ -266,7 +267,9 @@ def pixel_data(segments):
     return np.stack([s.pixel_array for s in segments])
 
 def preprocess_seg(images):
-    return gaussian_filter(images, sigma=1)
+    filtered_images = gaussian_filter(images, sigma=1)
+    edges = feature.sobel(filtered_images)
+    return edges
 
 def apply_thresholding(image):
     block_size = 35
@@ -276,7 +279,7 @@ def apply_thresholding(image):
 
 def dbscan_with_atlas(image):
     coords = np.column_stack(np.where(image > 0))
-    db_atl = DBSCAN(eps=5, min_samples=18).fit(coords)
+    db_atl = DBSCAN(eps=2, min_samples=10).fit(coords)
     return db_atl
 
 def get_coordinates(db_atl, labels):
