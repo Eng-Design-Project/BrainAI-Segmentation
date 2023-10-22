@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import SimpleITK as sitk
+#import SimpleITK as sitk
 import skimage
 from skimage.transform import resize
 import os
@@ -328,18 +328,25 @@ def save_sitk_3d_img_to_dcm(array, template_path, new_dir):
     print("Saved 3D image to {}".format(new_dir))
 
 #note, this function may have issues -Kevin
-def save_sitk_3d_img_to_png(image, new_dir):
+from pydicom.pixel_data_handlers.util import apply_modality_lut
+
+def save_dicom_3d_img_to_png(dicom_dataset, new_dir):
     # Check if the directory exists, if not, create it
     if not os.path.exists(new_dir):
         os.makedirs(new_dir)
 
-    # Get the 3D image size to iterate through the slices
-    size = image.GetSize()
+    # CHANGED: Get the 3D image array directly from pydicom Dataset
+    image_array = dicom_dataset.pixel_array
+    
+    # Apply Modality LUT if present to get the correct HU or grayscale values
+    image_array = apply_modality_lut(image_array, dicom_dataset)
 
-    # Iterate through the slices and save each one as PNG
-    for z in range(size[2]):
-        slice_image = image[:,:,z]
-        slice_image_np = sitk.GetArrayFromImage(slice_image)
+    # CHANGED: Using shape attribute of the numpy array to get the dimensions
+    depth, height, width = image_array.shape
+
+    # CHANGED: Iterate through the slices using numpy slicing and save each one as PNG
+    for z in range(depth):
+        slice_image_np = image_array[z, :, :]
         slice_image_np = np.interp(slice_image_np, (slice_image_np.min(), slice_image_np.max()), (0, 255))
         slice_image_np = np.uint8(slice_image_np)
 
@@ -353,6 +360,7 @@ def save_sitk_3d_img_to_png(image, new_dir):
         print("Saved slice {} to {}".format(z, filename))
 
     print("Saved 3D image slices as PNG in {}".format(new_dir))
+
 
 
 #just spits out "atlas"
@@ -526,7 +534,7 @@ def store_seg_png_on_file(img_dict, new_dir):
         sub_dir = os.path.join(new_dir, key)
         os.makedirs(sub_dir)
 
-        save_sitk_3d_img_to_png(img_dict[key], sub_dir)
+        save_dicom_3d_img_to_png(img_dict[key], sub_dir)
         #print("key:", key)
 
 # SITK TO PYDICOM - MD
