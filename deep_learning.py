@@ -130,16 +130,20 @@ def executeDL(dict_of_np_arrays, user_score=0, model=buildPixelModel()):
 #   should windows also be a class attribute? why extract windows many times
 #   if windows are a class attribute, than we wouldn't need to keep the entire image in memory
 class CustomClassifier:
-    def __init__(self, initial_model=None, labeled_data=None):
+    def __init__(self, initial_model=None):
         self.model = initial_model if initial_model else buildPixelModel()
         self.classification_dict = {}
         self.normalized_data = None
-        self.labeled_data = labeled_data
+        self.labeled_data = None
         self.windows_dict = {}
 
-    def executeDL(self, dict_of_np_arrays=None, user_score=0):
+    def executeDL(self, user_score=0, dict_of_np_arrays=None, labeled_data=None):
+        #initialize data on first run on executeDL
         if self.normalized_data == None:
             self.normalized_data = normalize_np_dict(dict_of_np_arrays)
+        #use labled_data if it's given
+        if (labeled_data != None):
+            self.labeled_data = labeled_data
 
         # No need to compile multiple times, so we check if it's compiled.
         if not hasattr(self.model, 'optimizer'):
