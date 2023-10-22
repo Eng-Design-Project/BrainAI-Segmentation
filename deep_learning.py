@@ -135,7 +135,7 @@ class CustomClassifier:
         self.classification_dict = {}
         self.normalized_data = None
         self.labeled_data = labeled_data
-        self.windows = None
+        self.windows_dict = {}
 
     def executeDL(self, dict_of_np_arrays=None, user_score=0):
         if self.normalized_data == None:
@@ -146,9 +146,9 @@ class CustomClassifier:
             self.model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
 
         for region, seg_volume in self.normalized_data.items():
-            if self.windows == None:
+            if (len(self.windows_dict) < len(self.normalized_data)):
                 windows, indices = extract_windows(seg_volume)
-                self.windows = windows[..., np.newaxis]  # Adding a channel dimension
+                self.windows_dict[region] = windows[..., np.newaxis]  # Adding a channel dimension
 
             # Using the labeled_data for the specific region if available
             region_labels = self.labeled_data.get(region) if self.labeled_data else None
