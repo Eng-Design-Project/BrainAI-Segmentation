@@ -44,38 +44,49 @@ import deep_learning_copy
 
 
 class ImageScoringPopup:
+    # Constructor for the ImageScoringPopup class
+    # Initialize the class with a parent/master window, image paths, and a callback function
     def __init__(self, master,image_paths, callback):
         self.master = master
         self.callback = callback
         self.image_paths = image_paths
         self.current_image_index = 0
 
+        # Create the main frame for the popup
         self.popup_frame = Frame(master)
         self.popup_frame.pack(fill='both', expand=True)
 
+        # Create a canvas to display images and allow scrolling
         self.canvas = Canvas(self.popup_frame)
         self.canvas.pack(side="left", fill="both", expand=True)
 
+        # Create a vertical scrollbar for the canvas
         self.scrollbar = Scrollbar(self.popup_frame, orient="vertical", command=self.canvas.yview)
         self.scrollbar.pack(side="right", fill="y")
 
+        # Configure the canvas to scroll with the scrollbar
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
 
+        # Create an inner frame within the canvas for placing widgets
         self.inner_frame = Frame(self.canvas)
         self.inner_frame_canvas = self.canvas.create_window((0, 0), window=self.inner_frame, anchor="nw")
 
+        # Load and display images from the provided paths
         self.images = [Image.open(path) for path in image_paths]
         self.photo_images = [ImageTk.PhotoImage(image) for image in self.images]
 
+        # Display the current image in a label
         self.image_label = tk.Label(self.inner_frame, image=self.photo_images[self.current_image_index])
         self.image_label.pack(pady=(20, 10), anchor="center")
 
+        # Create buttons for navigating to the previous and next images
         self.prev_button = tk.Button(self.inner_frame, text="Previous", command=self.show_previous_image)
         self.prev_button.pack(side="left", padx=10)
         
         self.next_button = tk.Button(self.inner_frame, text="Next", command=self.show_next_image)
         self.next_button.pack(side="right", padx=10)
 
+        # Create sliders for scoring the displayed images
         self.score_label1 = tk.Label(self.inner_frame, text="Score Image 1:")
         self.score_label1.pack(pady=10, anchor="center")
 
@@ -88,24 +99,30 @@ class ImageScoringPopup:
         self.score_entry2 = tk.Scale(self.inner_frame, from_=1, to=10, orient="horizontal", sliderrelief='flat')
         self.score_entry2.pack(pady=10, anchor="center")
 
+        # Create a button to submit the scores
         self.submit_button = tk.Button(self.inner_frame, text="Submit", command=self.submit_scores)
         self.submit_button.pack(pady=20, anchor="center")
 
+        # Bind events to handle canvas and inner frame configuration
         self.inner_frame.bind("<Configure>", self.on_frame_configure)
         self.canvas.bind("<Configure>", self.on_canvas_configure)
 
     def on_frame_configure(self, event):
+        # Configure the canvas scroll region based on the inner frame size
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
     def on_canvas_configure(self, event):
+        # Configure the canvas item based on its width
         self.canvas.itemconfig(self.inner_frame_canvas, width=event.width)
 
     def show_previous_image(self):
+        # Display the previous image if available
         if self.current_image_index > 0:
             self.current_image_index -= 1
             self.image_label.config(image=self.photo_images[self.current_image_index])
 
     def show_next_image(self):
+        # Display the next image if available
         if self.current_image_index < len(self.photo_images) - 1:
             self.current_image_index += 1
             self.image_label.config(image=self.photo_images[self.current_image_index])
@@ -113,15 +130,16 @@ class ImageScoringPopup:
 
     def submit_scores(self):
         try:
+            # Get the scores entered by the user from the GUI
             score1 = float(self.score_entry1.get())
             score2 = float(self.score_entry2.get())
         
-            # Ensure the scores are within the desired range (0-10 or 1-10 or 1-5)
+            # Ensure the scores are within the desired range (1-10)
             #min_score = min(score1, score2)
             #max_score = max(score1, score2)
             #min and max are hardcoded, not set by user (or risk divide by zero error)
-            min_score = 1
-            max_score = 10
+            min_score = 1 # Minimum possible score
+            max_score = 10 # Maximum possible score
 
             # Normalize the scores between 0 and 1
             normalized_score1 = (score1 - min_score) / (max_score - min_score)
@@ -130,6 +148,7 @@ class ImageScoringPopup:
             # Save the normalized scores or pass them to your CNN
             self.callback(normalized_score1, normalized_score2)
 
+            # Close the popup window
             self.master.destroy()
         except ValueError:
             # Handle invalid input (e.g., non-numeric input)
@@ -148,34 +167,46 @@ class Core:
         self.style = ttk.Style()
         self.style.configure("TButton", font=("Helvetica", 12))
 
+        # Select folder button
         self.select_folder_button = tk.Button(self.master, text="Select Folder", command=self.select_folder)
         self.select_folder_button.pack(pady=20)
         self.selected_folder = ""
 
+        # Label for selected folder button
         self.folder_label = tk.Label(self.master, text="Selected Folder: ")
         self.folder_label.pack()
 
+        # Atlas segment button
         self.atlas_segment_button = tk.Button(self.master, text="Atlas Segment", command=self.atlas_segment)
         self.atlas_segment_button.pack(pady=20)
 
+        # Image scoring button
         self.image_scoring_button = tk.Button(self.master, text="Score Images", command=self.open_image_scoring_popup)
         self.image_scoring_button.pack(pady=20)
 
+        # Advanced segmentation button
         self.advanced_segmentation_button = tk.Button(self.master, text="Advanced Segmentation", command=lambda: self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button], [self.advanced_segmentation_button, self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button, self.execute_clustering_button]))
         self.advanced_segmentation_button.pack(pady=20)
 
+        # Clustering button
         self.clustering_button = tk.Button(self.master, text="Clustering", command=lambda:self.change_buttons([self.execute_clustering_button, self.clustering_back_button],[self.advanced_segmentation_button, self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
 
+        # Deep learning button
         self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:self.change_buttons([self.U_Net_button, self.execute_deep_learning, self.deeplearning_back_button],[self.deep_learning_button, self.clustering_button, self.execute_clustering_button, self.advanced_back_button]))
 
+        # Execute deep learning button
         self.execute_deep_learning = tk.Button(self.master, text="Execute Deep Learning", command=self.execute_deep_learning_click)
 
+        # Advanced segmentation back button
         self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.advanced_segmentation_button, self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button],[self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
 
+        # Clustering back button
         self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.results_label, self.execute_clustering_button, self.image_label, self.previous_button, self.next_button, self.clustering_back_button]))
 
+        # U-Net button
         self.U_Net_button = tk.Button(self.master, text="U-Net", command=self.U_Net)
 
+        # Deep learning back button
         self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.image_label ,self.previous_button, self.next_button, self.U_Net_button, self.deeplearning_back_button]))
         
 
@@ -235,6 +266,13 @@ class Core:
             # Create a label to instruct the user
             label = tk.Label(popup_window, text="Select clustering parameters:")
             label.pack(pady=10)
+
+            segment_var = tk.StringVar()
+            segment_var.set(None)
+            whole_brain = tk.Radiobutton(popup_window, text="Whole Brain", variable=segment_var, value="Whole Brain")
+            whole_brain.pack()
+            segment = tk.Radiobutton(popup_window, text="Segment", variable=segment_var, value="Segment")
+            segment.pack()
 
             # Create radio buttons for clustering algorithm options
             algorithm_var = tk.StringVar()
@@ -345,6 +383,7 @@ class Core:
         # You can use labels or other widgets to display the clustering results here.
 
     def show_current_image(self):
+        # Display the current image in the popup
         if self.image_paths:
             current_image_path = self.image_paths[self.current_image_index]
             image = Image.open(current_image_path)
@@ -356,12 +395,16 @@ class Core:
             self.image_label.pack()
 
     def show_previous_image(self):
+        # Display the previous image in the popup
         if self.image_paths:
+            # Calculate the index of the previous image, considering the loop behavior
             self.current_image_index = (self.current_image_index - 1) % len(self.image_paths)
             self.show_current_image()
 
     def show_next_image(self):
+        # Display the next image in the popup
         if self.image_paths:
+            # Calculate the index of the next image, considering the loop behavior
             self.current_image_index = (self.current_image_index + 1) % len(self.image_paths)
             self.show_current_image()
 
@@ -454,20 +497,25 @@ class Core:
         self.master.deiconify()  # Show the main window
 
     def select_folder(self):
+        # Open a dialog to select a folder path
         folder_path = filedialog.askdirectory()
+        # If a folder is selected, store it and update the folder label
         if folder_path:
             print("Selected folder:", folder_path)
             self.selected_folder = folder_path
             self.update_folder_label()
 
     def get_selected_folder(self):
+        # Open a dialog to select a folder path and return it
         folder_path = filedialog.askdirectory()
         return folder_path
 
     def update_folder_label(self):
+        # Update the label to display the selected folder path
         self.folder_label.config(text="Selected Folder: " + self.selected_folder)
 
     def display_file_png(self):
+        # Display a PNG image file specified by the image_file_path attribute
         file_path = self.image_file_path
         self.image1 = tk.PhotoImage(file=file_path)
         self.label = tk.Label(self.master, image=self.image1)
@@ -491,6 +539,17 @@ class Core:
             print("no folder selected") 
             #prompt the user to select a folder
             self.select_folder()
+
+        # Check if the selected folder is a valid segment results directory
+        if not data.contains_only_dcms(self.selected_folder):
+            error_message = "Incorrect input folder, contains non-DCMs"
+            self.show_popup_message(error_message, close_callback=self.select_folder)
+            # Clear the selected folder
+            self.selected_folder = ""
+            # Prompt the user to select a folder again
+            self.select_folder()
+            return  # Exit the function or handle the invalid folder as needed   
+               
         # use functions in data to read the atlas and 
         #   the image in question into memory here as sitk images
         image = data.get_3d_image(self.selected_folder)
@@ -502,6 +561,8 @@ class Core:
         seg_results = segmentation.execute_atlas_seg(atlas, color_atlas, image)
         # returns dict of simple itk images
         # save them as dcms to the nested folder
+        # Check if the selected folder is a valid segment results directory
+        
 
         #I want a function that converts the sitk image dicts to dicts with pngs
         png_dict = data.sitk_dict_to_png_dict(seg_results)
@@ -590,6 +651,30 @@ class Core:
 
         # Initialize the initial segmentation type to "Brain"
         update_image()
+
+    def show_popup_message(self, message, close_callback=None):
+        # Create a new popup window
+        popup_window = tk.Toplevel()
+        popup_window.title("Popup")
+
+        # Create a label to display the message
+        label = tk.Label(popup_window, text=message)
+        label.pack(padx=20, pady=10)
+
+        def on_close():
+            if close_callback:
+                close_callback()
+            popup_window.destroy()
+
+        # Create a button to close the popup
+        close_button = tk.Button(popup_window, text="Close", command=on_close)
+        close_button.pack(pady=10)
+
+        # Center the popup window on the screen
+        popup_window.geometry(f"+{popup_window.winfo_screenwidth() // 2 - popup_window.winfo_reqwidth() // 2}+{popup_window.winfo_screenheight() // 2 - popup_window.winfo_reqheight() // 2}")
+
+        # Start the main loop for the popup window
+        popup_window.mainloop()    
                 
 
 
