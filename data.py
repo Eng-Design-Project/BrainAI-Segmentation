@@ -124,6 +124,7 @@ def get_3d_array_from_file(folder_path):
     slices = [pydicom.dcmread(os.path.join(folder_path, f)) for f in image_files] # read each file
     slices.sort(key=lambda x: float(x.ImagePositionPatient[2])) # sorting and maintaining correct order
     return np.stack([s.pixel_array for s in slices])
+    
 # SITK TO PYDICOM - MD
 # original:
 '''
