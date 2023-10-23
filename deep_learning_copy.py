@@ -117,17 +117,15 @@ def dlAlgorithm(segmentDict, depth=5, epochs=3):
     normalizedDict = normalizeTF(numpyImagesDict)
     model = unet(input_size=(depth, 128, 128, 1))
 
-    # Callbacks
     early_stopping = EarlyStopping(patience=5, verbose=1)
     model_checkpoint = ModelCheckpoint("best_model.keras", save_best_only=True, verbose=1)
     callbacks_list = [early_stopping, model_checkpoint]
-    
+
     loss_list = []
 
     for epoch in range(epochs):
         for key, sub_array in normalizedDict.items():
             sub_arrays_split = split_into_subarrays(sub_array, depth)
-            
             slice_triplets_to_display = []
 
             for sub_arr in sub_arrays_split:
@@ -138,37 +136,28 @@ def dlAlgorithm(segmentDict, depth=5, epochs=3):
                 history = model.train_on_batch(sub_arr_exp, sub_boundary_array_exp)
                 loss_list.append(history[0])
 
-                # Predict and collect slices for visualization
                 pred = model.predict(sub_arr_exp)
                 middle_index = depth // 2
-                slices_triplets = [
-                    (sub_arr[middle_index], pred[0][middle_index])
-                ]
-                slice_triplets_to_display.extend(slices_triplets)
-                
-                # Display in groups of three
+                slices_triplet = (sub_arr[middle_index], pred[0][middle_index])
+                slice_triplets_to_display.append(slices_triplet)
+
                 if len(slice_triplets_to_display) == 3:
                     show_slices(slice_triplets_to_display)
-                    slice_triplets_to_display = []
-                    proceed = input("Would you like to see more images? (y/n): ")
+
+                    proceed = input("Would you like to see more slices? (y/n): ")
                     if proceed.lower() != 'y':
                         return  # Exit the function entirely
+                    
+                    slice_triplets_to_display = []  # Empty the list for the next set of 3 slices
 
-            # Display any remaining images
-            if slice_triplets_to_display:
-                show_slices(slice_triplets_to_display)
-                proceed = input("Would you like to proceed to the next epoch? (y/n): ")
-                if proceed.lower() != 'y':
-                    return  # Exit the function entirely
-
-    # Optional: Load the best saved model
     model = load_model("best_model.keras")
-    
+
     plt.plot(loss_list)
     plt.title('Model Loss')
     plt.ylabel('Loss')
     plt.xlabel('Batch')
     plt.show()
+
 
 if __name__ == "__main__":
     sitk_images_dict = {
