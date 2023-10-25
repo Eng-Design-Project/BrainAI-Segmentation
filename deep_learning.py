@@ -2,43 +2,39 @@ import SimpleITK as sitk
 import os
 import tensorflow as tf
 import numpy as np
+from scipy.ndimage import convolve
 import data
-
-
-print(" Entered deep learning ")
 
 
 def print_hello():
     print(" Entered deep learning ")
 
 
-
+#dummy input data
 sitk_images_dict = {
     "image1": data.get_3d_image("scan1"),
     "image2": data.get_3d_image("scan2"),   
     # Add other images...
 }
 
+#normalizes pixel value of 3d array
+def normalizeTF(volume3dDict):
+    normalizedDict = {}
+    for key, value in volume3dDict.items():
+        tensor = tf.convert_to_tensor(value, dtype=tf.float32)
+        minVal = tf.reduce_min(tensor)
+        maxVal = tf.reduce_max(tensor)
+        normalizedTensor = (tensor - minVal) / (maxVal - minVal)
+        
+        # Convert back to numpy and store it in the dictionary
+        normalizedDict[key] = normalizedTensor.numpy()
+    return normalizedDict
 
-numpy_images_dict = {key: sitk.GetArrayFromImage(img) for key, img in sitk_images_dict.items()}
 
-
-def normalize_tf(volume_3d):
-    tensor = tf.convert_to_tensor(volume_3d, dtype=tf.float32)
-    min_val = tf.reduce_min(tensor)
-    max_val = tf.reduce_max(tensor)
-    normalized_tensor = (tensor - min_val) / (max_val - min_val)
-    return normalized_tensor.numpy()
-
-normalized_image = normalize_tf(numpy_images_dict["image1"])
-
-print(normalized_image.min())
-print(normalized_image.max())
-
-"""
-def build_model(input_shape):
+#standard binary classifier, probably not useful for our use-case
+def buildModel(inputShape):
     model = tf.keras.Sequential([
-        tf.keras.layers.InputLayer(input_shape=input_shape),
+        tf.keras.layers.InputLayer(input_shape=inputShape),  # Corrected here
         tf.keras.layers.Conv2D(32, (3, 3), activation='relu'),
         tf.keras.layers.MaxPooling2D(2, 2),
         tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
@@ -51,13 +47,110 @@ def build_model(input_shape):
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     return model
 
-"""
+#pix by pix classifier, not built with user score in mind
+def buildPixelModel(input_shape, window_size=3):
+    # Assumes input is a 3D patch of size [window_size, window_size, depth]
+    model = tf.keras.Sequential([
+        tf.keras.layers.InputLayer(input_shape=input_shape),
+        tf.keras.layers.Conv2D(32, (window_size, window_size), activation='relu', padding='valid'),
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(128, activation='relu'),
+        tf.keras.layers.Dense(2, activation='softmax')  # Assumes binary classification
+    ])
+
+    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    return model        
+
+#wrapper for getting the np arrays from sitkimages, normalizing, getting shape,
+# and plugging shape into basic classifier
+def dlAlgorithm(segmentDict):
+    numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()}
+    normalizedDict = normalizeTF(numpyImagesDict)
+
+    """Currently using 3D arrays, might switch to tensors. In such case, the shape might change."""
+    sampleShape = numpyImagesDict[list(numpyImagesDict.keys())[0]].shape
+    model = buildModel((sampleShape[1], sampleShape[2], sampleShape[0]))  # (height, width, channels)
+
+#finds edges of the image, only need to classify edges, not the entire thing
+def find_boundary(segment):
+    # Define a kernel for 3D convolution that checks for 26 neighbors in 3D
+    kernel = np.ones((3, 3, 3))
+    kernel[1, 1, 1] = 0
+    
+    # Convolve with the segment to find the boundary of ROI
+    boundary = convolve(segment > 0, kernel) > 0
+    
+    # Keep only boundary voxels that are non-zero in the original segment
+    boundary = boundary & (segment > 0)
+    
+    return boundary
+
+#takes boundary (edges), and gets 3d windows around each boundary voxel. These are inputs to the model
+def extract_windows(volume, boundary, window_size=3):
+    padding = window_size // 2
+    padded_volume = np.pad(volume, ((padding, padding), (padding, padding), (padding, padding)), mode='constant')
+    windows = []
+    indices = []
+    
+    boundary_indices = np.argwhere(boundary)  # Find the indices of boundary voxels
+    
+    for index in boundary_indices:
+        z, y, x = index
+        window = padded_volume[z:z + window_size, y:y + window_size, x:x + window_size]
+        windows.append(window)
+        indices.append((z, y, x))
+    
+    return np.array(windows), np.array(indices)
+
+def build_boundary_window_model(window_size=3):
+    model = tf.keras.models.Sequential([
+        tf.keras.layers.Conv3D(16, (3, 3, 3), activation='relu', input_shape=(window_size, window_size, window_size, 1)),
+        tf.keras.layers.MaxPooling3D(),
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(32, activation='relu'),
+        tf.keras.layers.Dense(2, activation='softmax')  # Assuming binary classification (0 or 1)
+    ])
+    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    return model
+
+def train_model(model, windows, labels, success_metric):
+    # Simple example, you might want to adjust training based on the success metric
+    model.fit(windows, labels, epochs=int(success_metric * 10))  # Hypothetical usage of success_metric
+
+def classify_voxels(segment_volume, success_metric, window_size=3):
+    boundary = find_boundary(segment_volume)
+    windows, indices = extract_windows(segment_volume, boundary)
+    windows = windows[..., np.newaxis]  # Adding a channel dimension
+    model = build_boundary_window_model(window_size=window_size)
+    
+    # Dummy labels for demonstration; replace with actual labels if available
+    labels = np.random.randint(0, 2, size=len(windows))  
+    
+    train_model(model, windows, labels, success_metric)
+    
+    predictions = model.predict(windows)
+    predicted_labels = np.argmax(predictions, axis=1)
+    
+    classified_indices = indices[predicted_labels == 1]
+    return classified_indices.tolist()
+def test_classify_voxels():
+    boundary_volume = np.random.randint(0, 2, (128, 128, 128))  # Replace with your actual boundary volume
+    success_metric = 0.8  # Replace with your actual success metric
+    classified_indices = classify_voxels(boundary_volume, success_metric)
+    print(classified_indices)
+
+    
+#if __name__ == '__main__':
+ #   test_classify_voxels()
 
 
-
+'''
+#class not needed
 class DeepLearningModule:
     def __init__(self):
-        pass
+        self.atlas_segmentation_data = {}
+        self.user_score1 = -1
+        self.user_score2 = -2
 
     def load_regions(self, region_data):
         for region_name, sitk_name in region_data.items():
@@ -68,37 +161,27 @@ class DeepLearningModule:
                 print(f"Error loading {region_name} from {sitk_name}: {e}")
 
     def load_atlas_data(self, atlas_data1, atlas_data2):
-        """
-        Load or set the atlas segmentation data from two folders.
-
-        Args:
-            atlas_data1: Path to the first atlas segmentation folder.
-            atlas_data2: Path to the second atlas segmentation folder.
-        """
-        global atlas_segmentation_data  # Assuming this is declared globally
-        
-        atlas_segmentation_data = {}
-        
         for folder_path in [atlas_data1, atlas_data2]:
             for filename in os.listdir(folder_path):
                 file_path = os.path.join(folder_path, filename)
                 try:
                     atlas_image = sitk.ReadImage(file_path)
-                    atlas_segmentation_data[filename] = atlas_image
+                    self.atlas_segmentation_data[filename] = atlas_image
                     print(f"Loaded atlas data from {file_path}")
                 except Exception as e:
                     print(f"Error loading atlas data from {file_path}: {e}")
 
-# Global variable for atlas segmentation data
-atlas_segmentation_data = {}
 
 # Existing user score global variables and function
+#will prob be removed, user score will be supplied to dl algo as argument from core
 user_score1 = -1
 user_score2 = -2
 
+#will be removed, user score updated in core
 def get_user_score(x1, x2):
     global user_score1, user_score2
     user_score1 = x1
     user_score2 = x2
     print("score 1 is: ", user_score1)
     print("score 2 is: ", user_score2)
+'''
