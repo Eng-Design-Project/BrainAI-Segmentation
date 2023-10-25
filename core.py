@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, simpledialog
 from tkinter import ttk
 from tkinter import Canvas, Scrollbar, Frame
 from PIL import Image, ImageTk  # Import PIL for image manipulation
@@ -57,7 +57,7 @@ class ImageScoringPopup:
         self.popup_frame.pack(fill='both', expand=True)
 
         # Create a canvas to display images and allow scrolling
-        self.canvas = Canvas(self.popup_frame)
+        self.canvas = Canvas(self.popup_frame, width=800, height=600)
         self.canvas.pack(side="left", fill="both", expand=True)
 
         # Create a vertical scrollbar for the canvas
@@ -160,13 +160,13 @@ class Core:
         self.current_page = None  # Track the current page being displayed
         self.segmentation_results = {}  # Initialize the segmentation_results variable as an empty dictionary
         self.popup_window = None  # Add this line to define popup_window
-
-
+        self.results_label = tk.Label(self.master, text="")
+        self.results_label.pack_forget()  # Hide the label by default
 
         self.master.title("Image Analysis Tool")
         self.style = ttk.Style()
         self.style.configure("TButton", font=("Helvetica", 12))
-
+        
         # Select folder button
         self.select_folder_button = tk.Button(self.master, text="Select Folder", command=self.select_folder)
         self.select_folder_button.pack(pady=20)
@@ -192,22 +192,19 @@ class Core:
         self.clustering_button = tk.Button(self.master, text="Clustering", command=lambda:self.change_buttons([self.execute_clustering_button, self.clustering_back_button],[self.advanced_segmentation_button, self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
 
         # Deep learning button
-        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:self.change_buttons([self.U_Net_button, self.execute_deep_learning, self.deeplearning_back_button],[self.deep_learning_button, self.clustering_button, self.execute_clustering_button, self.advanced_back_button]))
+        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:self.change_buttons([self.execute_deep_learning, self.deeplearning_back_button],[self.deep_learning_button, self.clustering_button, self.execute_clustering_button, self.advanced_back_button]))
 
         # Execute deep learning button
         self.execute_deep_learning = tk.Button(self.master, text="Execute Deep Learning", command=self.execute_deep_learning_click)
 
         # Advanced segmentation back button
-        self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.advanced_segmentation_button, self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button],[self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
+        self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.atlas_segment_button, self.image_scoring_button, self.advanced_segmentation_button, self.show_image_results_button, self.show_folder_results_button],[self.image_scoring_button, self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
 
         # Clustering back button
         self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.results_label, self.execute_clustering_button, self.image_label, self.previous_button, self.next_button, self.clustering_back_button]))
 
-        # U-Net button
-        self.U_Net_button = tk.Button(self.master, text="U-Net", command=self.U_Net)
-
         # Deep learning back button
-        self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.image_label ,self.previous_button, self.next_button, self.U_Net_button, self.deeplearning_back_button]))
+        self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.image_label ,self.previous_button, self.next_button, self.deeplearning_back_button]))
         
 
         """self.image_file_path = 'mytest.png'
@@ -438,6 +435,10 @@ class Core:
             label = tk.Label(popup_window, text="Select segmentation results source:")
             label.pack(pady=10)
 
+            algorithm_var = tk.StringVar()
+            algorithm_var.set(None)
+            U_Net = tk.Radiobutton(popup_window, text="U-Net", variable=algorithm_var, value="U-Net")
+            U_Net.pack()
             selection_var = tk.StringVar()
             selection_var.set(None)
             file_option = tk.Radiobutton(popup_window, text="From File", variable=selection_var, value="file")
@@ -445,7 +446,7 @@ class Core:
             memory_option = tk.Radiobutton(popup_window, text="From Memory", variable=selection_var, value="memory")
             memory_option.pack()
 
-            confirm_button = tk.Button(popup_window, text="Confirm", command=lambda: self.handle_segmentation_selection(popup_window, selection_var.get()))
+            confirm_button = tk.Button(popup_window, text="Confirm", command=lambda: self.handle_segmentation_selection(popup_window, selection_var.get(), algorithm_var.get()))
             confirm_button.pack(pady=20)
 
         #if seg results loaded from file, have to convert nested folder directory to dict of sitk images
@@ -456,7 +457,7 @@ class Core:
         #self.deep_learning_function(data.segmentation_results)
 
 
-    def handle_segmentation_selection(self, popup_window, selection):
+    def handle_segmentation_selection(self, popup_window, selection, algorithm):
         # Close the popup window
         popup_window.destroy()
 
@@ -469,6 +470,10 @@ class Core:
             # Set segmentation results from memory
             data.set_seg_results()
             self.segmentation_results = {}
+
+        if algorithm == "U-Net":
+            # Call the U_Net function
+            self.U_Net()    
 
         folder_path = "scan1_pngs"
         self.image_paths = [os.path.join(folder_path, filename) for filename in os.listdir(folder_path) if filename.endswith(".png")]
@@ -567,14 +572,19 @@ class Core:
         #I want a function that converts the sitk image dicts to dicts with pngs
         png_dict = data.sitk_dict_to_png_dict(seg_results)
 
+        # Ask the user to select a folder for saving the results
+        save_folder = filedialog.askdirectory(title="Select Save Folder")
 
-
-        data.store_seg_img_on_file(seg_results, "atl_segmentation_DCMs")
-        # save as pngs in nested folder by region structure
-        data.store_seg_png_on_file(seg_results, "atl_segmentation_PNGs")
-        # display pngs in gui
-        # save dict of sitk images to data global seg results
-        data.segmentation_results = seg_results
+        if save_folder:
+            # Prompt the user to enter a file name within the GUI
+            file_name = simpledialog.askstring("Input", "Enter file name:")
+            
+            if file_name:
+                # Save the segmentation results with the user-specified file name
+                data.store_seg_img_on_file(seg_results, f"{save_folder}/{file_name}.DCMs")
+                data.store_seg_png_on_file(seg_results, f"{save_folder}/{file_name}.PNGs")
+            # save dict of sitk images to data global seg results
+            data.segmentation_results = seg_results
         # Set a flag to indicate that atlas segmentation has been performed
         
         # Create a popup window for selecting segmentation type
