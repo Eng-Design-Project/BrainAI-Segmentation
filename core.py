@@ -46,10 +46,12 @@ import deep_learning_copy
 class ImageScoringPopup:
     # Constructor for the ImageScoringPopup class
     # Initialize the class with a parent/master window, image paths, and a callback function
-    def __init__(self, master,image_paths, callback):
+    def __init__(self, master,image1, image2, callback):
         self.master = master
         self.callback = callback
-        self.image_paths = image_paths
+        #image1 and image2 are pillow images
+        self.image1 = image1
+        self.image1 = image2
         self.current_image_index = 0
 
         # Create the main frame for the popup
@@ -72,7 +74,7 @@ class ImageScoringPopup:
         self.inner_frame_canvas = self.canvas.create_window((0, 0), window=self.inner_frame, anchor="nw")
 
         # Load and display images from the provided paths
-        self.images = [Image.open(path) for path in image_paths]
+        self.images = [image1, image2]
         self.photo_images = [ImageTk.PhotoImage(image) for image in self.images]
 
         # Display the current image in a label
@@ -726,12 +728,17 @@ class Core:
 
     def open_image_scoring_popup(self):
         #should take PIL images as input instead of directories
+
         image_paths = [
         "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png",  # Replace with actual image paths
         "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png"]
 
+        #pillow images
+        image1 = Image.open(image_paths[0])
+        image2 = Image.open(image_paths[1])
+
         popup_window = tk.Toplevel(self.master)
-        image_scoring_popup = ImageScoringPopup(popup_window, image_paths, self.save_scores)
+        image_scoring_popup = ImageScoringPopup(popup_window, image1, image2, self.save_scores)
         
 
     def save_scores(self, score1, score2):
