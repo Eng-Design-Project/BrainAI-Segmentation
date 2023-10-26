@@ -1,29 +1,34 @@
-# Import relevant modules
-import SimpleITK as sitk  # Medical imaging
-import tensorflow as tf  # Deep learning
-import numpy as np  # Numerical operations
-from scipy.ndimage import convolve  # Convolution
-import data  # Custom data module
-from tensorflow.keras.models import load_model  # Keras model loading
-import matplotlib.pyplot as plt  # Visualization
+import SimpleITK as sitk
+import tensorflow as tf
+import numpy as np
+from scipy.ndimage import convolve
+import data
+from tensorflow.keras.models import load_model
+import matplotlib.pyplot as plt
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 
 
 # Function to split 3D images into smaller sub-arrays
 def split_into_subarrays(img_array, depth=5):
-
-    #Splits a 3D image into sub-arrays of given depth.
     total_slices = img_array.shape[0]
-    # Create list of sub-arrays
     sub_arrays = [img_array[i:i+depth, :, :] for i in range(0, total_slices, depth) if i+depth <= total_slices]
     return sub_arrays
 
+def weighted_binary_crossentropy(y_true, y_pred):
+    # custom weights for binary cross entropy
+    weight_0 = 1.0  # for regions
+    weight_1 = 2.0  # for boundaries
+    b_ce = tf.keras.backend.binary_crossentropy(y_true, y_pred)
+    weight_vector = y_true * weight_1 + (1. - y_true) * weight_0
+    weighted_b_ce = weight_vector * b_ce
+    return tf.keras.backend.mean(weighted_b_ce)
+
+
 # Function to create a U-Net model for 3D image segmentation
-def unet(input_size=(5, 128, 128, 1)):
+def unet(input_size=(5, 128, 128, 1)):  # Notice the change in the last dimension
+    inputs = tf.keras.layers.Input(input_size)
     
-    inputs = tf.keras.layers.Input(input_size)# Define input layer
-    
-    # Encoder layers (convolutions and pooling)
+# Encoder layers (convolutions and pooling)
     conv1 = tf.keras.layers.Conv3D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(inputs)
     conv1 = tf.keras.layers.Conv3D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv1)
     pool1 = tf.keras.layers.MaxPooling3D(pool_size=(1, 2, 2))(conv1)
@@ -66,9 +71,9 @@ def unet(input_size=(5, 128, 128, 1)):
     
     # Compile and return the model
     model = tf.keras.models.Model(inputs=[inputs], outputs=[outputs])
-    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-    
+    model.compile(optimizer='adam', loss=weighted_binary_crossentropy, metrics=['accuracy'])
     return model
+
 
 
 def get_surrounding_slices(original_slice, sub_arrays, slice_index, depth):
@@ -100,99 +105,82 @@ def normalizeTF(volume3dDict):
     return normalizedDict
 
 def find_boundary(segment):
+    segment_copy = segment.copy()  # Work on a copy to avoid modifying the original
     kernel = np.ones((3, 3, 3))
     kernel[1, 1, 1] = 0
-    boundary = convolve(segment > 0, kernel) > 0
-    boundary = boundary & (segment > 0)
-    return boundary
+    boundary = convolve(segment_copy > 0, kernel) > 0
+    boundary = boundary & (segment_copy > 0)
+    segment_copy[boundary] = 1  # Label the boundary as 1
+    segment_copy[~boundary] = 0  # Label the rest as 0
+    return segment_copy
 
-def show_slices(slices):
-    """ Function to display a batch of image slices """
-    n = len(slices)
+def show_slices(triplets):
+    n = len(triplets)
     fig, axes = plt.subplots(1, n * 2, figsize=(12, 6))
-    
     for i in range(n):
-        orig, pred = slices[i]
+        orig, pred = triplets[i]
         axes[i * 2].imshow(orig.T, cmap="gray", origin="lower")
-        axes[i * 2 + 1].imshow(pred.T, cmap="gray", origin="lower")
-        
-    plt.suptitle("Middle slices of original and prediction")
+        pred_2d = np.squeeze(pred.T)
+        axes[i * 2 + 1].imshow(pred_2d, cmap="gray", origin="lower")
+    plt.suptitle("Original and Segmented")
     plt.show()
-
 
 def dlAlgorithm(segmentDict, depth=5, epochs=3):
     numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()}
     normalizedDict = normalizeTF(numpyImagesDict)
+    
+    # Define the U-Net model
     model = unet(input_size=(depth, 128, 128, 1))
     
+    # Compile the model with the custom loss
+    model.compile(optimizer='adam', loss=weighted_binary_crossentropy, metrics=['accuracy'])
+
+    early_stopping = EarlyStopping(patience=5, verbose=1)
+    model_checkpoint = ModelCheckpoint("best_model.keras", save_best_only=True, verbose=1)
+    callbacks_list = [early_stopping, model_checkpoint]
+
     loss_list = []
-    accumulated_slices = []
-    
+
     for epoch in range(epochs):
-        print(f"Epoch: {epoch+1}/{epochs}")
-        
-        for scan_name, img_array in normalizedDict.items():
-            print(f"Processing {scan_name}...")
-            sub_arrays = split_into_subarrays(img_array, depth)
-             
-            for sub_img_array in sub_arrays:
-                sub_boundary_array = find_boundary(sub_img_array)
+        for key, sub_array in normalizedDict.items():
+            # Splitting the array to get subarrays
+            sub_arrays_split = split_into_subarrays(sub_array, depth)
+            slice_triplets_to_display = []
+
+            for idx, sub_arr in enumerate(sub_arrays_split):
+                # Get surrounding slices using the function
+                surrounding_slices = get_surrounding_slices(sub_arr[depth//2], sub_arrays_split, idx, depth)
                 
-                sub_img_array_exp = np.expand_dims(np.expand_dims(sub_img_array, axis=0), axis=-1)
+                # Loading the model from the saved checkpoint for every prediction
+                model = load_model("current_model.keras", custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
+
+                sub_boundary_array = find_boundary(surrounding_slices)
+                sub_arr_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
                 sub_boundary_array_exp = np.expand_dims(np.expand_dims(sub_boundary_array, axis=0), axis=-1)
-                
-                loss = model.train_on_batch(sub_img_array_exp, sub_boundary_array_exp)
-                loss_list.append(loss)
-                
-                prediction = model.predict(sub_img_array_exp)
-                prediction = (prediction[0, :, :, :, 0] > 0.5).astype(np.uint8)
-                
-                slice_index = depth // 2
-                
-                accumulated_slices.append((sub_img_array[slice_index], prediction[slice_index]))
-                
-                if len(accumulated_slices) == 3:
-                    show_slices(accumulated_slices)
-                
-                    while True:  # Loop until the user finds the batch acceptable
-                        feedback = input("Is this batch acceptable? (y/n): ")
-                        
-                        if feedback.lower() == 'y':
-                            accumulated_slices = [] # Clear the accumulated slices
-                            break
-                        
-                        elif feedback.lower() == 'n':  
-                            retrained_slices = []  # Create a list to hold the retrained slices
-                            
-                            for original_slice, _ in accumulated_slices:
-                                surrounding_slices = get_surrounding_slices(original_slice, sub_arrays, slice_index, depth)
-                                sub_boundary_array = find_boundary(surrounding_slices)
-                                
-                                surrounding_slices_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
-                                sub_boundary_array_exp = np.expand_dims(np.expand_dims(sub_boundary_array, axis=0), axis=-1)
-                                
-                                model.train_on_batch(surrounding_slices_exp, sub_boundary_array_exp)
-                                
-                                # Repredict the slice and add to retrained_slices
-                                sub_img_array_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
-                                new_prediction = model.predict(sub_img_array_exp)
-                                new_prediction = (new_prediction[0, :, :, :, 0] > 0.5).astype(np.uint8)
-                                new_slice_index = depth // 2
-                                retrained_slices.append((surrounding_slices[new_slice_index], new_prediction[new_slice_index]))
-                            
-                            # Clear the accumulated slices and replace with retrained_slices for re-display
-                            accumulated_slices = retrained_slices
-                            
-                            show_slices(accumulated_slices)  # Re-display the slices
 
+                history = model.train_on_batch(sub_arr_exp, sub_boundary_array_exp)
+                loss_list.append(history[0])
 
-        proceed = input("Would you like to proceed to the next epoch? (y/n): ")
-        if proceed.lower() != 'y':
-            break    
+                pred = model.predict(sub_arr_exp)
+                middle_index = depth // 2
+                slices_triplet = (surrounding_slices[middle_index], pred[0][middle_index])
+                slice_triplets_to_display.append(slices_triplet)
 
-    model.save('my_model.keras')
-    loaded_model = load_model('my_model.keras')
-    loaded_model.summary()
+                if len(slice_triplets_to_display) == 3:
+                    # Check the image values and display them
+                    for idx, triplet in enumerate(slice_triplets_to_display):
+                        print(f"Triplet {idx + 1} Original Min: {triplet[0].min()}, Max: {triplet[0].max()}")
+                        print(f"Triplet {idx + 1} Prediction Min: {triplet[1].min()}, Max: {triplet[1].max()}")
+                    
+                    show_slices(slice_triplets_to_display)
+
+                    proceed = input("Would you like to see more slices? (y/n): ")
+                    if proceed.lower() != 'y':
+                        return  # Exit the function entirely
+                    
+                    slice_triplets_to_display = []  # Empty the list for the next set of 3 slices
+
+    model = load_model("best_model.keras", custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
 
     plt.plot(loss_list)
     plt.title('Model Loss')
@@ -201,9 +189,12 @@ def dlAlgorithm(segmentDict, depth=5, epochs=3):
     plt.show()
 
 
+
+
 if __name__ == "__main__":
     sitk_images_dict = {
         "image1": data.get_3d_image("scan1"),
         "image2": data.get_3d_image("scan2"),
     }
+
     dlAlgorithm(sitk_images_dict)
