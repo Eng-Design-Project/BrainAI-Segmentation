@@ -725,6 +725,7 @@ class Core:
     
 
     def open_image_scoring_popup(self):
+        #should take PIL images as input instead of directories
         image_paths = [
         "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png",  # Replace with actual image paths
         "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png"]
@@ -748,7 +749,80 @@ class Core:
     def show_image_results(self):
         # This function will eventually display segmentation results for an image
         # You can add your image processing and display logic here
-        print("Displaying segmentation results for an image")
+        # can take a directory (a folder containing sub-folders, each subfolder containing dcms) as input and then 
+        # use PIL to turn them into images to display in a popup, similar to how ImageScoringPopup is now
+        folder = filedialog.askdirectory(title="Select folder with subfolders containing DCM files")
+        while data.is_segment_results_dir(folder) != True:
+            print("the folder you selected does not match the expected structure")
+            tk.messagebox.showwarning(title="Invalid Selection", message=
+            "The folder you selected does not match the expected structure. Select a folder with sub-folders containg DCM files.")
+            folder = filedialog.askdirectory(title="Select folder with subfolders containing DCM files")
+
+        image_dict = data.subfolders_to_dictionary(folder)
+        pngs_dict = data.sitk_dict_to_png_dict(image_dict)
+
+        #below is the same code that was used for the atlas_segment popup
+        popup_window = tk.Toplevel(self.master)
+        popup_window.title("Select Segmentation Type")
+        brain_index = 0
+        skull_index = 0
+        current_segmentation = "Brain"  # Initialize with "Brain" as the default
+
+        def update_image():
+            nonlocal brain_index, skull_index, current_segmentation
+            if current_segmentation == "Brain":
+                image_list = pngs_dict['Brain']
+                index = brain_index
+            else:
+                image_list = pngs_dict['Skull']
+                index = skull_index
+            image = image_list[index]
+            photo = ImageTk.PhotoImage(image)
+            image_label.configure(image=photo)
+            image_label.image = photo
+
+        def handle_brain_skull_selection(segmentation_type):
+            nonlocal current_segmentation
+            if segmentation_type == "Brain":
+                if current_segmentation == "Brain":
+                    return  # If already on "Brain," do nothing
+                current_segmentation = "Brain"
+                update_image()
+            else:
+                if current_segmentation == "Skull":
+                    return  # If already on "Skull," do nothing
+                current_segmentation = "Skull"
+                update_image()
+
+        def handle_previous():
+            nonlocal brain_index, skull_index
+            if current_segmentation == "Brain":
+                brain_index = (brain_index - 1) % len(pngs_dict['Brain'])
+            else:
+                skull_index = (skull_index - 1) % len(pngs_dict['Skull'])
+            update_image()
+
+        def handle_next():
+            nonlocal brain_index, skull_index
+            if current_segmentation == "Brain":
+                brain_index = (brain_index + 1) % len(pngs_dict['Brain'])
+            else:
+                skull_index = (skull_index + 1) % len(pngs_dict['Skull'])
+            update_image()
+
+        image_label = tk.Label(popup_window)
+        image_label.pack()
+        button_frame = tk.Frame(popup_window)
+        button_frame.pack()
+        previous_button = tk.Button(button_frame, text="Previous", command=handle_previous)
+        next_button = tk.Button(button_frame, text="Next", command=handle_next)
+        previous_button.pack(side="left", padx=10)
+        next_button.pack(side="right", padx=10)
+        brain_button = tk.Button(popup_window, text="Brain", command=lambda: handle_brain_skull_selection("Brain"))
+        skull_button = tk.Button(popup_window, text="Skull", command=lambda: handle_brain_skull_selection("Skull"))
+        brain_button.pack(pady=10)
+        skull_button.pack(pady=10)
+        update_image()
 
     def show_folder_results(self):
         # This function will eventually display segmentation results for images in a folder
