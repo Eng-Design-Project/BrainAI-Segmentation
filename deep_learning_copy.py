@@ -14,6 +14,16 @@ def split_into_subarrays(img_array, depth=5):
     sub_arrays = [img_array[i:i+depth, :, :] for i in range(0, total_slices, depth) if i+depth <= total_slices]
     return sub_arrays
 
+def weighted_binary_crossentropy(y_true, y_pred):
+    # custom weights for binary cross entropy
+    weight_0 = 1.0  # for regions
+    weight_1 = 2.0  # for boundaries
+    b_ce = tf.keras.backend.binary_crossentropy(y_true, y_pred)
+    weight_vector = y_true * weight_1 + (1. - y_true) * weight_0
+    weighted_b_ce = weight_vector * b_ce
+    return tf.keras.backend.mean(weighted_b_ce)
+
+
 # Function to create a U-Net model for 3D image segmentation
 def unet(input_size=(5, 128, 128, 1)):  # Notice the change in the last dimension
     inputs = tf.keras.layers.Input(input_size)
@@ -61,7 +71,7 @@ def unet(input_size=(5, 128, 128, 1)):  # Notice the change in the last dimensio
     
     # Compile and return the model
     model = tf.keras.models.Model(inputs=[inputs], outputs=[outputs])
-    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer='adam', loss=weighted_binary_crossentropy, metrics=['accuracy'])
     return model
 
 
@@ -95,11 +105,14 @@ def normalizeTF(volume3dDict):
     return normalizedDict
 
 def find_boundary(segment):
+    segment_copy = segment.copy()  # Work on a copy to avoid modifying the original
     kernel = np.ones((3, 3, 3))
     kernel[1, 1, 1] = 0
-    boundary = convolve(segment > 0, kernel) > 0
-    boundary = boundary & (segment > 0)
-    return boundary
+    boundary = convolve(segment_copy > 0, kernel) > 0
+    boundary = boundary & (segment_copy > 0)
+    segment_copy[boundary] = 1  # Label the boundary as 1
+    segment_copy[~boundary] = 0  # Label the rest as 0
+    return segment_copy
 
 def show_slices(triplets):
     n = len(triplets)
@@ -142,6 +155,11 @@ def dlAlgorithm(segmentDict, depth=5, epochs=3):
                 slice_triplets_to_display.append(slices_triplet)
 
                 if len(slice_triplets_to_display) == 3:
+                    # Check the image values and display them
+                    for idx, triplet in enumerate(slice_triplets_to_display):
+                        print(f"Triplet {idx + 1} Original Min: {triplet[0].min()}, Max: {triplet[0].max()}")
+                        print(f"Triplet {idx + 1} Prediction Min: {triplet[1].min()}, Max: {triplet[1].max()}")
+                    
                     show_slices(slice_triplets_to_display)
 
                     proceed = input("Would you like to see more slices? (y/n): ")
@@ -149,7 +167,9 @@ def dlAlgorithm(segmentDict, depth=5, epochs=3):
                         return  # Exit the function entirely
                     
                     slice_triplets_to_display = []  # Empty the list for the next set of 3 slices
+                model.reset_states()
 
+    
     model = load_model("best_model.keras")
 
     plt.plot(loss_list)
@@ -157,6 +177,7 @@ def dlAlgorithm(segmentDict, depth=5, epochs=3):
     plt.ylabel('Loss')
     plt.xlabel('Batch')
     plt.show()
+
 
 
 if __name__ == "__main__":
