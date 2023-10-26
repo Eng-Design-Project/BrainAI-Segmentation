@@ -128,7 +128,12 @@ def show_slices(triplets):
 def dlAlgorithm(segmentDict, depth=5, epochs=3):
     numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()}
     normalizedDict = normalizeTF(numpyImagesDict)
+    
+    # Define the U-Net model
     model = unet(input_size=(depth, 128, 128, 1))
+    
+    # Compile the model with the custom loss
+    model.compile(optimizer='adam', loss=weighted_binary_crossentropy, metrics=['accuracy'])
 
     early_stopping = EarlyStopping(patience=5, verbose=1)
     model_checkpoint = ModelCheckpoint("best_model.keras", save_best_only=True, verbose=1)
@@ -138,12 +143,19 @@ def dlAlgorithm(segmentDict, depth=5, epochs=3):
 
     for epoch in range(epochs):
         for key, sub_array in normalizedDict.items():
+            # Splitting the array to get subarrays
             sub_arrays_split = split_into_subarrays(sub_array, depth)
             slice_triplets_to_display = []
 
-            for sub_arr in sub_arrays_split:
-                sub_boundary_array = find_boundary(sub_arr)
-                sub_arr_exp = np.expand_dims(np.expand_dims(sub_arr, axis=0), axis=-1)
+            for idx, sub_arr in enumerate(sub_arrays_split):
+                # Get surrounding slices using the function
+                surrounding_slices = get_surrounding_slices(sub_arr[depth//2], sub_arrays_split, idx, depth)
+                
+                # Loading the model from the saved checkpoint for every prediction
+                model = load_model("current_model.keras", custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
+
+                sub_boundary_array = find_boundary(surrounding_slices)
+                sub_arr_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
                 sub_boundary_array_exp = np.expand_dims(np.expand_dims(sub_boundary_array, axis=0), axis=-1)
 
                 history = model.train_on_batch(sub_arr_exp, sub_boundary_array_exp)
@@ -151,7 +163,7 @@ def dlAlgorithm(segmentDict, depth=5, epochs=3):
 
                 pred = model.predict(sub_arr_exp)
                 middle_index = depth // 2
-                slices_triplet = (sub_arr[middle_index], pred[0][middle_index])
+                slices_triplet = (surrounding_slices[middle_index], pred[0][middle_index])
                 slice_triplets_to_display.append(slices_triplet)
 
                 if len(slice_triplets_to_display) == 3:
@@ -167,16 +179,15 @@ def dlAlgorithm(segmentDict, depth=5, epochs=3):
                         return  # Exit the function entirely
                     
                     slice_triplets_to_display = []  # Empty the list for the next set of 3 slices
-                model.reset_states()
 
-    
-    model = load_model("best_model.keras")
+    model = load_model("best_model.keras", custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
 
     plt.plot(loss_list)
     plt.title('Model Loss')
     plt.ylabel('Loss')
     plt.xlabel('Batch')
     plt.show()
+
 
 
 
