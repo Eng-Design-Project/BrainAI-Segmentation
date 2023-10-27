@@ -131,57 +131,50 @@ def dlAlgorithm(segmentDict, depth=5, epochs=3):
     
     # Define the U-Net model
     model = unet(input_size=(depth, 128, 128, 1))
-    
-    # Compile the model with the custom loss
-    model.compile(optimizer='adam', loss=weighted_binary_crossentropy, metrics=['accuracy'])
 
     early_stopping = EarlyStopping(patience=5, verbose=1)
     model_checkpoint = ModelCheckpoint("best_model.keras", save_best_only=True, verbose=1)
     callbacks_list = [early_stopping, model_checkpoint]
 
     loss_list = []
+    all_triplets = []  # <-- Store all the segmented triplets here
 
-    for epoch in range(epochs):
-        for key, sub_array in normalizedDict.items():
-            # Splitting the array to get subarrays
-            sub_arrays_split = split_into_subarrays(sub_array, depth)
-            slice_triplets_to_display = []
+    # First loop for segmentation
+    for key, sub_array in normalizedDict.items():
+        sub_arrays_split = split_into_subarrays(sub_array, depth)
+        
+        for idx, sub_arr in enumerate(sub_arrays_split):
+            surrounding_slices = get_surrounding_slices(sub_arr[depth//2], sub_arrays_split, idx, depth)
+            model = load_model("current_model.keras", custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
+            
+            sub_boundary_array = find_boundary(surrounding_slices)
+            sub_arr_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
+            sub_boundary_array_exp = np.expand_dims(np.expand_dims(sub_boundary_array, axis=0), axis=-1)
 
-            for idx, sub_arr in enumerate(sub_arrays_split):
-                # Get surrounding slices using the function
-                surrounding_slices = get_surrounding_slices(sub_arr[depth//2], sub_arrays_split, idx, depth)
-                
-                # Loading the model from the saved checkpoint for every prediction
-                model = load_model("current_model.keras", custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
+            history = model.train_on_batch(sub_arr_exp, sub_boundary_array_exp)
+            loss_list.append(history[0])
 
-                sub_boundary_array = find_boundary(surrounding_slices)
-                sub_arr_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
-                sub_boundary_array_exp = np.expand_dims(np.expand_dims(sub_boundary_array, axis=0), axis=-1)
+            pred = model.predict(sub_arr_exp)
+            middle_index = depth // 2
+            slices_triplet = (surrounding_slices[middle_index], pred[0][middle_index])
+            all_triplets.append(slices_triplet)
 
-                history = model.train_on_batch(sub_arr_exp, sub_boundary_array_exp)
-                loss_list.append(history[0])
+    # Second loop for displaying the segmented images in batches of 3
+    for i in range(0, len(all_triplets), 3):
+        batch_triplets = all_triplets[i:i+3]
 
-                pred = model.predict(sub_arr_exp)
-                middle_index = depth // 2
-                slices_triplet = (surrounding_slices[middle_index], pred[0][middle_index])
-                slice_triplets_to_display.append(slices_triplet)
+        for idx, triplet in enumerate(batch_triplets):
+            print(f"Triplet {idx + 1} Original Min: {triplet[0].min()}, Max: {triplet[0].max()}")
+            print(f"Triplet {idx + 1} Prediction Min: {triplet[1].min()}, Max: {triplet[1].max()}")
 
-                if len(slice_triplets_to_display) == 3:
-                    # Check the image values and display them
-                    for idx, triplet in enumerate(slice_triplets_to_display):
-                        print(f"Triplet {idx + 1} Original Min: {triplet[0].min()}, Max: {triplet[0].max()}")
-                        print(f"Triplet {idx + 1} Prediction Min: {triplet[1].min()}, Max: {triplet[1].max()}")
-                    
-                    show_slices(slice_triplets_to_display)
+        show_slices(batch_triplets)
 
-                    proceed = input("Would you like to see more slices? (y/n): ")
-                    if proceed.lower() != 'y':
-                        return  # Exit the function entirely
-                    
-                    slice_triplets_to_display = []  # Empty the list for the next set of 3 slices
+        proceed = input("Would you like to see more slices? (y/n): ")
+        if proceed.lower() != 'y':
+            break  # Exit the function entirely
 
     model = load_model("best_model.keras", custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
-
+    
     plt.plot(loss_list)
     plt.title('Model Loss')
     plt.ylabel('Loss')
