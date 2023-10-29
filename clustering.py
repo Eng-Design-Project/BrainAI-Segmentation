@@ -6,16 +6,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pydicom
 import os
-from sklearn.cluster import DBSCAN
-from sklearn.cluster import SpectralClustering
-from sklearn.metrics.pairwise import euclidean_distances
-from sklearn.metrics.pairwise import rbf_kernel
+from sklearn.cluster import DBSCAN, KMeans, AgglomerativeClustering
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics.pairwise import euclidean_distances, rbf_kernel
 from scipy.ndimage import gaussian_filter
-from skimage import morphology
-from skimage import measure
-from skimage import feature
-from skimage import exposure
-from skimage.filters import threshold_local
+from scipy.cluster.hierarchy import dendrogram, linkage
+from skimage import morphology, measure, feature, exposure
+from skimage.filters import gaussian, median, threshold_local, sobel
+from skimage.morphology import ball
 import data
 
 
