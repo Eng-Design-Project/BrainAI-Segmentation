@@ -6,19 +6,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pydicom
 import os
-from sklearn.cluster import DBSCAN
-from sklearn.cluster import SpectralClustering
-from sklearn.metrics.pairwise import euclidean_distances
-from sklearn.metrics.pairwise import rbf_kernel
+from sklearn.cluster import DBSCAN, KMeans, AgglomerativeClustering
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics.pairwise import euclidean_distances, rbf_kernel
 from scipy.ndimage import gaussian_filter
-from skimage import morphology
-from skimage import measure
-from skimage import feature
-from skimage import exposure
-from skimage.filters import sobel
-from skimage.filters import threshold_local
+from scipy.cluster.hierarchy import dendrogram, linkage
+from skimage import morphology, measure, feature, exposure
+from skimage.filters import gaussian, median, threshold_local, sobel
+from skimage.morphology import ball
 import data
 
+
+###DBSCAN WITHOUT ATLAS###
 
 # Gaussian filter 
 # uses the gaussian PDF to smooth/ lower contrast in the roi by blurring and reducing noise
@@ -224,14 +223,8 @@ if __name__ == "__main__":
     print("3D Skull Cluster Coordinates:")
     print(skull_cluster_coordinates) 
 
-
-
-
-
-# THE CODES RUN BUT ARE STILL IN THE EDITING PHASE SO THERE AREN'T ANY COMMENTS. 
-# LMK IF YOU HAVE QUESTIONS.
  
-###DBSCAN WITH ATLAS:###
+###DBSCAN WITH ATLAS###
 
 # temp directory upload function till initial testing is complete
 def upload_segments(directory):
