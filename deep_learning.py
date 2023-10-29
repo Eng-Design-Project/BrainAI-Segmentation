@@ -1,4 +1,4 @@
-import SimpleITK as sitk
+# import SimpleITK as sitk
 import os
 import tensorflow as tf
 import numpy as np
