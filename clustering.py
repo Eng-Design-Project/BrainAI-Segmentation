@@ -16,8 +16,7 @@ from skimage.filters import gaussian, median, threshold_local, sobel
 from skimage.morphology import ball
 import data
 
-
-###DBSCAN WITHOUT ATLAS###
+## DBSCAN WITHOUT ATLAS ##
 
 # Gaussian filter 
 # uses the gaussian PDF to smooth/ lower contrast in the roi by blurring and reducing noise
@@ -203,6 +202,26 @@ def display_slices(volume, labels, cluster_coords, brain_mask, skull_mask):
         # display full processed image
         display_rgb_image(rgb_img, z)
 
+def execute_clustering(sitk_dict, algo):
+    output_coords = {} # initialize sitk dictionary to store output
+    algos_dict = {
+        'dbscan_3d': dbscan_3d
+    } 
+
+    for key in sitk_dict:
+
+        # perform dbscan and get labeled volume, coordinates, and binary masks for each slice in the output dictionary
+        labeled_volume, cluster_coords, brain_mask, skull_mask = algos_dict[algo](sitk_dict.key)
+
+        # determine coordinates
+        brain_cluster_coordinates, skull_cluster_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
+        
+        # dictionary to store output coordinates
+        output_coords[key] = brain_cluster_coordinates
+        #display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
+    #dbscan optimized for entire brain, not atlas segments, currently outputs brain coords as opposed to "skull coords"
+    return output_coords
+
 # used as main sript, this helps a lot with testing and pinpointing errors.
 #I'm already working on creating function shortcuts and combining factors for easy use as a sub-module instead.
 if __name__ == "__main__":
@@ -224,15 +243,14 @@ if __name__ == "__main__":
     print(skull_cluster_coordinates) 
 
  
-###DBSCAN WITH ATLAS###
+## DBSCAN WITH ATLAS ##
 
-# temp directory upload function till initial testing is complete
 def upload_segments(directory):
     segments = []
     for s in os.listdir(directory):
         filepath = os.path.join(directory, s)
         if os.path.isfile(filepath):  # Ensure the path is a file
-            dataset = pydicom.dcmread(filepath)
+            dataset = pydicom.dcmread(filepath, force=True)
             segments.append(dataset)
     return segments
 
@@ -241,7 +259,7 @@ def pixel_data(segments):
 
 def preprocess_seg(images):
     filtered_images = gaussian_filter(images, sigma=1)
-    edges = feature.sobel(filtered_images)
+    edges = sobel(filtered_images)
     return edges
 
 def apply_thresholding(image):
@@ -250,260 +268,196 @@ def apply_thresholding(image):
     binary_adaptive = image > adaptive_thresh
     return binary_adaptive
 
-def dbscan_with_atlas(image):
-    coords = np.column_stack(np.where(image > 0))
-    db_atl = DBSCAN(eps=2, min_samples=10).fit(coords)
-    return db_atl
+def dbscan_with_atlas(image_slice):
+    coords = np.column_stack(np.where(image_slice > 0))
+    db_atl = DBSCAN(eps=1.5, min_samples=7).fit(coords)
+    
+    # Calculate cluster centers
+    cluster_centers = []
+    labels = db_atl.labels_
+    unique_labels = np.unique(labels)
+    for label in unique_labels:
+        if label != -1:  # Exclude noise label
+            members = coords[labels == label]
+            center = members.mean(axis=0)
+            cluster_centers.append(center)
+    
+    return db_atl, np.array(cluster_centers)
 
 def get_coordinates(db_atl, labels):
-    cluster_coords = []
-    n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
-    for i in range(n_clusters):
-        coord = np.where(db_atl.labels_ == i)
-        cluster_coords.append(coord)
-    return cluster_coords
-
-def main(brain_directory, skull_directory):
-    # Process brain
-    brain_segments = upload_segments(brain_directory)
-    brain_images = pixel_data(brain_segments)
-    preprocessed_brain = preprocess_seg(brain_images)
-    thresholded_brain = apply_thresholding(preprocessed_brain)
-    db_brain = dbscan_with_atlas(thresholded_brain)
-    brain_cluster_coordinates = get_coordinates(db_brain, db_brain.labels_)
-    
-    # Process skull
-    skull_segments = upload_segments(skull_directory)
-    skull_images = pixel_data(skull_segments)
-    preprocessed_skull = preprocess_seg(skull_images)
-    thresholded_skull = apply_thresholding(preprocessed_skull)
-    db_skull = dbscan_with_atlas(thresholded_skull)
-    skull_cluster_coordinates = get_coordinates(db_skull, db_skull.labels_)
-    
-    return brain_cluster_coordinates, skull_cluster_coordinates
-
-if __name__ == "__main__":
-    brain_directory =  "brain_seg_path"
-    skull_directory =  "skull_seg_path"
-    brain_coords, skull_coords = main(brain_directory, skull_directory)
-    
-    print("Brain Cluster Coordinates:")
-    for idx, cluster in enumerate(brain_coords, start=1):
-        print(f"Cluster {idx}:", cluster)
-        print()  
-
-    print("\nSkull Cluster Coordinates:")
-    for idx, cluster in enumerate(skull_coords, start=1):
-        print(f"Cluster {idx}:", cluster)
-        print()  
-        
-
-###SPECTRAL WITH RBF###
-# SPECTRAL ALGOS REQUIRE A LOT OF RAM, BE CAREFUL RUNNING IT
-
-def upload_segments(directory):
-    segments = []
-    for s in os.listdir(directory):
-        filepath = os.path.join(directory, s)
-        if os.path.isfile                                                           (filepath):
-            dataset = pydicom.dcmread(filepath)
-            segments.append(dataset)
-    return segments
-
-def pixel_data(segments):
-    return np.stack([s.pixel_array for s in segments])
-
-def preprocess_seg(images):
-    return gaussian_filter(images, sigma=1)
-
-def apply_thresholding(image):
-    block_size = 35
-    adaptive_thresh = threshold_local(image, block_size, offset=10)
-    binary_adaptive = image > adaptive_thresh
-    return binary_adaptive
-
-def contruct_rbf(image, gamma=1):
-    coords = np.column_stack(np.where(image > 0))
-    affinity_matrix = rbf_kernel(coords, coords, gamma=gamma)
-    return affinity_matrix, coords
-
-def spectral_rbf_(affinity_matrix, n_clusters=3):
-    sc = SpectralClustering(n_clusters=n_clusters, affinity='precomputed')
-    labels = sc.fit_predict(affinity_matrix)
-    return labels
-
-def get_cluster_coordinates(labels, coords):
     unique_labels = np.unique(labels)
-    cluster_coords = {label: coords[labels == label] for label in unique_labels}
+    cluster_coords = {label: np.column_stack(np.where(labels == label)) for label in unique_labels if label != -1}
     return cluster_coords
 
-def main_rbf(brain_directory, skull_directory):
-    brain_segments = upload_segments(brain_directory)
-    brain_images = pixel_data(brain_segments)
-    preprocessed_brain = preprocess_seg(brain_images)
-    thresholded_brain = apply_thresholding(preprocessed_brain)
-    affinity_brain, coords_brain = construct_rbf(thresholded_brain)
-    labels_brain = spectral_rbf(affinity_brain)
-    brain_cluster_coords = get_cluster_coordinates(labels_brain, coords_brain)
-
-    skull_segments = upload_segments(skull_directory)
-    skull_images = pixel_data(skull_segments)
-    preprocessed_skull = preprocess_seg(skull_images)
-    thresholded_skull = apply_thresholding(preprocessed_skull)
-    affinity_skull, coords_skull = construct_rbf(thresholded_skull)
-    labels_skull = spectral_cluster_rbf(affinity_skull)
-    skull_cluster_coords = get_cluster_coordinates(labels_skull, coords_skull)
-
-    return brain_cluster_coords, skull_cluster_coords
-
-if __name__ == "__main__":
-    brain_directory =  "brain_seg_path"
-    skull_directory =  "skull_seg_path"
-    brain_cluster_coords, skull_cluster_coords = main_rbf(brain_directory, skull_directory)
-
-    print("Brain Coordinates:")
-    for label, coords in brain_cluster_coords.items():
-        print(f"Cluster {label}:")
-        print(coords)
-
-    print("\nSkull Coordinates:")
-    for label, coords in skull_cluster_coords.items():
-        print(f"Cluster {label}:")
-        print(coords)
-
-
-
-###SPECTRAL WITH EUCLEDIAN DISTANCE###
-
-
-def upload_segments(directory):
-    segments = []
-    for s in os.listdir(directory):
-        filepath = os.path.join(directory, s)
-        if os.path.isfile(filepath): 
-            dataset = pydicom.dcmread(filepath)
-            segments.append(dataset)
-    return segments
-
-
-def pixel_data(segments):
-    return np.stack([s.pixel_array for s in segments])
-
-def preprocess_seg(images):
-    return gaussian_filter(images, sigma=1)
-
-def apply_thresholding(image):
-    block_size = 35
-    adaptive_thresh = threshold_local(image, block_size, offset=10)
-    binary_adaptive = image > adaptive_thresh
-    return binary_adaptive
-
-def construct_affinity_matrix(image, gamma=1):
-    coords = np.column_stack(np.where(image > 0))
-    pairwise_dists = euclidean_distances(coords, coords)
-    affinity_matrix = np.exp(-gamma * pairwise_dists)
-    return affinity_matrix, coords
-
-def spectral_cluster(affinity_matrix, n_clusters=3):
-    sc = SpectralClustering(n_clusters=n_clusters, affinity='precomputed')
-    labels = sc.fit_predict(affinity_matrix)
-    return labels
-
-def get_cluster_coordinates(labels, coords):
-    unique_labels = np.unique(labels)
-    cluster_coords = {label: coords[labels == label] for label in unique_labels}
-    return cluster_coords
-
-def main(brain_directory, skull_directory):
-    brain_segments = upload_segments(brain_directory)
-    brain_images = pixel_data(brain_segments)
-    preprocessed_brain = preprocess_seg(brain_images)
-    thresholded_brain = apply_thresholding(preprocessed_brain)
-    affinity_brain, coords_brain = construct_affinity_matrix(thresholded_brain)
-    labels_brain = spectral_cluster(affinity_brain)
-    brain_cluster_coords = get_cluster_coordinates(labels_brain, coords_brain)
-
-    skull_segments = upload_segments(skull_directory)
-    skull_images = pixel_data(skull_segments)
-    preprocessed_skull = preprocess_seg(skull_images)
-    thresholded_skull = apply_thresholding(preprocessed_skull)
-    affinity_skull, coords_skull = construct_affinity_matrix(thresholded_skull)
-    labels_skull = spectral_cluster(affinity_skull)
-    skull_cluster_coords = get_cluster_coordinates(labels_skull, coords_skull)
-
-    return brain_cluster_coords, skull_cluster_coords
-
-if __name__ == "__main__":
-    brain_directory =  "brain_seg_path"
-    skull_directory =  "skull_seg_path"
-    brain_cluster_coords, skull_cluster_coords = main(brain_directory, skull_directory)
-
-    print("Brain Coordinates:")
-    for label, coords in brain_cluster_coords.items():
-        print(f"Cluster {label}:")
-        print(coords)
-
-    print("\nSkull Coordinates:")
-    for label, coords in skull_cluster_coords.items():
-        print(f"Cluster {label}:")
-        print(coords)
-
-
-
-
-
-#moved to bottom, just to keep sep from everything else
-def execute_whole_clustering(input, algo):
-    """
-    input: an entire scan (3d np array) and a string representing the chosen algo
-    selects the algo from a dictionary of corresponding functions
-    output: a dictionary of region : voxel coordinate lists
-    """
-     # initialize dictionary to store output
-    output_coords = {}
-
-    #dict of strings that correspond to functions
-    algos_dict = {
-        'dbscan_3d': dbscan_3d
-    } 
-
-    # perform dbscan and get labeled volume, coordinates, and binary masks for each slice in the output dictionary
-    labeled_volume, cluster_coords, brain_mask, skull_mask = algos_dict[algo](input)
-
-    # determine coordinates
-    brain_cluster_coordinates, skull_cluster_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
-
-    # dictionary to store output coordinates
-    output_coords["brain"] = brain_cluster_coordinates
-    #display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
-    #dbscan optimized for entire brain, not atlas segments, currently outputs brain coords as opposed to "skull coords"
-        
-    return output_coords
-
-def tester_algo(input_array):
-    """
-    input: np array
-    prints
-    output: format for the output of any clustering algo
-    """
-    print("clustering testing algo")
-    test_coords = [[x, y, z] for x in range(0, 30) for y in range(0, 30) for z in range(0, 30)]
-    return test_coords
-
-
-def execute_seg_clustering(input, algo):
-    """
-    input: an pre-atlas segmented scan (dict of 3d np arrays) and a string representing the chosen algo
-    selects the algo from a dictionary of corresponding functions
-    output: a dictionary of region : voxel coordinate lists
-    """
-    # initialize dictionary to store output
-    output_coords = {}
-    algos_dict = {
-        'test': tester_algo
-    } 
+def main(directories):
+    all_cluster_coords = []
     
-    for region, scan in input.items():
-        output_coords[region] = algos_dict[algo](scan)
+    for directory in directories:
+        segments = upload_segments(directory)
+        images = pixel_data(segments)
         
-    return output_coords
+        for img_slice in images:
+            preprocessed_slice = preprocess_seg(img_slice)
+            thresholded_slice = apply_thresholding(preprocessed_slice)
+            
+            db, cluster_centers = dbscan_with_atlas(thresholded_slice)
+            cluster_coords = get_coordinates(db, db.labels_)
+            
+            all_cluster_coords.append(cluster_coords)
+    
+    return all_cluster_coords
+
+if __name__ == "__main__":
+    directories = ["/content/brain", "/content/skull"]
+    cluster_coords = main(directories)
+
+    print("Number of Clusters:", len(cluster_coords))
+    print("\n3D Coordinates of Clusters:")
+    for clusters in cluster_coords:
+        for label, coords in clusters.items():
+            print(f"{label} :", coords.tolist())
+            print()
+
+
+## K-MEANS ##
+
+def load_volume(directory):
+    """Load DICOM slices from a directory and create a 3D volume."""
+    slices = [pydicom.dcmread(os.path.join(directory, s)) for s in os.listdir(directory)]
+    slices.sort(key=lambda x: int(x.filename.split('_')[1].split('.')[0]))
+    volume = np.stack([s.pixel_array for s in slices])
+    return volume
+
+def apply_gaussian_filter(volume, sigma=1):
+    return gaussian(volume, sigma=sigma)
+
+def apply_median_filter(volume):
+    return median(volume, footprint=ball(1))
+
+def preprocess_volume(volume):
+    volume = apply_gaussian_filter(volume)
+    return apply_median_filter(volume)
+
+def combine_volumes(volume1, volume2):
+    return np.concatenate([volume1, volume2])
+
+def kmeans_clustering(volume, n_clusters=4, n_init='auto', max_iter=1000):
+    reshaped_volume = volume.reshape((-1, 1))
+    kmeans = KMeans(n_clusters=n_clusters, init='k-means++', n_init=n_init, max_iter=max_iter)
+    labels = kmeans.fit_predict(reshaped_volume)
+    return labels.reshape(volume.shape), kmeans.cluster_centers_
+
+def calculate_brightness(cluster_centers):
+    avg_brightness = {}
+    for label, center in enumerate(cluster_centers):
+        avg_brightness[label] = center[0]
+    return avg_brightness
+
+def extract_coordinates(labeled_volume):
+    coordinates = {}
+    for label in np.unique(labeled_volume):
+        coords = np.argwhere(labeled_volume == label)
+        coordinates[label] = coords
+    return coordinates
+
+def main():
+    brain_dir = input("Enter the path for the brain directory: ")
+    skull_dir = input("Enter the path for the skull directory: ")
+
+    brain_volume = preprocess_volume(load_volume(brain_dir))
+    skull_volume = preprocess_volume(load_volume(skull_dir))
+    
+    combined_volume = combine_volumes(brain_volume, skull_volume)
+    labeled_volume, cluster_centers = kmeans_clustering(combined_volume)
+    
+    coordinates = extract_coordinates(labeled_volume)
+    avg_brightness = calculate_brightness(cluster_centers)
+
+    return coordinates, labeled_volume, avg_brightness
+
+coordinates, labeled_3d, avg_brightness = main()
+
+print("Average Cluster Brightness:")
+for key, value in avg_brightness.items():
+    print(key, ":", value)
+
+print("\n3D Coordinates of Clusters:")
+for key, value in coordinates.items():
+    print(key, ":", value, "\n")
+
+
+
+## Hierarchical ##
+
+def load_volume(directory):
+    slices = [pydicom.dcmread(os.path.join(directory, s)) for s in os.listdir(directory)]
+
+    # Extract numerical value from the filename and use it for sorting
+    slices.sort(key=lambda x: int(x.filename.split('_')[1].split('.')[0]))
+
+    volume = np.stack([s.pixel_array for s in slices])
+    return volume
+
+
+def preprocess_volume(volume):
+    scaler = StandardScaler()
+    standardized_volume = scaler.fit_transform(volume.reshape(-1, 1)).reshape(volume.shape)
+    return standardized_volume
+
+def extract_features(volume):
+
+    # Intensity feature
+    intensity = volume.flatten()
+    print(f"Intensity shape: {intensity.shape}")
+
+    # Gradient feature
+    grad_x, grad_y, grad_z = np.gradient(volume)
+    print(f"grad_x shape: {grad_x.flatten().shape}")
+    print(f"grad_y shape: {grad_y.flatten().shape}")
+    print(f"grad_z shape: {grad_z.flatten().shape}")
+
+    combined_features = np.stack([
+        intensity,
+        grad_x.flatten(),
+        grad_y.flatten(),
+        grad_z.flatten()
+    ], axis=-1)
+
+    return combined_features
+
+
+def perform_clustering(features, n_clusters):
+    clustering = AgglomerativeClustering(n_clusters=n_clusters, affinity='euclidean', linkage='ward').fit(features)
+    return clustering.labels_
+
+def extract_cluster_coordinates(labels, n_clusters):
+    clusters_coordinates = {}
+    for cluster in range(n_clusters):
+        clusters_coordinates[cluster] = np.argwhere(labels == cluster)
+    return clusters_coordinates
+
+# Load, preprocess, extract
+brain_volume = load_volume('/content/brain')  # path to brain dir
+skull_volume = load_volume('/content/skull')  # path to skull dir
+
+print(f"Shape of brain_volume: {brain_volume.shape}")
+print(f"Shape of skull_volume: {skull_volume.shape}")
+
+if brain_volume.shape != skull_volume.shape:
+    raise ValueError("Brain and Skull volumes aren't the same. Make sure they both have the same # of slices.")
+
+combined_volume = np.concatenate([brain_volume, skull_volume])
+combined_volume = preprocess_volume(combined_volume)
+features = extract_features(combined_volume)
+
+Z = linkage(features, method='ward')
+plt.figure(figsize=(10, 7))
+dendrogram(Z)
+plt.show()
+
+
+n_clusters = int(input("Number of clusters: "))
+labels = perform_clustering(features, n_clusters)
+labels_volume = labels.reshape(combined_volume[1:-1].shape)
+
+clusters_coordinates = extract_cluster_coordinates(labels_volume, n_clusters)
