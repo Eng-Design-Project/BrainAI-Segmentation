@@ -202,6 +202,9 @@ def display_slices(volume, labels, cluster_coords, brain_mask, skull_mask):
         # display full processed image
         display_rgb_image(rgb_img, z)
 
+# SITK TO PYDICOM - MD
+# original:
+'''
 def execute_clustering(sitk_dict, algo):
     output_coords = {} # initialize sitk dictionary to store output
     algos_dict = {
@@ -220,6 +223,27 @@ def execute_clustering(sitk_dict, algo):
         output_coords[key] = brain_cluster_coordinates
         #display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
     #dbscan optimized for entire brain, not atlas segments, currently outputs brain coords as opposed to "skull coords"
+    return output_coords
+'''
+def execute_clustering(dcm_dict, algo):
+    output_coords = {}  # initialize dcm dictionary to store output
+    algos_dict = {
+        'dbscan_3d': dbscan_3d
+    }
+
+    for key in dcm_dict:
+
+        # perform dbscan and get labeled volume, coordinates, and binary masks for each slice in the output dictionary
+        labeled_volume, cluster_coords, brain_mask, skull_mask = algos_dict[algo](dcm_dict[key])
+
+        # determine coordinates
+        brain_cluster_coordinates, skull_cluster_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
+        
+        # dictionary to store output coordinates
+        output_coords[key] = brain_cluster_coordinates
+        #display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
+    
+    # dbscan optimized for entire brain, not atlas segments, currently outputs brain coords as opposed to "skull coords"
     return output_coords
 
 # used as main sript, this helps a lot with testing and pinpointing errors.
