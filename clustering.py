@@ -16,6 +16,7 @@ from skimage.filters import gaussian, median, threshold_local, sobel
 from skimage.morphology import ball
 import data
 
+## DBSCAN WITHOUT ATLAS ##
 
 # Gaussian filter 
 # uses the gaussian PDF to smooth/ lower contrast in the roi by blurring and reducing noise
@@ -241,13 +242,8 @@ if __name__ == "__main__":
     print("3D Skull Cluster Coordinates:")
     print(skull_cluster_coordinates) 
 
-
-
-
-
-# lmk if you have any questions
  
-### DBSCAN WITH ATLAS: ###
+## DBSCAN WITH ATLAS ##
 
 def upload_segments(directory):
     segments = []
@@ -323,10 +319,7 @@ if __name__ == "__main__":
             print()
 
 
-
-### K-MEANS (CENTROID-BASED): ###
-
-
+## K-MEANS ##
 
 def load_volume(directory):
     """Load DICOM slices from a directory and create a 3D volume."""
@@ -394,7 +387,7 @@ for key, value in coordinates.items():
 
 
 
-### Hierarchical: ###
+## Hierarchical ##
 
 def load_volume(directory):
     slices = [pydicom.dcmread(os.path.join(directory, s)) for s in os.listdir(directory)]
