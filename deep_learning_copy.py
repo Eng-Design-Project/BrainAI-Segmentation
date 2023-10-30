@@ -1,4 +1,4 @@
-import SimpleITK as sitk
+# import SimpleITK as sitk
 import tensorflow as tf
 import numpy as np
 from scipy.ndimage import convolve
@@ -6,6 +6,7 @@ import data
 from tensorflow.keras.models import load_model
 import matplotlib.pyplot as plt
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+import pydicom
 
 
 # Function to split 3D images into smaller sub-arrays
@@ -126,7 +127,22 @@ def show_slices(triplets):
     plt.show()
 
 def dlAlgorithm(segmentDict, depth=5, epochs=3):
+    
+    # SITK TO PYDICOM - MD
+    # original:
+    '''
     numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()}
+    '''
+    numpyImagesDict = {key: img.pixel_array for key, img in segmentDict.items()} 
+    # if tf doesn't have auto rescaling, comment out the above line and use this instead:
+    '''
+    numpyImagesDict = {}
+    for key, img in segmentDict.items():
+        pixel_data = img.pixel_array
+        rescaled_data = pixel_data * img.RescaleSlope + img.RescaleIntercept
+        numpyImagesDict[key] = rescaled_data
+    '''
+
     normalizedDict = normalizeTF(numpyImagesDict)
     
     # Define the U-Net model
