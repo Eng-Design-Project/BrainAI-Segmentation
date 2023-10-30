@@ -348,7 +348,7 @@ def initial_segment_test():
 #THIS FUNCTION WILL BE DEPRECATED SOON, AS THERE IS A FUNCTION IN THE DATA MODULE THAT DOES IT MORE SIMPLY
 #given a dictionary with region names as keys and sitk images as values, this funciton displays them
 #I have not any changes to this function because the above comments suggest that this function should be deleted anyway. -Justin
-def display_regions_from_dict(region_images):
+'''def display_regions_from_dict(region_images):
     for region_name, region_image in region_images.items():
         print(region_name)
         print(region_image.GetSize())
@@ -359,7 +359,7 @@ def display_regions_from_dict(region_images):
         plt.imshow(array_from_image[0, :, :], cmap='gray')
         plt.axis('off')
         plt.title(f"Region: {region_name}")
-        plt.show()
+        plt.show()'''
 
 #converted to pydicom -Justin
 def create_seg_images_from_image(images_dict, coords_dict):
