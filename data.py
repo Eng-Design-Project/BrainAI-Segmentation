@@ -114,7 +114,18 @@ def get_3d_image(directory):
 def get_3d_image(directory):
     # Get a list of all DICOM files in the directory
     scan_files = sorted([os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")])
-    slices = [pydicom.dcmread(s).pixel_array for s in scan_files]    
+    slices = [ ]
+    for s in scan_files:
+        dicom_slice = pydicom.dcmread(s)
+        numpy_slice = dicom_slice.pixel_array
+
+        if ('RescaleSlope' in dicom_slice) and ('RescaleIntercept' in dicom_slice):
+            slope = float(dicom_slice.RescaleSlope)
+            intercept = float(dicom_slice.RescaleIntercept)
+            numpy_slice = slope * numpy_slice + Intercept
+
+        slices.append(numpy_slice)
+    
     image = np.stack(slices, axis=0) 
     return image
 
