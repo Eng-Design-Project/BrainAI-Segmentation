@@ -19,7 +19,8 @@ sitk_images_dict = {
 numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in sitk_images_dict.items()}
 '''
 #for the dummyDL functiom
-numpyImagesDict = images.dict
+numpyImagesDict = {key: img.pixel_array for key, img in sitk_images_dict.items()}
+
 
 #for the dummyDL function
 #labeled data is tricky, because it should probably be in the same format as the input data + a 1 or 0 label
