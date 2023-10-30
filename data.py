@@ -122,7 +122,7 @@ def get_3d_image(directory):
         if ('RescaleSlope' in dicom_slice) and ('RescaleIntercept' in dicom_slice):
             slope = float(dicom_slice.RescaleSlope)
             intercept = float(dicom_slice.RescaleIntercept)
-            numpy_slice = slope * numpy_slice + Intercept
+            numpy_slice = slope * numpy_slice + intercept
 
         slices.append(numpy_slice)
     
