@@ -206,6 +206,14 @@ def view_slice_metadata_from_directory(directory):
         image = pydicom.dcmread(filename)
         print(image.ImagePositionPatient)
         
+    # imagepositionpatient doesn't always work very well so here's the same function, but going by file name instead of metadata:
+'''
+def view_filenames_from_directory(directory):
+    scan_files = sorted([os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")])
+    for filename in scan_files:
+        print(filename)
+'''
+        
 # SITK TO PYDICOM - MD
 # original:
 '''
@@ -222,9 +230,9 @@ def resize_and_convert_to_3d_image(directory):
 #  after an image has been converted to an array: the meta data used by sitk is lost
 def resize_and_convert_to_3d_image(directory):
     image=get_3d_image(directory)
-    array = image.pixel_array
+   # array = image.pixel_array
     new_images = []
-    for i in range(0, array.shape[0]):
+    for i in range(0, image.shape[0]):
         new_images.append(resize(array[i,:,:], (224, 224), anti_aliasing=True))
     return new_images
     
