@@ -85,7 +85,7 @@ def find_boundary(segment):
     
     return boundary
 
-#takes boundary (edges), and gets 3d windows around each boundary voxel. These are inputs to the model
+#takes boundary (edges), and gets 3d windows around each boundary voxel. These are inputs tthe model
 def extract_windows(volume, boundary, window_size=3):
     padding = window_size // 2
     padded_volume = np.pad(volume, ((padding, padding), (padding, padding), (padding, padding)), mode='constant')

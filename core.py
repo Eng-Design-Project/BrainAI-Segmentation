@@ -502,8 +502,12 @@ class Core:
         self.master.deiconify()  # Show the main window
 
     def select_folder(self):
+        # Display a message to inform the user
+        
         # Open a dialog to select a folder path
-        folder_path = filedialog.askdirectory()
+        folder_path = filedialog.askdirectory(title="Select Folder",
+            message="Please select a folder for your task."
+        )
         # If a folder is selected, store it and update the folder label
         if folder_path:
             print("Selected folder:", folder_path)
@@ -535,6 +539,19 @@ class Core:
 
         # Call the dlAlgorithm function from deep_learning_copy module
         deep_learning_copy.dlAlgorithm(sitk_images_dict)
+
+    def custom_askdirectory(title):
+        # Create a custom dialog with a label
+        dialog = tk.Toplevel()
+        dialog.title(title)
+
+        label = tk.Label(dialog, text=title)
+        label.pack(padx=20, pady=10)
+
+        selected_directory = filedialog.askdirectory(parent=dialog, title=title)
+        dialog.destroy()  # Close the custom dialog
+
+        return selected_directory        
 
     def atlas_segment(self):
         print("Atlas Segmentation called")
@@ -573,7 +590,10 @@ class Core:
         png_dict = data.sitk_dict_to_png_dict(seg_results)
 
         # Ask the user to select a folder for saving the results
-        save_folder = filedialog.askdirectory(title="Select Save Folder")
+        save_folder = filedialog.askdirectory(
+            title="Select Save Folder",
+            message="Please select a folder to save the results."
+        )
 
         if save_folder:
             # Prompt the user to enter a file name within the GUI
@@ -584,6 +604,10 @@ class Core:
                 data.store_seg_img_on_file(seg_results, f"{save_folder}/{file_name}.DCMs")
                 data.store_seg_png_on_file(seg_results, f"{save_folder}/{file_name}.PNGs")
             # save dict of sitk images to data global seg results
+            # Show a message to inform the user that the folder was selected for saving
+            save_message = "Selected folder for saving: " + save_folder
+            save_message_label = tk.Label(self.master, text=save_message)
+            save_message_label.pack()
             data.segmentation_results = seg_results
         # Set a flag to indicate that atlas segmentation has been performed
         
