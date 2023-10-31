@@ -208,10 +208,10 @@ class Core:
         self.advanced_segmentation_button.pack(pady=20)
 
         # Clustering button
-        self.clustering_button = tk.Button(self.master, text="Clustering", command=lambda:(self.advanced_algo.set("Clustering"), self.change_buttons([self.execute_clustering_button, self.algo_btn, self.full_scan_btn, self.pre_atlas_seg_btn, self.clustering_back_button],[self.advanced_segmentation_button, self.deep_learning_button, self.clustering_button, self.advanced_back_button])))
+        self.clustering_button = tk.Button(self.master, text="Clustering", command=lambda:(self.advanced_algo.set("Clustering"), self.change_buttons([self.execute_clustering_button, self.full_scan_btn, self.pre_atlas_seg_btn, self.clustering_back_button],[self.advanced_segmentation_button, self.deep_learning_button, self.clustering_button, self.advanced_back_button])))
 
         # Deep learning button
-        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:(self.advanced_algo.set("Deep Learning"), self.change_buttons([self.execute_deep_learning, self.algo_btn, self.full_scan_btn, self.pre_atlas_seg_btn, self.deeplearning_back_button],[self.deep_learning_button, self.clustering_button, self.execute_clustering_button, self.advanced_back_button])))
+        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:(self.advanced_algo.set("Deep Learning"), self.change_buttons([self.execute_deep_learning, self.full_scan_btn, self.pre_atlas_seg_btn, self.deeplearning_back_button],[self.deep_learning_button, self.clustering_button, self.execute_clustering_button, self.advanced_back_button])))
 
         # Execute deep learning button
         self.execute_deep_learning = tk.Button(self.master, text="Execute Deep Learning", command=lambda:self.change_buttons([],[])) #self.execute_deep_learning_click)
@@ -220,10 +220,10 @@ class Core:
         self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.atlas_segment_button, self.image_scoring_button, self.advanced_segmentation_button, self.show_image_results_button, self.show_folder_results_button],[self.image_scoring_button, self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
 
         # Clustering back button
-        self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.results_label, self.execute_clustering_button, self.image_label, self.previous_button, self.next_button, self.algo_btn, self.full_scan_btn, self.pre_atlas_seg_btn, self.clustering_back_button]))
+        self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.results_label, self.execute_clustering_button, self.image_label, self.previous_button, self.next_button, self.full_scan_btn, self.pre_atlas_seg_btn, self.clustering_back_button]))
 
         # Deep learning back button
-        self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.image_label ,self.previous_button, self.next_button, self.algo_btn, self.full_scan_btn, self.pre_atlas_seg_btn, self.deeplearning_back_button]))
+        self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.image_label ,self.previous_button, self.next_button, self.full_scan_btn, self.pre_atlas_seg_btn, self.deeplearning_back_button]))
         
 
         """self.image_file_path = 'mytest.png'
@@ -238,7 +238,6 @@ class Core:
         self.show_folder_results_button = tk.Button(self.master, text="Show Folder Results", command=self.show_folder_results)
         self.show_folder_results_button.pack(pady=20)
 
-        self.algo_btn = tk.Button(self.master, text = "Algorithm")
         self.full_scan_btn = tk.Button(self.master, text = "Full Scan", command = self.full_scan)
         self.pre_atlas_seg_btn = tk.Button(self.master, text = "Pre Atlas Segmentation", command = self.pre_atlas_seg)
 
