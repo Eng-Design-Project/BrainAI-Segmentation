@@ -184,7 +184,6 @@ class Core:
         self.master.title("Image Analysis Tool")
         self.style = ttk.Style()
         self.style.configure("TButton", font=("Helvetica", 12))
-        self.advanced_algo =tk.StringVar() #this will be set to either 'Deep Learning' or 'Clustering' depending on the button click
         
         # Select folder button
         self.select_folder_button = tk.Button(self.master, text="Select Folder", command=self.select_folder)
@@ -208,10 +207,10 @@ class Core:
         self.advanced_segmentation_button.pack(pady=20)
 
         # Clustering button
-        self.clustering_button = tk.Button(self.master, text="Clustering", command=lambda:(self.advanced_algo.set("Clustering"), self.change_buttons([self.execute_clustering_button, self.clustering_back_button],[self.advanced_segmentation_button, self.deep_learning_button, self.clustering_button, self.advanced_back_button])))
+        self.clustering_button = tk.Button(self.master, text="Clustering", command=lambda:(self.change_buttons([self.execute_clustering_button, self.clustering_back_button],[self.advanced_segmentation_button, self.deep_learning_button, self.clustering_button, self.advanced_back_button])))
 
         # Deep learning button
-        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:(self.advanced_algo.set("Deep Learning"), self.change_buttons([self.execute_deep_learning, self.deeplearning_back_button],[self.deep_learning_button, self.clustering_button, self.execute_clustering_button, self.advanced_back_button])))
+        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:(self.change_buttons([self.execute_deep_learning, self.deeplearning_back_button],[self.deep_learning_button, self.clustering_button, self.execute_clustering_button, self.advanced_back_button])))
 
         # Execute deep learning button
         self.execute_deep_learning = tk.Button(self.master, text="Execute Deep Learning", command=lambda:self.change_buttons([],[])) #self.execute_deep_learning_click)
@@ -872,11 +871,11 @@ class Core:
             self.selected_folder = filedialog.askdirectory(title = "Select a folder containing DCMs")
             if (self.selected_folder == ""): break # this triggers if the user clicks "cancel" or "X"
 
-        if(self.advanced_algo.get() == "Deep Learning"):
-        # there's a bit of redundance here, because the user will get asked to select a folder again    
-            self.open_segmentation_selection_popup()
-        elif(self.advanced_algo.get() == "Clustering"):
-            self.open_clustering_options_popup()
+        # if(self.advanced_algo.get() == "Deep Learning"):
+        # # there's a bit of redundance here, because the user will get asked to select a folder again    
+        #     self.open_segmentation_selection_popup()
+        # elif(self.advanced_algo.get() == "Clustering"):
+        #     self.open_clustering_options_popup()
 
         print("full scan button clicked")
 
@@ -896,12 +895,12 @@ class Core:
                 break # while loop breaks if user selects a dcm folder
             if (self.selected_folder == ""): break # this triggers if the user clicks "cancel" or "X"
 
-        if(self.advanced_algo.get() == "Deep Learning"):
-            # there's a bit of redundance here, because the user will get asked to select a folder again    
-            self.open_segmentation_selection_popup()
+        # if(self.advanced_algo.get() == "Deep Learning"):
+        #     # there's a bit of redundance here, because the user will get asked to select a folder again    
+        #     self.open_segmentation_selection_popup()
 
-        elif(self.advanced_algo.get() == "Clustering"):
-            self.open_clustering_options_popup()
+        # elif(self.advanced_algo.get() == "Clustering"):
+        #     self.open_clustering_options_popup()
 
         print("pre atlas seg clicked")
 
