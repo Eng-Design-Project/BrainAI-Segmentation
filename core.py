@@ -46,10 +46,12 @@ import deep_learning_copy
 class ImageScoringPopup:
     # Constructor for the ImageScoringPopup class
     # Initialize the class with a parent/master window, image paths, and a callback function
-    def __init__(self, master,image_paths, callback):
+    def __init__(self, master,image1, image2, callback):
         self.master = master
         self.callback = callback
-        self.image_paths = image_paths
+        #image1 and image2 are pillow images
+        self.image1 = image1
+        self.image1 = image2
         self.current_image_index = 0
 
         # Create the main frame for the popup
@@ -72,7 +74,7 @@ class ImageScoringPopup:
         self.inner_frame_canvas = self.canvas.create_window((0, 0), window=self.inner_frame, anchor="nw")
 
         # Load and display images from the provided paths
-        self.images = [Image.open(path) for path in image_paths]
+        self.images = [image1, image2]
         self.photo_images = [ImageTk.PhotoImage(image) for image in self.images]
 
         # Display the current image in a label
@@ -127,7 +129,6 @@ class ImageScoringPopup:
             self.current_image_index += 1
             self.image_label.config(image=self.photo_images[self.current_image_index])
 
-
     def submit_scores(self):
         try:
             # Get the scores entered by the user from the GUI
@@ -154,6 +155,23 @@ class ImageScoringPopup:
             # Handle invalid input (e.g., non-numeric input)
             print("Invalid input. Please enter numeric scores.")
 
+#how UX for exec clustering or exec dl should go:
+    #user selects options: algorithm, full scan or pre atlas seg
+    #if (full scan selected):
+    #   while (self.selected_folder != dcm folder):
+    #       popup says "select a folder containing dcms"
+    #       select folder
+    #   exec_full_scan_clustering(self.selected_folder, algo)
+    #   
+    #else if (pre_atlas_seg selected):
+    #   while (self.selected_folder != seg folder):
+    #          popup says "select a segmented dcm folder"
+    #          select folder
+    #          if (self.selected_folder == dcm folder):
+    #               run atlas_seg(self.selected_folder)
+    #   exec_seg_clustering(self.selected_folder, algo)
+    #
+
 class Core:
     def __init__(self, master):
         self.master = master
@@ -166,6 +184,7 @@ class Core:
         self.master.title("Image Analysis Tool")
         self.style = ttk.Style()
         self.style.configure("TButton", font=("Helvetica", 12))
+        self.advanced_algo =tk.StringVar() #this will be set to either 'Deep Learning' or 'Clustering' depending on the button click
         
         # Select folder button
         self.select_folder_button = tk.Button(self.master, text="Select Folder", command=self.select_folder)
@@ -189,22 +208,22 @@ class Core:
         self.advanced_segmentation_button.pack(pady=20)
 
         # Clustering button
-        self.clustering_button = tk.Button(self.master, text="Clustering", command=lambda:self.change_buttons([self.execute_clustering_button, self.clustering_back_button],[self.advanced_segmentation_button, self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
+        self.clustering_button = tk.Button(self.master, text="Clustering", command=lambda:(self.advanced_algo.set("Clustering"), self.change_buttons([self.execute_clustering_button, self.algo_btn, self.full_scan_btn, self.pre_atlas_seg_btn, self.clustering_back_button],[self.advanced_segmentation_button, self.deep_learning_button, self.clustering_button, self.advanced_back_button])))
 
         # Deep learning button
-        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:self.change_buttons([self.execute_deep_learning, self.deeplearning_back_button],[self.deep_learning_button, self.clustering_button, self.execute_clustering_button, self.advanced_back_button]))
+        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:(self.advanced_algo.set("Deep Learning"), self.change_buttons([self.execute_deep_learning, self.algo_btn, self.full_scan_btn, self.pre_atlas_seg_btn, self.deeplearning_back_button],[self.deep_learning_button, self.clustering_button, self.execute_clustering_button, self.advanced_back_button])))
 
         # Execute deep learning button
-        self.execute_deep_learning = tk.Button(self.master, text="Execute Deep Learning", command=self.execute_deep_learning_click)
+        self.execute_deep_learning = tk.Button(self.master, text="Execute Deep Learning", command=lambda:self.change_buttons([],[])) #self.execute_deep_learning_click)
 
         # Advanced segmentation back button
         self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.atlas_segment_button, self.image_scoring_button, self.advanced_segmentation_button, self.show_image_results_button, self.show_folder_results_button],[self.image_scoring_button, self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
 
         # Clustering back button
-        self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.results_label, self.execute_clustering_button, self.image_label, self.previous_button, self.next_button, self.clustering_back_button]))
+        self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.results_label, self.execute_clustering_button, self.image_label, self.previous_button, self.next_button, self.algo_btn, self.full_scan_btn, self.pre_atlas_seg_btn, self.clustering_back_button]))
 
         # Deep learning back button
-        self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.image_label ,self.previous_button, self.next_button, self.deeplearning_back_button]))
+        self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.execute_deep_learning, self.image_label ,self.previous_button, self.next_button, self.algo_btn, self.full_scan_btn, self.pre_atlas_seg_btn, self.deeplearning_back_button]))
         
 
         """self.image_file_path = 'mytest.png'
@@ -218,6 +237,10 @@ class Core:
         # Button for showing segmentation results for a folder
         self.show_folder_results_button = tk.Button(self.master, text="Show Folder Results", command=self.show_folder_results)
         self.show_folder_results_button.pack(pady=20)
+
+        self.algo_btn = tk.Button(self.master, text = "Algorithm")
+        self.full_scan_btn = tk.Button(self.master, text = "Full Scan", command = self.full_scan)
+        self.pre_atlas_seg_btn = tk.Button(self.master, text = "Pre Atlas Segmentation", command = self.pre_atlas_seg)
 
         #self.advanced_segmentation_button = tk.Button(self.master, text="Advanced Segmentation", command=lambda: self.change_buttons([], [self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button]))
         #self.advanced_segmentation_button.pack(pady=20)
@@ -749,12 +772,18 @@ class Core:
     
 
     def open_image_scoring_popup(self):
+        #should take PIL images as input instead of directories
+
         image_paths = [
         "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png",  # Replace with actual image paths
         "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011437_2_S32031_I54071.png"]
 
+        #pillow images
+        image1 = Image.open(image_paths[0])
+        image2 = Image.open(image_paths[1])
+
         popup_window = tk.Toplevel(self.master)
-        image_scoring_popup = ImageScoringPopup(popup_window, image_paths, self.save_scores)
+        image_scoring_popup = ImageScoringPopup(popup_window, image1, image2, self.save_scores)
         
 
     def save_scores(self, score1, score2):
@@ -772,7 +801,79 @@ class Core:
     def show_image_results(self):
         # This function will eventually display segmentation results for an image
         # You can add your image processing and display logic here
-        print("Displaying segmentation results for an image")
+        # can take a directory (a folder containing sub-folders, each subfolder containing dcms) as input and then 
+        # use PIL to turn them into images to display in a popup, similar to how ImageScoringPopup is now
+        folder = filedialog.askdirectory(title="Select folder with subfolders containing DCM files")
+        while data.is_segment_results_dir(folder) != True:
+            tk.messagebox.showwarning(title="Invalid Selection", message=
+            "The folder you selected does not match the expected structure. Select a folder with sub-folders containg DCM files.")
+            folder = filedialog.askdirectory(title="Select folder with subfolders containing DCM files")
+
+        image_dict = data.subfolders_to_dictionary(folder)
+        pngs_dict = data.sitk_dict_to_png_dict(image_dict)
+
+        #below is the same code that was used for the atlas_segment popup
+        popup_window = tk.Toplevel(self.master)
+        popup_window.title("Select Segmentation Type")
+        brain_index = 0
+        skull_index = 0
+        current_segmentation = "Brain"  # Initialize with "Brain" as the default
+
+        def update_image():
+            nonlocal brain_index, skull_index, current_segmentation
+            if current_segmentation == "Brain":
+                image_list = pngs_dict['Brain']
+                index = brain_index
+            else:
+                image_list = pngs_dict['Skull']
+                index = skull_index
+            image = image_list[index]
+            photo = ImageTk.PhotoImage(image)
+            image_label.configure(image=photo)
+            image_label.image = photo
+
+        def handle_brain_skull_selection(segmentation_type):
+            nonlocal current_segmentation
+            if segmentation_type == "Brain":
+                if current_segmentation == "Brain":
+                    return  # If already on "Brain," do nothing
+                current_segmentation = "Brain"
+                update_image()
+            else:
+                if current_segmentation == "Skull":
+                    return  # If already on "Skull," do nothing
+                current_segmentation = "Skull"
+                update_image()
+
+        def handle_previous():
+            nonlocal brain_index, skull_index
+            if current_segmentation == "Brain":
+                brain_index = (brain_index - 1) % len(pngs_dict['Brain'])
+            else:
+                skull_index = (skull_index - 1) % len(pngs_dict['Skull'])
+            update_image()
+
+        def handle_next():
+            nonlocal brain_index, skull_index
+            if current_segmentation == "Brain":
+                brain_index = (brain_index + 1) % len(pngs_dict['Brain'])
+            else:
+                skull_index = (skull_index + 1) % len(pngs_dict['Skull'])
+            update_image()
+
+        image_label = tk.Label(popup_window)
+        image_label.pack()
+        button_frame = tk.Frame(popup_window)
+        button_frame.pack()
+        previous_button = tk.Button(button_frame, text="Previous", command=handle_previous)
+        next_button = tk.Button(button_frame, text="Next", command=handle_next)
+        previous_button.pack(side="left", padx=10)
+        next_button.pack(side="right", padx=10)
+        brain_button = tk.Button(popup_window, text="Brain", command=lambda: handle_brain_skull_selection("Brain"))
+        skull_button = tk.Button(popup_window, text="Skull", command=lambda: handle_brain_skull_selection("Skull"))
+        brain_button.pack(pady=10)
+        skull_button.pack(pady=10)
+        update_image()
 
     def show_folder_results(self):
         # This function will eventually display segmentation results for images in a folder
@@ -784,6 +885,50 @@ class Core:
             button.pack_forget()
         for button in show_list:
             button.pack(pady=20) 
+
+    def full_scan(self):
+        #   while (self.selected_folder != dcm folder):
+        #       popup says "select a folder containing dcms"
+        #       select folder
+        #   exec_full_scan_clustering(self.selected_folder, algo)
+        #self.open_clustering_options_popup()
+        
+        while(data.contains_only_dcms(self.selected_folder)!=True or self.selected_folder == ""):
+            self.selected_folder = filedialog.askdirectory(title = "Select a folder containing DCMs")
+            if (self.selected_folder == ""): break # this triggers if the user clicks "cancel" or "X"
+
+        if(self.advanced_algo.get() == "Deep Learning"):
+        # there's a bit of redundance here, because the user will get asked to select a folder again    
+            self.open_segmentation_selection_popup()
+        elif(self.advanced_algo.get() == "Clustering"):
+            self.open_clustering_options_popup()
+
+        print("full scan button clicked")
+
+    def pre_atlas_seg(self):
+    #else if (pre_atlas_seg selected):
+    #   while (self.selected_folder != seg folder):
+    #          popup says "select a segmented dcm folder"
+    #          select folder
+    #          if (self.selected_folder == dcm folder):
+    #               run atlas_seg(self.selected_folder)
+    #   exec_seg_clustering(self.selected_folder, algo)
+    
+        while(self.selected_folder == "" or data.is_segment_results_dir(self.selected_folder)!=True):
+            self.selected_folder = filedialog.askdirectory(title = "Select a segmented DCM folder")
+            if(data.contains_only_dcms(self.selected_folder)):
+                self.atlas_segment()
+                break # while loop breaks if user selects a dcm folder
+            if (self.selected_folder == ""): break # this triggers if the user clicks "cancel" or "X"
+
+        if(self.advanced_algo.get() == "Deep Learning"):
+            # there's a bit of redundance here, because the user will get asked to select a folder again    
+            self.open_segmentation_selection_popup()
+
+        elif(self.advanced_algo.get() == "Clustering"):
+            self.open_clustering_options_popup()
+
+        print("pre atlas seg clicked")
 
 """class ClusteringPage:
     def __init__(self, master, core_instance):

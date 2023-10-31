@@ -441,7 +441,7 @@ def create_black_copy(image: sitk.Image) -> sitk.Image:
     return black_image
 
 #global variable
-segmentation_results= None
+segmentation_results= {}
 
 # this function sets the global variable segmentation_results to a dictionary of regions:sitk images
 # It takes an optional argument of a directory of DCMS. If no directory is passed, it uses "scan1"
