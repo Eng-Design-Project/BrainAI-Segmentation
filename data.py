@@ -601,13 +601,18 @@ def sitk_dict_to_png_dict(img_dict):
 
 # first argument should be a higher level folder with brain region subfolders containing DCM files.
 # the output is a dictionary with brain region names as keys and sitk images as values
-def subfolders_to_dictionary(directory):
+'''def subfolders_to_dictionary(directory):
     #print(os.listdir(directory))
     region_dict = {}
     for i in os.listdir(directory):
         # print(i)
         region_dict[i] = get_3d_image(os.path.join(directory, i))
 
+    return region_dict'''
+def subfolders_to_3d_array_dictionary(directory):
+    region_dict = {}
+    for i in os.listdir(directory):
+        region_dict[i] = get_3d_array_from_file(os.path.join(directory, i))
     return region_dict
 
 # SITK TO PYDICOM - MD
