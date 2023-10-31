@@ -225,6 +225,9 @@ def execute_clustering(sitk_dict, algo):
     #dbscan optimized for entire brain, not atlas segments, currently outputs brain coords as opposed to "skull coords"
     return output_coords
 '''
+
+#Dustin: I had made some functions, they were trivial so it's not a big deal to remake them,
+#but I'm wondering where they went. They gave a bit of an outline for the clustering algo functions
 def execute_wholescan_clustering(np3d_dict, algo):
     output_coords = {}  # initialize dcm dictionary to store output
     algos_dict = {
