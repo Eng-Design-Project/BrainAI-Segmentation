@@ -125,22 +125,22 @@ def show_slices(triplets):
     plt.suptitle("Original and Segmented")
     plt.show()
 
-def dlAlgorithm(segmentDict, depth=5):
+def dlAlgorithm(segmentDict, depth=5, epochs=3):
     numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()}
     normalizedDict = normalizeTF(numpyImagesDict)
     
     # Define the U-Net model
     model = unet(input_size=(depth, 128, 128, 1))
 
-    #early_stopping = EarlyStopping(patience=5, verbose=1)
-    #model_checkpoint = ModelCheckpoint("best_model.keras", save_best_only=True, verbose=1)
-    #callbacks_list = [early_stopping, model_checkpoint]
+    early_stopping = EarlyStopping(patience=5, verbose=1)
+    model_checkpoint = ModelCheckpoint("best_model.keras", save_best_only=True, verbose=1)
+    callbacks_list = [early_stopping, model_checkpoint]
 
     loss_list = []
     all_triplets = []  # <-- Store all the segmented triplets here
 
     # First loop for segmentation
-    for sub_array in normalizedDict.items():
+    for key, sub_array in normalizedDict.items():
         sub_arrays_split = split_into_subarrays(sub_array, depth)
         
         for idx, sub_arr in enumerate(sub_arrays_split):
