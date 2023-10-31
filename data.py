@@ -230,7 +230,7 @@ def resize_and_convert_to_3d_image(directory):
 #  after an image has been converted to an array: the meta data used by sitk is lost
 def resize_and_convert_to_3d_image(directory):
     image=get_3d_image(directory)
-   # array = image.pixel_array
+    array = image
     new_images = []
     for i in range(0, image.shape[0]):
         new_images.append(resize(array[i,:,:], (224, 224), anti_aliasing=True))
@@ -586,10 +586,7 @@ def sitk_dict_to_png_dict(img_dict):
     for key in img_dict:
         # Create a new nested dictionary for the keya
         png_dict[key] = {}
-
-        dcm_data = pydicom.dcmread(img_dict[key])
-
-        full_image_np = dcm_data.pixel_array
+        full_image_np = img_dict[key]
 
         for z in range(full_image_np.shape[0]):
             slice_image_np = full_image_np[z,:,:]
