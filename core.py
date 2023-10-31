@@ -259,7 +259,9 @@ class Core:
         self.image_label = tk.Label(self.master)
     
     def execute_clustering(self):
+        # we can probably combine execute clustering and open_clustering_options_popup
         # Get the selected segmentation method
+        #we can probably remove get_selected_segmentation_method()
         selected_segmentation_method = self.get_selected_segmentation_method()
 
         if selected_segmentation_method == "atlas_segmentation":
@@ -357,6 +359,8 @@ class Core:
             """
 
     def handle_clustering_selection(self, popup_window, algorithm, source):
+        #determine if "full scan segmentation"
+        
         # Close the popup window
         popup_window.destroy()
 
