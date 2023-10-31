@@ -249,7 +249,7 @@ def execute_whole_clustering(input, algo):
     brain_cluster_coordinates, skull_cluster_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
 
     # dictionary to store output coordinates
-    output_coords["brain"] = brain_cluster_coordinates
+    output_coords["skull"] = skull_cluster_coordinates
     #display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
     #dbscan optimized for entire brain, not atlas segments, currently outputs brain coords as opposed to "skull coords"
         
