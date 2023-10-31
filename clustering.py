@@ -226,27 +226,61 @@ def execute_clustering(sitk_dict, algo):
     return output_coords
 '''
 
-#Dustin: I had made some functions, they were trivial so it's not a big deal to remake them,
-#but I'm wondering where they went. They gave a bit of an outline for the clustering algo functions
-def execute_wholescan_clustering(np3d_dict, algo):
-    output_coords = {}  # initialize dcm dictionary to store output
+
+#moved to bottom, just to keep sep from everything else
+def execute_whole_clustering(input, algo):
+    """
+    input: an entire scan (3d np array) and a string representing the chosen algo
+    selects the algo from a dictionary of corresponding functions
+    output: a dictionary of region : voxel coordinate lists
+    """
+     # initialize dictionary to store output
+    output_coords = {}
+
+    #dict of strings that correspond to functions
     algos_dict = {
         'dbscan_3d': dbscan_3d
-    }
+    } 
 
-    for key in np3d_dict:
+    # perform dbscan and get labeled volume, coordinates, and binary masks for each slice in the output dictionary
+    labeled_volume, cluster_coords, brain_mask, skull_mask = algos_dict[algo](input)
 
-        # perform dbscan and get labeled volume, coordinates, and binary masks for each slice in the output dictionary
-        labeled_volume, cluster_coords, brain_mask, skull_mask = algos_dict[algo](np3d_dict[key])
+    # determine coordinates
+    brain_cluster_coordinates, skull_cluster_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
 
-        # determine coordinates
-        brain_cluster_coordinates, skull_cluster_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
+    # dictionary to store output coordinates
+    output_coords["brain"] = brain_cluster_coordinates
+    #display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
+    #dbscan optimized for entire brain, not atlas segments, currently outputs brain coords as opposed to "skull coords"
         
-        # dictionary to store output coordinates
-        output_coords[key] = brain_cluster_coordinates
-        #display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
+    return output_coords
+
+def tester_algo(input_array):
+    """
+    input: np array
+    prints
+    output: format for the output of any clustering algo
+    """
+    print("clustering testing algo")
+    test_coords = [[x, y, z] for x in range(0, 30) for y in range(0, 30) for z in range(0, 30)]
+    return test_coords
+
+
+def execute_seg_clustering(input, algo):
+    """
+    input: an pre-atlas segmented scan (dict of 3d np arrays) and a string representing the chosen algo
+    selects the algo from a dictionary of corresponding functions
+    output: a dictionary of region : voxel coordinate lists
+    """
+    # initialize dictionary to store output
+    output_coords = {}
+    algos_dict = {
+        'test': tester_algo
+    } 
     
-    # dbscan optimized for entire brain, not atlas segments, currently outputs brain coords as opposed to "skull coords"
+    for region, scan in input.items():
+        output_coords[region] = algos_dict[algo](scan)
+        
     return output_coords
 
 # used as main sript, this helps a lot with testing and pinpointing errors.
