@@ -25,6 +25,19 @@ dummyLabels = {
     # Add more labels...
 }
 
+#since our classifier model is looking at windows, labeled data must be in the form of windows
+#i.e. a dictionary, key is brain region, value is a 4d np array. 3 dimensions are a single window 
+# (a 3x3x3 chunk of the original image around the boundary)
+#4th dimension is the index of that window
+def generate_dummy_labeled_data(windows_dict):
+    labeled_data = {}
+    for region, windows in windows_dict.items():
+        num_windows = windows.shape[0]
+        # Randomly generate labels (0 or 1) for each window
+        labels = np.random.randint(0, 2, num_windows)
+        labeled_data[region] = labels
+    return labeled_data
+
 #normalizes pixel value of 3d array dict
 def normalize_np_dict(volume3dDict):
     normalizedDict = {}
@@ -88,11 +101,22 @@ def extract_windows(volume, window_size=3):
     #does it make sense to convert to arrays?
     return np.array(windows), np.array(indices)
 
-
+#this will break without labeled data
+#this is deprecated, the logic is all in the class definition now
 def train_model(model, windows, user_score, labels=None):
     model.fit(windows, labels, epochs= 20 - int(user_score * 10)) 
 
-# not tested yet -Kevin
+#this should run without labeled data
+def train_model_with_user_feedback(model, windows, user_score, optimizer):
+    with tf.GradientTape() as tape:
+        predictions = model(windows)[:, 1]
+        loss = tf.keras.losses.MSE(tf.constant([user_score], dtype=tf.float32), tf.reduce_mean(predictions))
+    grads = tape.gradient(loss, model.trainable_variables)
+    optimizer.apply_gradients(zip(grads, model.trainable_variables))
+    return loss
+
+# the function below will not be used: the class method will be used instead
+#only keeping this for now as a note
 def executeDL(dict_of_np_arrays, user_score=0, model=buildPixelModel()):
     
     #should only have to normalize data once, and we only need to pass dict_of_np_arrays once
@@ -126,76 +150,70 @@ def executeDL(dict_of_np_arrays, user_score=0, model=buildPixelModel()):
     #dummyDL is run on a loop, probably in core?
 
 #class version of executeDL: no need to output and reinput things other than user_score
-#Notes: labeled data could be a bunch of 'windows', labeled 0 or 1
-#   should windows also be a class attribute? why extract windows many times
-#   if windows are a class attribute, than we wouldn't need to keep the entire image in memory
-class CustomClassifier:
+#notes: this class assumes one model can be used for all regions to be classified.
+#  Probably not the case, so another class will be made that has a seperate model for each region
+class CustomClassifierSingleModel:
     def __init__(self, initial_model=None):
         self.model = initial_model if initial_model else buildPixelModel()
         self.classification_dict = {}
         self.normalized_data = None
         self.labeled_data = None
         self.windows_dict = {}
+        self.optimizer = tf.keras.optimizers.Adam()  # Initialize once at the class level
 
     def executeDL(self, user_score=0, dict_of_np_arrays=None, labeled_data=None):
-        #initialize data on first run on executeDL
-        if self.normalized_data == None:
+
+        # initialize data on first run of executeDL
+        if self.normalized_data is None:
             self.normalized_data = normalize_np_dict(dict_of_np_arrays)
-        #use labled_data if it's given
-        if (labeled_data != None):
+
+        # update labeled_data if it's given
+        if labeled_data:
             self.labeled_data = labeled_data
 
-        # No need to compile multiple times, so we check if it's compiled.
-        if not hasattr(self.model, 'optimizer'):
-            self.model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
-
         for region, seg_volume in self.normalized_data.items():
-            if (len(self.windows_dict) < len(self.normalized_data)):
+            if region not in self.windows_dict:
                 windows, indices = extract_windows(seg_volume)
                 self.windows_dict[region] = windows[..., np.newaxis]  # Adding a channel dimension
+            else:
+                windows = self.windows_dict[region]
 
             # Using the labeled_data for the specific region if available
             region_labels = self.labeled_data.get(region) if self.labeled_data else None
-            #labeled data needs to be redone, to fit with the input data expected
 
-            train_model(self.model, windows, user_score, region_labels)
-            
-            #make predictions
+            # No need to compile multiple times, so we check if it's compiled.
+            if not hasattr(self.model, 'optimizer'):
+                self.model.compile(optimizer=self.optimizer, loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+
+            if region_labels:
+                self.model.fit(windows, region_labels, epochs=10)  # or any other number of epochs
+
+            train_model_with_user_feedback(self.model, windows, user_score, self.optimizer)
+
             predictions = self.model.predict(windows)
-
-            #average predicted probability for positive class
-            avg_prediction = np.mean(predictions[:, 1])
-
-            #what datastruct is predictions? does this round or just make things 1? Find the highest preds?
             predicted_labels = np.argmax(predictions, axis=1)
 
-            #Define a loss based on the user's score
-            # We can use mean squared error here, but other choices might be appropriate depending on the problem
-            loss = (avg_prediction - user_score) ** 2
-
-            # Update the model
-            # This part is tricky without labeled data; we need a way to compute gradients
-            # One option is to use a library like TensorFlow's 'tape' mechanism
-            with tf.GradientTape() as tape:
-                tape.watch(self.model.trainable_variables)
-                # Repredict to get the model's outputs as TensorFlow tensors
-                predictions_tf = self.model(windows, training=True)
-                avg_prediction_tf = tf.reduce_mean(predictions_tf[:, 1])
-                loss_tf = (avg_prediction_tf - user_score) ** 2
-                grads = tape.gradient(loss_tf, self.model.trainable_variables)
-                optimizer = tf.keras.optimizers.Adam()
-                optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
-
-            classified_indices = indices[predicted_labels == 1]
+            # Filter out the indices where the prediction is positive
+            classified_indices = indices[predicted_labels == 1].tolist()
             self.classification_dict[region] = classified_indices
 
         return self.classification_dict
-    
 
+#temp putting this function here while md finalises pydicom conversion
+def subfolders_to_3d_array_dictionary(directory):
+    region_dict = {}
+    for i in os.listdir(directory):
+        region_dict[i] = data.get_3d_array_from_file(os.path.join(directory, i))
+    return region_dict
 
 if __name__ == '__main__':
    print("running dl module")
-   classifier = CustomClassifier()
+   classifier = CustomClassifierSingleModel()
+   #need dict of np arrays
+   test_data_input = {"scan1": data.get_3d_array_from_file("scan1"), "scan2": data.get_3d_array_from_file("scan2"),}
+   classif_dict = classifier.executeDL(0, test_data_input)
+   for keys, values in classif_dict.items():
+       print(keys, ": ", values)
    
 
 '''

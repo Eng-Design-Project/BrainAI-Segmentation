@@ -101,6 +101,7 @@ def save_2d_images_list(image_list, directory):
         # Save the image
         img.save(file_path)
 
+#sitk-based, will be deprecated
 def get_3d_image(directory):
     # Get a list of all DICOM files in the directory
     scan_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")]
