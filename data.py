@@ -135,9 +135,28 @@ def view_sitk_3d_image(image, numSlices, displayText):
         axes[i].axis('off')
     plt.show()
 
+def view_np_3d_image(np_array_image, numSlices, displayText):
+    array = np_array_image
+    # Calculate the step size
+    step = array.shape[0] // numSlices
+    # Generate the slices
+    slices = [array[i*step, :, :] for i in range(numSlices)]
+    #display the slices
+    fig, axes = plt.subplots(1, numSlices, figsize=(18, 18))
+    # Set the title for the plot
+    fig.suptitle(displayText, fontsize=16)
+    for i, slice in enumerate(slices):
+        axes[i].imshow(slice, cmap='gray')
+        axes[i].axis('off')
+    plt.show()
+
 def display_seg_images(image_dict):
     for region, sitk_image in image_dict.items():
         view_sitk_3d_image(sitk_image, 5, region)
+
+def display_seg_np_images(image_dict):
+    for region, np_image in image_dict.items():
+        view_np_3d_image(np_image, 5, region)
 
 #note: simple ITK does not get all metadata, only most useful metadata for registration
 def view_slice_metadata_from_directory(directory):
@@ -376,6 +395,18 @@ def sitk_dict_to_png_dict(img_dict):
             png_dict[key][z] = slice_png
     #print("PNG DICTIONARY HAS BEEN GENERATED")       
     return png_dict
+
+def convert_sitk_dict_to_numpy(sitk_dict):
+    numpy_dict = {}
+    for key, image in sitk_dict.items():
+        if isinstance(image, sitk.Image):
+            numpy_array = sitk.GetArrayFromImage(image)
+            numpy_dict[key] = numpy_array
+        else:
+            raise ValueError(f"Value for key '{key}' is not a SimpleITK image.")
+
+    return numpy_dict
+
 
 # first argument should be a higher level folder with brain region subfolders containing DCM files.
 # the output is a dictionary with brain region names as keys and sitk images as values
