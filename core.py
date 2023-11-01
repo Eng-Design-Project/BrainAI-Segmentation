@@ -260,19 +260,19 @@ class Core:
     
     def execute_clustering(self):
         # we can probably combine execute clustering and open_clustering_options_popup
-        # Get the selected segmentation method
-        #we can probably remove get_selected_segmentation_method()
-        selected_segmentation_method = self.get_selected_segmentation_method()
+        #when user hits clustering (we can remove execute clustering button before it) button
+        #calls open_clustering_options_popup
+        #user selects fullscan /segscan
+        #user selects algo (save as string, string fed to data.execute~~(input, string)) 
+        #user selects from memory or from file
+        #handle_clustering_selection is called: it either takes 
+        # the three selections as params or they are class attributes (params is better imo)
+        #further comments on handle clustering selection  
 
-        if selected_segmentation_method == "atlas_segmentation":
-            # If the selected method is "atlas_segmentation," call the atlas_segment function
-            self.atlas_segment()
-        else:
-            if not data.segmentation_results:
-                # If segmentation results are not available, call atlas_segment
-                self.atlas_segment()
-            # Open a clustering options popup
-            self.open_clustering_options_popup()
+
+        
+        # Open a clustering options popup
+        self.open_clustering_options_popup()
 
     def open_clustering_options_popup(self):
         if self.get_selected_segmentation_method() == "atlas_segmentation" and not data.segmentation_results:
@@ -293,6 +293,8 @@ class Core:
             whole_brain.pack()
             segment = tk.Radiobutton(popup_window, text="Segment", variable=segment_var, value="Segment")
             segment.pack()
+            #Note: We need to grey out or otherwise deselect options for any algos but DBSCAN if whole brain selected 
+            #temporarily, just have DBSCAN be the default value
 
             # Create radio buttons for clustering algorithm options
             algorithm_var = tk.StringVar()
@@ -309,7 +311,7 @@ class Core:
             source_var.set(None)  # Set an initial value that does not correspond to any option
             file_option = tk.Radiobutton(popup_window, text="From File", variable=source_var, value="file")
             file_option.pack()
-            memory_option = tk.Radiobutton(popup_window, text="From Memory", variable=source_var, value="memory")
+            memory_option = tk.Radiobutton(popup_window, text="From Memory (most recent Segmentation Results)", variable=source_var, value="memory")
             memory_option.pack()
 
             # Create a button to confirm the selection and execute clustering
@@ -359,7 +361,42 @@ class Core:
             """
 
     def handle_clustering_selection(self, popup_window, algorithm, source):
-        #determine if "full scan segmentation"
+        #if memory
+            #if seg scan
+                #if !seg_results
+                    #change to from file
+            #if full scan
+                #if !selected_file
+                    #change to from file
+        #if from file
+            #clear seg_results
+            #while !seg_results
+                #open file selector
+                #if seg scan
+                    #if is_segment_results_dir(selection)
+                        #set seg results(selection)
+                    #else
+                        #popup, thats not a seg results folder
+                        #in the future, can query if user wants to atlas seg first, 
+                        # if contains_only_dcms(selection) == true
+                #if full scan
+                    #if contains_only_dcms(selection)
+                        #break
+                    #else
+                        #popup, thats not a dcm folder
+            
+        #implement in popup selection later
+        #if (seg scan && !seg_results) || (full scan && !selected_file)
+            #user shouldn't been able to select 'from memory'
+        
+        #if seg scan
+            #execute_seg_clustering(seg results, selected_algo)
+        #if full scan
+            #execute_full_clustering(3d_array_from_file(selection), selected_algo)
+            
+            
+
+        
         
         # Close the popup window
         popup_window.destroy()
@@ -370,6 +407,7 @@ class Core:
             data.set_seg_results(selected_folder)
             self.segmentation_results = data.segmentation_results
             print("Selected file or folder:", selected_folder)
+            #call execute clustering here
 
             # Logic to perform clustering from a file and set the clustering_results variable
             clustering_results = {}  # Implement file-based clustering logic here

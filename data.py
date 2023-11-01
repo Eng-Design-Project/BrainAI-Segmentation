@@ -407,23 +407,6 @@ def create_seg_images(image, region_dict):
     #print(f"Size of output images:  {len(output_images)}")
     return output_images
     
-# function copied from segmentation
-def DCMs_to_sitk_img_dict(directory):
-    image = get_3d_image(directory)
-    def generate_regions(): 
-        region1 = [[x, y, z] for x in range(0, 51) for y in range(0, 51) for z in range(0, 51)]
-        region2 = [[x, y, z] for x in range(50, 101) for y in range(50, 101) for z in range(0, 50)]
-
-        region_dict = {
-            "Region1": region1,
-            "Region2": region2
-        }
-        return region_dict
-    region_dict = generate_regions()
-    region_images = create_seg_images(image, region_dict)
-    #display_regions_from_dict(region_images)
-    display_seg_images(region_images)
-    return region_images
 
 # the following code tests the "subfolders_to_dictionary()" function
 def test_subfolders_to_dictionary(directory):
@@ -449,9 +432,10 @@ segmentation_results= None
 
 # this function sets the global variable segmentation_results to a dictionary of regions:sitk images
 # It takes an optional argument of a directory of DCMS. If no directory is passed, it uses "scan1"
-def set_seg_results(directory = "scan1"):
+def set_seg_results(directory = "atl_segmentation_DCMs"):
     global segmentation_results
-    segmentation_results = DCMs_to_sitk_img_dict(directory)
+
+    segmentation_results = subfolders_to_dictionary(directory)
     print("segmentation results: ",segmentation_results.keys())
     #note: the function DCMs_to_etc, is a dummy function that grabs a single scan from memory and then 
     # splits it into a dict. We don't need this at all. We should assume this function is 
