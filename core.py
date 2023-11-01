@@ -382,6 +382,8 @@ class Core:
                     if data.is_segment_results_dir(folder):
                         #the function below sets data.segmentation_results to an sitk image dict
                         data.set_seg_results(folder)
+                        #now I convert it to np array dict
+                        data.segmentation_results = data.convert_sitk_dict_to_numpy(data.segmentation_results)
                     else:
                         tk.messagebox.showwarning(title="Invalid Selection", message="The folder you selected does not match the expected structure. Select a folder with sub-folders containg DCM files.")
                         # in the future, add logic to query to user if they want to do atlas seg first,
