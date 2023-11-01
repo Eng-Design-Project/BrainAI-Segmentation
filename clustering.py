@@ -1,19 +1,18 @@
 # "# ADJUSTABLE:" indicates all the values that can be changed
-# ROI: region of interest
 
-# All additional necessary libraries are in requirements.txt
 import numpy as np
 import matplotlib.pyplot as plt
 import pydicom
 import os
 from sklearn.cluster import DBSCAN, KMeans, AgglomerativeClustering
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics.pairwise import euclidean_distances, rbf_kernel
+from sklearn.metrics.pairwise import euclidean_distances
 from scipy.ndimage import gaussian_filter
 from scipy.cluster.hierarchy import dendrogram, linkage
 from skimage import morphology, measure, feature, exposure
 from skimage.filters import gaussian, median, threshold_local, sobel
 from skimage.morphology import ball
+from skimage.feature import greycomatrix, greycoprops
 import data
 
 ## DBSCAN WITHOUT ATLAS ##
@@ -303,7 +302,7 @@ if __name__ == "__main__":
     print("3D Skull Cluster Coordinates:")
     print(skull_cluster_coordinates) 
 
-'''
+
 ## DBSCAN WITH ATLAS ##
 
 def upload_segments(directory):
@@ -319,10 +318,40 @@ def pixel_data(segments):
     return np.stack([s.pixel_array for s in segments])
     #why not use the function in data for getting 3d np arrays from directory?
 
+def clahe_enhance(images):
+    return exposure.equalize_adapthist(images)
+
 def preprocess_seg(images):
+
+    # apply gaussian
     filtered_images = gaussian_filter(images, sigma=1)
-    edges = sobel(filtered_images)
-    return edges
+
+    # computing gradient magnitude w the sobel filter
+    gradient_mag = np.sqrt(np.square(sobel(filtered_images, axis = 0)) + np.square(sobel(filtered_images, axis = 1)))
+
+    # enhancement w clahe
+    enhanced_images = clahe_enhance(gradient_mag)
+
+    # apply opening
+    opened_images = morphology.opening(enhanced_images, morphology.square(3))
+
+    return opened_images
+
+def texture_features(image):
+
+    image_rescaled = (image * 255).astype(np.uint8)
+    # computing co-occurence matrix (grey level)
+    gl_con_matrix = greycomatrix(image, [1], [0], 256, symmetric = True, normed = True)
+
+    # actually extracting the texture
+    contrast = greycoprops(gl_con_matrix, 'contrast')[0, 0]
+    dissimilarity = greycoprops(gl_con_matrix, 'dissimilarity')[0, 0]
+    homogeneity = greycoprops(gl_con_matrix, 'homogeneity')[0, 0]
+    energy = greycoprops(gl_con_matrix, 'energy')[0, 0]
+    correlation = greycoprops(gl_con_matrix, 'correlation')[0, 0]
+
+    return np.array([contrast, dissimilarity, homogeneity, energy, correlation])
+
 
 def apply_thresholding(image):
     block_size = 35
@@ -331,6 +360,9 @@ def apply_thresholding(image):
     return binary_adaptive
 
 def dbscan_with_atlas(image_slice):
+
+    apply_texture_features = texture_features(image_slice)
+
     coords = np.column_stack(np.where(image_slice > 0))
     db_atl = DBSCAN(eps=1.5, min_samples=7).fit(coords)
     
@@ -403,11 +435,16 @@ def preprocess_volume(volume):
 def combine_volumes(volume1, volume2):
     return np.concatenate([volume1, volume2])
 
+
 def kmeans_clustering(volume, n_clusters=4, n_init='auto', max_iter=1000):
-    reshaped_volume = volume.reshape((-1, 1))
+
+    # Reshape to (-1, volume.shape[2]) to maintain 3D structure
+    reshaped_volume = volume.reshape(-1, volume.shape[2]) 
     kmeans = KMeans(n_clusters=n_clusters, init='k-means++', n_init=n_init, max_iter=max_iter)
     labels = kmeans.fit_predict(reshaped_volume)
-    return labels.reshape(volume.shape), kmeans.cluster_centers_
+    # Adjust reshape back to original 3D shape
+    return labels.reshape(volume.shape[:-1]), kmeans.cluster_centers_
+
 
 def calculate_brightness(cluster_centers):
     avg_brightness = {}
@@ -463,30 +500,24 @@ def load_volume(directory):
 
 def preprocess_volume(volume):
     scaler = StandardScaler()
-    standardized_volume = scaler.fit_transform(volume.reshape(-1, 1)).reshape(volume.shape)
+    # Adjust reshape for 3D
+    standardized_volume = scaler.fit_transform(volume.reshape(-1, volume.shape[2])).reshape(volume.shape)
     return standardized_volume
 
 def extract_features(volume):
-
     # Intensity feature
-    intensity = volume.flatten()
-    print(f"Intensity shape: {intensity.shape}")
-
-    # Gradient feature
+    intensity = volume.reshape(-1, volume.shape[2])
+    # Gradient feature (remains 3D)
     grad_x, grad_y, grad_z = np.gradient(volume)
-    print(f"grad_x shape: {grad_x.flatten().shape}")
-    print(f"grad_y shape: {grad_y.flatten().shape}")
-    print(f"grad_z shape: {grad_z.flatten().shape}")
-
-    combined_features = np.stack([
+    
+    combined_features = np.concatenate([
         intensity,
-        grad_x.flatten(),
-        grad_y.flatten(),
-        grad_z.flatten()
-    ], axis=-1)
-
+        grad_x.reshape(-1, volume.shape[2]),
+        grad_y.reshape(-1, volume.shape[2]),
+        grad_z.reshape(-1, volume.shape[2])
+    ], axis=1)
+    
     return combined_features
-
 
 def perform_clustering(features, n_clusters):
     clustering = AgglomerativeClustering(n_clusters=n_clusters, affinity='euclidean', linkage='ward').fit(features)
@@ -532,5 +563,3 @@ clusters_coordinates = extract_cluster_coordinates(labels_volume, n_clusters)
 #all the "main" functions should be labeled so they can be implemented
 #it also seems like you made many helper functions that do the same thing: loading a volume, normalizing, etc
 # clustering shouldn't need to access any directories
-
-'''
