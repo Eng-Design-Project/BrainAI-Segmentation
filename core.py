@@ -13,6 +13,7 @@ import segmentation
 import data
 import os
 import deep_learning_copy
+import clustering
 
 
 """class AdvancedSegmentationPage:
@@ -360,7 +361,7 @@ class Core:
             """
 
     def handle_clustering_selection(self, popup_window, seg_var, algorithm, source):
-        print(seg_var,", ",algorithm, ", ", source)
+        folder = "" #this variable is local to the function
         if source == "memory":
             if seg_var == "Segment":
                 if not data.segmentation_results:
@@ -373,7 +374,7 @@ class Core:
                     #add more logic here; add a file dialog for the user to select from file
 
         if source == "file":
-            data.segmentation_results = None #should I set it to None, or to empty dict {} ?
+            data.segmentation_results = None 
             while not data.segmentation_results: #note, this may result in infinite loop
                 folder = filedialog.askdirectory(title="Select folder with segmentation results")
                 if seg_var =="Segment":
@@ -396,16 +397,17 @@ class Core:
             #user shouldn't been able to select 'from memory'
         
         if seg_var == "Segment":
-            print("...")
-
-        #if seg scan
-            #execute_seg_clustering(seg results, selected_algo)
-        #if full scan
-            #execute_full_clustering(3d_array_from_file(selection), selected_algo)
-            
-            
-
-        
+            #the if statement below checks if data.segmentation_results is not empty. It should be unnecessary later when I've added more logic.
+            if data.segmentation_results:
+                #the first argument should be a pre-atlas segmented scan, the 2nd argument should be a string of the chosen algo
+                voxel_dict = clustering.execute_seg_clustering(data.segmentation_results, algorithm)
+                # display function? 
+        if seg_var == "Whole Brain":
+            # note, when it comes to whole brain, only the DBSCAN algorithm works at the moment
+            #the if statement below checks if the folder is not empty. It should be unnecessary later when I've added more logic.
+            if folder:
+                voxel_dict = clustering.execute_whole_clustering(data.get_3d_array_from_file(folder), algorithm)
+                # display function?
         
         # Close the popup window
         popup_window.destroy()
