@@ -245,6 +245,30 @@ def create_seg_images_from_image(image, region_dict):
 
     return output_images
 
+def filter_noise_from_images(images_dict, noise_coords_dict):
+    # Ensure the noise coordinates dictionary has keys that exist in the images dictionary
+    if not set(noise_coords_dict.keys()).issubset(set(images_dict.keys())):
+        raise ValueError("Keys in noise_coords_dict should be a subset of images_dict.")
+    
+    # Create a copy of the images dictionary to modify and return
+    filtered_images = {k: np.copy(v) for k, v in images_dict.items()}
+
+    # For each brain region in the noise_coords_dict
+    for region, coords_list in noise_coords_dict.items():
+        # Get the 3D image for the region
+        current_image = filtered_images[region]
+        
+        # Iterate over the coordinates in coords_list
+        for x, y, z in coords_list:
+            # Ensure the coordinates are within the image's bounds
+            if (0 <= x < current_image.shape[0]) and \
+               (0 <= y < current_image.shape[1]) and \
+               (0 <= z < current_image.shape[2]):
+                current_image[x, y, z] = 0  # Set the voxel to black
+    
+    return filtered_images
+
+
 #this would take a dict of atlas segmented images, and then further refine them with coordinates output by an 
 # Advanced Segmentation algo, with corresponding region names
 def create_seg_images_from_dict(images_dict, coords_dict):
