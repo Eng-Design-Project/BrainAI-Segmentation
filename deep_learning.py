@@ -155,6 +155,7 @@ def executeDL(dict_of_np_arrays, user_score=0, model=buildPixelModel()):
 class CustomClassifierSingleModel:
     def __init__(self, initial_model=None):
         self.model = initial_model if initial_model else buildPixelModel()
+        #self.models = {"brain": buildPixelModel()}
         self.classification_dict = {}
         self.normalized_data = None
         self.labeled_data = None
@@ -187,7 +188,7 @@ class CustomClassifierSingleModel:
 
             if region_labels:
                 self.model.fit(windows, region_labels, epochs=10)  # or any other number of epochs
-
+                #self.models[region].fit(....)
             train_model_with_user_feedback(self.model, windows, user_score, self.optimizer)
 
             predictions = self.model.predict(windows)
