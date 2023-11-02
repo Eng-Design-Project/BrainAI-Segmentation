@@ -242,148 +242,228 @@ if __name__ == "__main__":
     print("3D Skull Cluster Coordinates:")
     print(skull_cluster_coordinates) 
 
- 
-## DBSCAN WITH ATLAS ##
+## SHARED FUNCTIONS ##
 
-def upload_segments(directory):
-    segments = []
-    for s in os.listdir(directory):
-        filepath = os.path.join(directory, s)
-        if os.path.isfile(filepath):  # Ensure the path is a file
-            dataset = pydicom.dcmread(filepath, force=True)
-            segments.append(dataset)
-    return segments
 
-def pixel_data(segments):
-    return np.stack([s.pixel_array for s in segments])
+# 3d clahe enhancement w sliding window
+def clahe_enhance(volume, kernel_size=(3, 3, 3)):
 
-def preprocess_seg(images):
-    filtered_images = gaussian_filter(images, sigma=1)
-    edges = sobel(filtered_images)
-    return edges
+    half_depth = kernel_size[0] // 2
+    half_height = kernel_size[1] // 2
+    half_width = kernel_size[2] // 2
 
-def apply_thresholding(image):
-    block_size = 35
-    adaptive_thresh = threshold_local(image, block_size, offset=5)
-    binary_adaptive = image > adaptive_thresh
-    return binary_adaptive
+    # padded for edge cases
+    padded = np.pad(volume, ((half_depth, half_depth), (half_height, half_height), (half_width, half_width)))
+    enhanced = np.zeros_like(volume)
+    depth, height, width = volume.shape
+    for z in range(depth):
+        for y in range(height):
+            for x in range(width):
+                local_block = padded[z:z+2*half_depth+1, y:y+2*half_height+1, x:x+2*half_width+1]
+                local_enhanced = exposure.equalize_adapthist(local_block)
+                enhanced[z, y, x] = local_enhanced[half_depth, half_height, half_width]
 
-def dbscan_with_atlas(image_slice):
-    coords = np.column_stack(np.where(image_slice > 0))
-    db_atl = DBSCAN(eps=1.5, min_samples=7).fit(coords)
+    return enhanced
+
+
+def texture_features(volume):
+    # dimensions
+    depth, height, width = volume.shape
     
-    # Calculate cluster centers
-    cluster_centers = []
-    labels = db_atl.labels_
-    unique_labels = np.unique(labels)
-    for label in unique_labels:
-        if label != -1:  # Exclude noise label
-            members = coords[labels == label]
-            center = members.mean(axis=0)
-            cluster_centers.append(center)
+    # list to store features
+    all_features = []
     
-    return db_atl, np.array(cluster_centers)
+    for i in range(depth):
+        slice_ = volume[i, :, :]  # Axial slice
+        glcm = greycomatrix(slice_, [1], [0], 256, symmetric=True, normed=True)
+        features = [
+            greycoprops(glcm, 'contrast')[0, 0],
+            greycoprops(glcm, 'dissimilarity')[0, 0],
+            greycoprops(glcm, 'homogeneity')[0, 0],
+            greycoprops(glcm, 'energy')[0, 0],
+            greycoprops(glcm, 'correlation')[0, 0]
+        ]
 
-def get_coordinates(db_atl, labels):
-    unique_labels = np.unique(labels)
-    cluster_coords = {label: np.column_stack(np.where(labels == label)) for label in unique_labels if label != -1}
-    return cluster_coords
+        all_features.append(features)
 
-def main(directories):
-    all_cluster_coords = []
-    
-    for directory in directories:
-        segments = upload_segments(directory)
-        images = pixel_data(segments)
-        
-        for img_slice in images:
-            preprocessed_slice = preprocess_seg(img_slice)
-            thresholded_slice = apply_thresholding(preprocessed_slice)
-            
-            db, cluster_centers = dbscan_with_atlas(thresholded_slice)
-            cluster_coords = get_coordinates(db, db.labels_)
-            
-            all_cluster_coords.append(cluster_coords)
-    
-    return all_cluster_coords
-
-if __name__ == "__main__":
-    directories = ["/content/brain", "/content/skull"]
-    cluster_coords = main(directories)
-
-    print("Number of Clusters:", len(cluster_coords))
-    print("\n3D Coordinates of Clusters:")
-    for clusters in cluster_coords:
-        for label, coords in clusters.items():
-            print(f"{label} :", coords.tolist())
-            print()
-
-
-## K-MEANS ##
-
-def load_volume(directory):
-    """Load DICOM slices from a directory and create a 3D volume."""
-    slices = [pydicom.dcmread(os.path.join(directory, s)) for s in os.listdir(directory)]
-    slices.sort(key=lambda x: int(x.filename.split('_')[1].split('.')[0]))
-    volume = np.stack([s.pixel_array for s in slices])
-    return volume
+    return np.array(all_features)
 
 def apply_gaussian_filter(volume, sigma=1):
     return gaussian(volume, sigma=sigma)
 
+
+
+## DBSCAN WITH ATLAS ##
+# from core:
+    # run "db2_execute" to execute the algorithm
+    # call "db2_result_string" to display output
+
+def db2_preprocess(volume):
+
+    # apply gaussian
+    gaussian_filtered_volume = gaussian_filter(volume, sigma=1)
+
+    # computing gradient magnitude w the sobel filter
+    gradient_mag = np.sqrt(np.square(sobel(gaussian_filtered_volume, axis = 0)) + np.square(sobel(gaussian_filtered_volume, axis = 1)) + np.square(sobel(gaussian_filtered_volume, axis = 2)))
+
+    # enhancement w clahe
+    clahe_enhanced_volume = clahe_enhance(gradient_mag)
+
+    # apply opening
+    opened_volume = morphology.opening(clahe_enhanced_volume, morphology.ball(3))
+
+    return opened_volume
+
+def db2_thresholding(volume):
+    block_size = 35
+    db2_adaptive_thresholding = threshold_local(volume, block_size, offset=5)
+    binary_adaptive = volume > db2_adaptive_thresholding
+    return binary_adaptive
+
+def dbscan_with_atlas(volume):
+
+    apply_texture_features = texture_features(volume)
+
+    # bring non zero coordinates into volume
+    db2_coords = np.column_stack(np.where(volume > 0))
+
+    # fetch texture feature for each voxel
+    db2_iterate_texture_features = apply_texture_features[db2_coords[:, 0]]
+
+    # combine texture features with voxel coordinates 
+    db2_combined_texture_features = np.hstack((db2_coords, db2_iterate_texture_features))
+
+    # scale the combined features
+    db2_scaler = StandardScaler()
+    db2_scaled_features = db2_scaler.fit_transform(db2_combined_texture_features)
+
+    # run dbscan on scaled features
+    db2 = DBSCAN(eps=1.5, min_samples=7).fit(db2_scaled_features)
+    
+    # Calculate cluster centers
+    db2_cluster_centers = []
+    labels = db2.labels_
+    db2_unique_labels = np.unique(labels)
+    for label in db2_unique_labels:
+        if label != -1:  # Exclude noise label
+            members = db2_coords[labels == label]
+            center = members.mean(axis=0)
+            db2_cluster_centers.append(center)
+    
+    return db2, np.array(db2_cluster_centers)
+
+def db2_calculate_brightness(volume, db2_coords, labels):
+    avg_brightness = {}
+    unique_labels = np.unique(labels)
+    for label in unique_labels:
+        if label != -1:  # Exclude noise label
+            members = db2_coords[labels == label]
+            brightness_values = volume[members[:,0], members[:,1], members[:,2]]
+            avg_brightness[label] = np.mean(brightness_values)
+    return avg_brightness
+
+
+def db2_execute(volumes):
+    db2_coordinates = []
+    avg_brightness_list = []
+    
+    for volume in volumes:
+        db2_preprocessed_volume = db2_preprocess(volume)
+        db2_thresholded_volume = db2_thresholding(db2_preprocessed_volume)
+
+        db2, db2_cluster_coords = dbscan_with_atlas(db2_thresholded_volume)
+
+        avg_brightness = db2_calculate_brightness(volume, np.column_stack(np.where(db2_thresholded_volume > 0)), db2.labels_)
+        avg_brightness_list.append(avg_brightness)
+
+        db2_coordinates.append(db2_cluster_coords)
+    
+    return db2_coordinates, avg_brightness_list
+
+def db2_result_string(db2_coordinates, avg_brightness_list):
+    total_clusters = sum([len(db2_cluster_coords) for db2_cluster_coords in db2_coordinates])
+    db2_results = f"Number of Clusters Found: {total_clusters}\n"
+    
+    db2_results += "Average Cluster Brightness:\n"
+    for idx, avg_brightness in enumerate(avg_brightness_list):
+        for key, value in avg_brightness.items():
+            db2_results += f"{key} : {value}\n"
+
+    db2_results += "\n3D Coordinates of Clusters:\n"
+    db2_cluster_count = 1
+    for db2_volume_cluster_coords in db2_coordinates:
+        for db2_cluster_coord in db2_volume_cluster_coords:
+            db2_results += f"cluster {db2_cluster_count}: {db2_cluster_coord}\n"
+            db2_cluster_count += 1
+
+    return db2_results
+
+
+
+
+## K-MEANS ##
+# from core:
+    # run "km_execute" to execute the algorithm
+    # call "km_result_string" to display output
+
+''''
 def apply_median_filter(volume):
     return median(volume, footprint=ball(1))
+''''
 
-def preprocess_volume(volume):
-    volume = apply_gaussian_filter(volume)
-    return apply_median_filter(volume)
+def km_preprocess(volume):
+    
+    gaussian_filtered_volume = gaussian_filter(volume, sigma=1)
 
-def combine_volumes(volume1, volume2):
-    return np.concatenate([volume1, volume2])
+    gradient_mag = np.sqrt(np.square(sobel(gaussian_filtered_volume, axis = 0)) + np.square(sobel(gaussian_filtered_volume, axis = 1)) + np.square(sobel(gaussian_filtered_volume, axis = 2)))
+
+    clahe_enhanced_volume = clahe_enhance(gradient_mag)
+
+    opened_volume = morphology.opening(clahe_enhanced_volume, morphology.ball(3))
+    return opened_volume
 
 def kmeans_clustering(volume, n_clusters=4, n_init='auto', max_iter=1000):
-    reshaped_volume = volume.reshape((-1, 1))
+    apply_texture_features = texture_features(volume)
+    reshaped_volume = volume.reshape(-1, 1)
+    reshaped_features = np.repeat(apply_texture_features, volume.shape[1]*volume.shape[2], axis=0)
+    combined_data = np.hstack([reshaped_volume, reshaped_features])
+
     kmeans = KMeans(n_clusters=n_clusters, init='k-means++', n_init=n_init, max_iter=max_iter)
-    labels = kmeans.fit_predict(reshaped_volume)
+    labels = kmeans.fit_predict(combined_data)
     return labels.reshape(volume.shape), kmeans.cluster_centers_
 
-def calculate_brightness(cluster_centers):
+def km_calculate_brightness(km_cluster_centers):
     avg_brightness = {}
-    for label, center in enumerate(cluster_centers):
+    for label, center in enumerate(km_cluster_centers):
         avg_brightness[label] = center[0]
     return avg_brightness
 
-def extract_coordinates(labeled_volume):
-    coordinates = {}
-    for label in np.unique(labeled_volume):
-        coords = np.argwhere(labeled_volume == label)
-        coordinates[label] = coords
-    return coordinates
+def km_extract_coordinates(km_labeled_volume):
+    km_coordinates = {}
+    for label in np.unique(km_labeled_volume):
+        km_coords = np.argwhere(km_labeled_volume == label)
+        km_coordinates[label] = km_coords
+    return km_coordinates
 
-def main():
-    brain_dir = input("Enter the path for the brain directory: ")
-    skull_dir = input("Enter the path for the skull directory: ")
+def km_execute(volume):
+    km_preprocessed_volume = km_preprocess(volume)
+    km_labeled_volume, km_cluster_centers = kmeans_clustering(km_preprocessed_volume)
+    km_coordinates = km_extract_coordinates(km_labeled_volume)
+    avg_brightness = km_calculate_brightness(km_cluster_centers)
+    return km_coordinates, km_labeled_volume, avg_brightness
 
-    brain_volume = preprocess_volume(load_volume(brain_dir))
-    skull_volume = preprocess_volume(load_volume(skull_dir))
+def km_result_string(km_coordinates, avg_brightness):
+    km_result = "Average Cluster Brightness:\n"
+    for key, value in avg_brightness.items():
+        km_result += f"{key} : {value}\n"
+
+    km_result += "\n3D Coordinates of Clusters:\n"
+    for key, value in km_coordinates.items():
+        km_result += f"{key} : {value}\n"
+
+    return km_result
     
-    combined_volume = combine_volumes(brain_volume, skull_volume)
-    labeled_volume, cluster_centers = kmeans_clustering(combined_volume)
-    
-    coordinates = extract_coordinates(labeled_volume)
-    avg_brightness = calculate_brightness(cluster_centers)
 
-    return coordinates, labeled_volume, avg_brightness
-
-coordinates, labeled_3d, avg_brightness = main()
-
-print("Average Cluster Brightness:")
-for key, value in avg_brightness.items():
-    print(key, ":", value)
-
-print("\n3D Coordinates of Clusters:")
-for key, value in coordinates.items():
-    print(key, ":", value, "\n")
 
 
 
@@ -401,30 +481,24 @@ def load_volume(directory):
 
 def preprocess_volume(volume):
     scaler = StandardScaler()
-    standardized_volume = scaler.fit_transform(volume.reshape(-1, 1)).reshape(volume.shape)
+    # Adjust reshape for 3D
+    standardized_volume = scaler.fit_transform(volume.reshape(-1, volume.shape[2])).reshape(volume.shape)
     return standardized_volume
 
 def extract_features(volume):
-
     # Intensity feature
-    intensity = volume.flatten()
-    print(f"Intensity shape: {intensity.shape}")
-
-    # Gradient feature
+    intensity = volume.reshape(-1, volume.shape[2])
+    # Gradient feature (remains 3D)
     grad_x, grad_y, grad_z = np.gradient(volume)
-    print(f"grad_x shape: {grad_x.flatten().shape}")
-    print(f"grad_y shape: {grad_y.flatten().shape}")
-    print(f"grad_z shape: {grad_z.flatten().shape}")
-
-    combined_features = np.stack([
+    
+    combined_features = np.concatenate([
         intensity,
-        grad_x.flatten(),
-        grad_y.flatten(),
-        grad_z.flatten()
-    ], axis=-1)
-
+        grad_x.reshape(-1, volume.shape[2]),
+        grad_y.reshape(-1, volume.shape[2]),
+        grad_z.reshape(-1, volume.shape[2])
+    ], axis=1)
+    
     return combined_features
-
 
 def perform_clustering(features, n_clusters):
     clustering = AgglomerativeClustering(n_clusters=n_clusters, affinity='euclidean', linkage='ward').fit(features)
@@ -462,3 +536,11 @@ labels_volume = labels.reshape(combined_volume[1:-1].shape)
 
 clusters_coordinates = extract_cluster_coordinates(labels_volume, n_clusters)
 
+#Dustin:
+#The main functions bundle helper functions (like pixel_data) and 
+# the actual clustering algo (like dbscan_with_atlas), which is fine,
+# but it needs to take an np array(3d volume) is input for it to be usable
+# by the universal "execute clustering" function(s)
+#all the "main" functions should be labeled so they can be implemented
+#it also seems like you made many helper functions that do the same thing: loading a volume, normalizing, etc
+# clustering shouldn't need to access any directories
