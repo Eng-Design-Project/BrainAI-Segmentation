@@ -242,7 +242,7 @@ if __name__ == "__main__":
     print("3D Skull Cluster Coordinates:")
     print(skull_cluster_coordinates) 
 
- 
+ '''
 ## DBSCAN WITH ATLAS ##
 
 def upload_segments(directory):
@@ -461,4 +461,5 @@ labels = perform_clustering(features, n_clusters)
 labels_volume = labels.reshape(combined_volume[1:-1].shape)
 
 clusters_coordinates = extract_cluster_coordinates(labels_volume, n_clusters)
+'''
 
