@@ -191,7 +191,6 @@ def save_dcm_dir_to_png_dir(directory, new_dir):
         output_file = os.path.basename(scan_files[i]).split(".")[0] + ".png"
         output_file_path = os.path.join(new_dir, output_file)
         plt.imsave(output_file_path, png_file, cmap='gray')
-#save_dcm_dir_to_png_dir("scan4", "scan4_pngs")
 
 
 
@@ -271,6 +270,17 @@ def save_sitk_3d_img_to_png(image, new_dir):
         print("Saved slice {} to {}".format(z, filename))
 
     print("Saved 3D image slices as PNG in {}".format(new_dir))
+
+def convert_3d_numpy_to_png_list(np_3d):
+    png_list = []
+    length = len(np_3d[:][:])
+    for i in reversed(range(length)):
+        image = np_3d[:][:][i]
+        image = np.interp(image, (image.min(), image.max()), (0, 255))
+        image = np.uint8(image)
+        png = Image.fromarray(image)
+        png_list.append(png)
+    return png_list
 
 
 #just spits out "atlas"

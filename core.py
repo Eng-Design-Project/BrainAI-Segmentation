@@ -4,6 +4,7 @@ from tkinter import ttk
 from tkinter import Canvas, Scrollbar, Frame
 from PIL import Image, ImageTk  # Import PIL for image manipulation
 from tkinter import Toplevel, Radiobutton, Button, StringVar
+import numpy as np
 
 
 
@@ -204,7 +205,7 @@ class Core:
         self.image_scoring_button.pack(pady=20)
 
         # Advanced segmentation button
-        self.advanced_segmentation_button = tk.Button(self.master, text="Advanced Segmentation", command=lambda: self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button], [self.advanced_segmentation_button, self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button, self.execute_clustering_button]))
+        self.advanced_segmentation_button = tk.Button(self.master, text="Advanced Segmentation", command=lambda: self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button], [self.advanced_segmentation_button, self.atlas_segment_button, self.show_image_results_button, self.view_DCMS_btn, self.execute_clustering_button]))
         self.advanced_segmentation_button.pack(pady=20)
 
         # Clustering button
@@ -219,7 +220,7 @@ class Core:
         self.execute_deep_learning = tk.Button(self.master, text="Execute Deep Learning", command=lambda:self.change_buttons([],[])) #self.execute_deep_learning_click)
 
         # Advanced segmentation back button
-        self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.atlas_segment_button, self.image_scoring_button, self.advanced_segmentation_button, self.show_image_results_button, self.show_folder_results_button],[self.image_scoring_button, self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
+        self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.atlas_segment_button, self.image_scoring_button, self.advanced_segmentation_button, self.show_image_results_button, self.view_DCMS_btn],[self.image_scoring_button, self.deep_learning_button, self.clustering_button, self.advanced_back_button]))
 
         # Clustering back button
         self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.advanced_back_button],[self.results_label, self.execute_clustering_button, self.image_label, self.previous_button, self.next_button, self.clustering_back_button]))
@@ -237,8 +238,8 @@ class Core:
         self.show_image_results_button.pack(pady=20)
 
         # Button for showing segmentation results for a folder
-        self.show_folder_results_button = tk.Button(self.master, text="Show Folder Results", command=self.show_folder_results)
-        self.show_folder_results_button.pack(pady=20)
+        self.view_DCMS_btn = tk.Button(self.master, text="View DCM Images from Folder", command=self.view_DCMs_from_file)
+        self.view_DCMS_btn.pack(pady=20)
 
         #self.advanced_segmentation_button = tk.Button(self.master, text="Advanced Segmentation", command=lambda: self.change_buttons([], [self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button]))
         #self.advanced_segmentation_button.pack(pady=20)
@@ -905,10 +906,67 @@ class Core:
         skull_button.pack(pady=10)
         update_image()
 
-    def show_folder_results(self):
-        # This function will eventually display segmentation results for images in a folder
-        # You can add your image processing and display logic here
-        print("Displaying segmentation results for images in a folder") 
+    def view_DCMs_from_file(self):
+        # This function will eventually display DCMs from file
+        # note, currently only works for un-segmented DCMs
+        folder = filedialog.askdirectory(title="Select a folder containing only DCM files")
+        if (data.contains_only_dcms(folder)):
+            # convert each file to a PNG and save it to list
+            png_list = []
+            np_3d = data.get_3d_array_from_file(folder)
+            png_list = data.convert_3d_numpy_to_png_list(np_3d)
+
+            #create the popup
+            popup_wind = tk.Toplevel(self.master)
+            popup_wind.title("DCM images in Folder")
+            curr_index = 0
+
+            def handle_nex():
+                nonlocal curr_index
+                curr_index +=1
+                if curr_index >= len(png_list):
+                    curr_index = 0  # Cycle back to the first image
+                update() 
+                
+            def handle_prev():
+                nonlocal curr_index
+                curr_index -=1
+                if curr_index < 0:
+                    curr_index = len(png_list) - 1  # Cycle back to the last image                
+                update() 
+                
+            def update():
+                nonlocal png_list, curr_index
+                image = png_list[curr_index]
+                photo = ImageTk.PhotoImage(image)
+                image_label.configure(image=photo)
+                image_label.image = photo
+                # Update the label to show the current index
+                index_label.config(text=f"Image {curr_index + 1} out of {len(png_list)}")
+
+            image_label = tk.Label(popup_wind)
+            image_label.pack()
+            
+            # Add a label to display the current index
+            index_label = tk.Label(popup_wind, text="")
+            index_label.pack()
+
+            button_frame = tk.Frame(popup_wind)
+            button_frame.pack()
+            prev_btn = tk.Button(button_frame, text="Previous", command=handle_prev)
+            nex_btn = tk.Button(button_frame, text="Next", command=handle_nex)
+
+
+            prev_btn.pack(side="left", padx=10)
+            nex_btn.pack(side="right", padx=10)
+            update()
+
+            popup_wind.geometry("400x300")  # Adjust width and height as needed
+
+        #else if the folder does not have DCMs...  
+        else:
+            tk.messagebox.showwarning(title="Invalid Selection", message="Select a folder containg only DCM files.")
+
 
     def change_buttons(self, show_list, hide_list):
         for button in hide_list:
