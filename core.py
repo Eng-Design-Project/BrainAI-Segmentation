@@ -234,7 +234,7 @@ class Core:
         self.image_button.pack(pady=20)"""
 
         # Button for showing segmentation results for an image
-        self.show_image_results_button = tk.Button(self.master, text="Show Image Results", command=self.show_image_results)
+        self.show_image_results_button = tk.Button(self.master, text="Show Segmentation Results", command=self.show_image_results)
         self.show_image_results_button.pack(pady=20)
 
         # Button for showing segmentation results for a folder
@@ -905,6 +905,7 @@ class Core:
         brain_button.pack(pady=10)
         skull_button.pack(pady=10)
         update_image()
+        popup_window.geometry("300x300")  # Adjust width and height as needed
 
     def view_DCMs_from_file(self):
         # This function will eventually display DCMs from file
