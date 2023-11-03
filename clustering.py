@@ -262,7 +262,7 @@ def tester_algo(input_array):
     output: format for the output of any clustering algo
     """
     print("clustering testing algo")
-    test_coords = [[x, y, z] for x in range(0, 30) for y in range(0, 30) for z in range(0, 30)]
+    test_coords = [[z, y, x] for x in range(0, 80) for y in range(0, 80) for z in range(0, 30)]
     return test_coords
 
 
@@ -279,6 +279,7 @@ def execute_seg_clustering(input, algo):
     } 
     
     for region, scan in input.items():
+        print(region)
         output_coords[region] = algos_dict[algo](scan)
         
     return output_coords

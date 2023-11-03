@@ -363,6 +363,7 @@ class Core:
 
     def handle_clustering_selection(self, popup_window, seg_var, algorithm, source):
         folder = "" #this variable is local to the function
+        print(source,", ", seg_var, ", ",algorithm )
         if source == "memory":
             if seg_var == "Segment":
                 if not data.segmentation_results:
@@ -403,13 +404,20 @@ class Core:
             #the if statement below checks if data.segmentation_results is not empty. It should be unnecessary later when I've added more logic.
             if data.segmentation_results:
                 #the first argument should be a pre-atlas segmented scan, the 2nd argument should be a string of the chosen algo
-                voxel_dict = clustering.execute_seg_clustering(data.segmentation_results, algorithm)
+                voxel_dict = clustering.execute_seg_clustering(data.segmentation_results, 'test')
+                data.segmentation_results = segmentation.filter_noise_from_images(data.segmentation_results, voxel_dict)
+                # returns a dict on np arrays 
                 # display function? 
+                for region, image in data.segmentation_results.items():
+                    data.display_3d_array_slices(image, 10)
+                    
         if seg_var == "Whole Brain":
             # note, when it comes to whole brain, only the DBSCAN algorithm works at the moment
             #the if statement below checks if the folder is not empty. It should be unnecessary later when I've added more logic.
             if folder:
-                voxel_dict = clustering.execute_whole_clustering(data.get_3d_array_from_file(folder), algorithm)
+                new_img_dict = data.get_3d_array_from_file(folder)
+                voxel_dict = clustering.execute_whole_clustering(new_img_dict, algorithm)
+                new_img_dict = segmentation.filter_noise_from_images(new_img_dict, voxel_dict)
                 # display function?
         
         # Close the popup window

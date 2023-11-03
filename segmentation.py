@@ -256,15 +256,14 @@ def filter_noise_from_images(images_dict, noise_coords_dict):
     # For each brain region in the noise_coords_dict
     for region, coords_list in noise_coords_dict.items():
         # Get the 3D image for the region
-        current_image = filtered_images[region]
         
         # Iterate over the coordinates in coords_list
         for x, y, z in coords_list:
             # Ensure the coordinates are within the image's bounds
-            if (0 <= x < current_image.shape[0]) and \
-               (0 <= y < current_image.shape[1]) and \
-               (0 <= z < current_image.shape[2]):
-                current_image[x, y, z] = 0  # Set the voxel to black
+            if (0 <= x < filtered_images[region].shape[0]) and \
+               (0 <= y < filtered_images[region].shape[1]) and \
+               (0 <= z < filtered_images[region].shape[2]):
+                filtered_images[region][x, y, z] = 0  # Set the voxel to black
     
     return filtered_images
 
