@@ -203,6 +203,6 @@ def dlAlgorithm(numpyImagesDict, depth=5, epochs=3):
 
 
 if __name__ == "__main__":
-    
+    print("test")
     #before this, we generate a dict of images by loading "atl seg dcms" or similar with the function in data (get 3d arrays from file)
     #dlAlgorithm(images_dict)
