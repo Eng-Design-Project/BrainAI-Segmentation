@@ -472,7 +472,7 @@ def db2_result_string(db2_coordinates, avg_brightness_list):
 ''''
 def apply_median_filter(volume):
     return median(volume, footprint=ball(1))
-''''
+'''
 
 def km_preprocess(volume):
     
@@ -573,6 +573,8 @@ def extract_cluster_coordinates(labels, n_clusters):
         clusters_coordinates[cluster] = np.argwhere(labels == cluster)
     return clusters_coordinates
 
+#hardcoded, all of clustering is going to be overwritten by MD anyway
+'''
 # Load, preprocess, extract
 brain_volume = load_volume('/content/brain')  # path to brain dir
 skull_volume = load_volume('/content/skull')  # path to skull dir
@@ -598,6 +600,7 @@ labels = perform_clustering(features, n_clusters)
 labels_volume = labels.reshape(combined_volume[1:-1].shape)
 
 clusters_coordinates = extract_cluster_coordinates(labels_volume, n_clusters)
+'''
 
 #Dustin:
 #The main functions bundle helper functions (like pixel_data) and 
