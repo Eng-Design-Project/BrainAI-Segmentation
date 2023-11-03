@@ -301,10 +301,62 @@ if __name__ == "__main__":
     print("3D Skull Cluster Coordinates:")
     print(skull_cluster_coordinates) 
 
+## SHARED FUNCTIONS ##
+
+
+# 3d clahe enhancement w sliding window
+def clahe_enhance(volume, kernel_size=(3, 3, 3)):
+
+    half_depth = kernel_size[0] // 2
+    half_height = kernel_size[1] // 2
+    half_width = kernel_size[2] // 2
+
+    # padded for edge cases
+    padded = np.pad(volume, ((half_depth, half_depth), (half_height, half_height), (half_width, half_width)))
+    enhanced = np.zeros_like(volume)
+    depth, height, width = volume.shape
+    for z in range(depth):
+        for y in range(height):
+            for x in range(width):
+                local_block = padded[z:z+2*half_depth+1, y:y+2*half_height+1, x:x+2*half_width+1]
+                local_enhanced = exposure.equalize_adapthist(local_block)
+                enhanced[z, y, x] = local_enhanced[half_depth, half_height, half_width]
+
+    return enhanced
+
+
+def texture_features(volume):
+    # dimensions
+    depth, height, width = volume.shape
+    
+    # list to store features
+    all_features = []
+    
+    for i in range(depth):
+        slice_ = volume[i, :, :]  # Axial slice
+        glcm = greycomatrix(slice_, [1], [0], 256, symmetric=True, normed=True)
+        features = [
+            greycoprops(glcm, 'contrast')[0, 0],
+            greycoprops(glcm, 'dissimilarity')[0, 0],
+            greycoprops(glcm, 'homogeneity')[0, 0],
+            greycoprops(glcm, 'energy')[0, 0],
+            greycoprops(glcm, 'correlation')[0, 0]
+        ]
+
+        all_features.append(features)
+
+    return np.array(all_features)
+
+def apply_gaussian_filter(volume, sigma=1):
+    return gaussian(volume, sigma=sigma)
 
 
 ## SHARED FUNCTIONS ##
 
+## DBSCAN WITH ATLAS ##
+# from core:
+    # run "db2_execute" to execute the algorithm
+    # call "db2_result_string" to display output
 
 # 3d clahe enhancement w sliding window
 # takes np array, input has to be 3d volume

@@ -63,7 +63,10 @@ def get_2d_png_array_list(directory):
 def display_3d_array_slices(img_3d, num_slices):
     print(img_3d.shape)
     # Ensure that num_slices does not exceed the number of available slices
-    num_slices = min(num_slices, img_3d.shape[2])
+    num_slices = min(num_slices, img_3d.shape[0])
+
+    # Calculate indices for evenly spaced slices
+    indices = np.linspace(0, img_3d.shape[0] - 1, num_slices).astype(int)
 
     # Calculate grid dimensions
     cols = int(np.ceil(np.sqrt(num_slices)))
@@ -71,10 +74,11 @@ def display_3d_array_slices(img_3d, num_slices):
     
     fig, axes = plt.subplots(rows, cols, figsize=(15, 15))
     
-    for i in range(num_slices):
+    for i, index in enumerate(indices):
         ax = axes.flat[i]
-        ax.imshow(img_3d[:, :, :, i])
+        ax.imshow(img_3d[index, :, :], cmap='gray')
         ax.axis('off')  # Hide the axis
+        ax.set_title(f'Slice {index}')
 
     # Hide any remaining empty subplots
     for i in range(num_slices, rows * cols):
@@ -353,6 +357,17 @@ def save_dicom_3d_img_to_png(dicom_dataset, new_dir):
 
     print("Saved 3D image slices as PNG in {}".format(new_dir))
 
+def convert_3d_numpy_to_png_list(np_3d):
+    png_list = []
+    length = len(np_3d[:][:])
+    for i in reversed(range(length)):
+        image = np_3d[:][:][i]
+        image = np.interp(image, (image.min(), image.max()), (0, 255))
+        image = np.uint8(image)
+        png = Image.fromarray(image)
+        png_list.append(png)
+    return png_list
+
 
 
 #just spits out "atlas"
@@ -571,6 +586,18 @@ def sitk_dict_to_png_dict(img_dict):
     #print("PNG DICTIONARY HAS BEEN GENERATED")       
     return png_dict
 
+def convert_sitk_dict_to_numpy(sitk_dict):
+    numpy_dict = {}
+    for key, image in sitk_dict.items():
+        if isinstance(image, sitk.Image):
+            numpy_array = sitk.GetArrayFromImage(image)
+            numpy_dict[key] = numpy_array
+        else:
+            raise ValueError(f"Value for key '{key}' is not a SimpleITK image.")
+
+    return numpy_dict
+
+
 # first argument should be a higher level folder with brain region subfolders containing DCM files.
 # the output is a dictionary with brain region names as keys and sitk images as values
 '''def subfolders_to_dictionary(directory):
@@ -628,43 +655,6 @@ def create_seg_images(image_np, region_dict):
     return output_images_np
     
 
-# SITK TO PYDICOM - MD
-# original:
-'''
-# function copied from segmentation
-def DCMs_to_sitk_img_dict(directory):
-    image = get_3d_image(directory)
-    def generate_regions(): 
-        region1 = [[x, y, z] for x in range(0, 51) for y in range(0, 51) for z in range(0, 51)]
-        region2 = [[x, y, z] for x in range(50, 101) for y in range(50, 101) for z in range(0, 50)]
-
-        region_dict = {
-            "Region1": region1,
-            "Region2": region2
-        }
-        return region_dict
-    region_dict = generate_regions()
-    region_images = create_seg_images(image, region_dict)
-    #display_regions_from_dict(region_images)
-    display_seg_images(region_images)
-    return region_images
-'''
-def DCMs_to_sitk_img_dict(directory):
-    image_np = get_3d_image(directory)
-    def generate_regions(): 
-        region1 = [[x, y, z] for x in range(0, 51) for y in range(0, 51) for z in range(0, 51)]
-        region2 = [[x, y, z] for x in range(50, 101) for y in range(50, 101) for z in range(0, 50)]
-        region_dict = {
-            "Region1": region1,
-            "Region2": region2
-        }
-        return region_dict
-    region_dict = generate_regions()
-    region_images = create_seg_images(image_np, region_dict)
-    display_seg_images(region_images)
-    return region_images
-    
-
 #test_store_seg_img_on_file("brain1")
 #test_subfolders_to_dictionary("brain1")
 
@@ -691,9 +681,10 @@ segmentation_results= None
 
 # this function sets the global variable segmentation_results to a dictionary of regions:sitk images
 # It takes an optional argument of a directory of DCMS. If no directory is passed, it uses "scan1"
-def set_seg_results(directory = "scan1"):
+def set_seg_results(directory = "atl_segmentation_DCMs"):
     global segmentation_results
-    segmentation_results = DCMs_to_sitk_img_dict(directory)
+
+    segmentation_results = subfolders_to_dictionary(directory)
     print("segmentation results: ",segmentation_results.keys())
     #note: the function DCMs_to_etc, is a dummy function that grabs a single scan from memory and then 
     # splits it into a dict. We don't need this at all. We should assume this function is 
@@ -754,11 +745,15 @@ def contains_only_dcms(directory):
 
 
 if __name__ == "__main__":
-    print(is_segment_results_dir("atl_segmentation_DCMs"))
-    print(is_segment_results_dir("atl_segmentation_PNGs"))
-    print(is_segment_results_dir("atlas"))
-    print(is_segment_results_dir("atlas_pngs"))
-    print(contains_only_dcms("atlas"))
+    test_dir = "scan1"
+    test_pydicom_arr = get_3d_image(test_dir)
+    display_3d_array_slices(test_pydicom_arr, 20)
+    
+    # print(is_segment_results_dir("atl_segmentation_DCMs"))
+    # print(is_segment_results_dir("atl_segmentation_PNGs"))
+    # print(is_segment_results_dir("atlas"))
+    # print(is_segment_results_dir("atlas_pngs"))
+    # print(contains_only_dcms("atlas"))
 
 # Path to the directory that contains the DICOM files
 #directory1 = "scan1"

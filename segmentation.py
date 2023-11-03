@@ -290,58 +290,6 @@ def test_atlas_segment_hardcoded():
     data.save_dcm_dir_to_png_dir("registered", "reg pngs")
 #test_atlas_segment_hardcoded()
 
-
-# Converted to pydicom. I am less certain about this pydicom change than the others. -Justin
-def initial_segment_test():
-    # Load DICOM filepaths
-    dicom_path1 = "scan2/ADNI_003_S_1059_PT_adni2__br_raw_20071211125948781_11_S43552_I84553.dcm"
-    dicom_path2 = "scan2/ADNI_003_S_1059_PT_adni2__br_raw_20071211125949312_18_S43552_I84553.dcm"
-
-    # Read DICOM files using pydicom
-    dicom1 = pydicom.dcmread(dicom_path1)
-    dicom2 = pydicom.dcmread(dicom_path2)
-
-    # Convert DICOM pixel data to numpy arrays
-    pixel_array1 = dicom1.pixel_array
-    pixel_array2 = dicom2.pixel_array
-
-    # Perform image registration using our custom atlas_segment function
-    registered_dcm = atlas_segment(dicom_path1, dicom_path2)
-
-    # Exit if optimization failed
-    if registered_dcm is None:
-        print("Registration failed.")
-        return
-
-    # Convert the registered DICOM pixel data to a numpy array
-    registered_array = registered_dcm.pixel_array
-
-    # Plot the original and registered images
-    plt.figure(figsize=(15, 5))
-
-    # Plot Image 1 - Before Registration
-    plt.subplot(131)
-    plt.imshow(pixel_array1.squeeze(), cmap='gray')
-    plt.title("Image 1 - Before Registration")
-    plt.axis('off')
-
-    # Plot Image 2 - Before Registration
-    plt.subplot(132)
-    plt.imshow(pixel_array2.squeeze(), cmap='gray')
-    plt.title("Image 2 - Before Registration")
-    plt.axis('off')
-
-    # Plot Registered Image
-    plt.subplot(133)
-    plt.imshow(registered_array.squeeze(), cmap='gray')
-    plt.title("Registered Image")
-    plt.axis('off')
-
-    plt.show()
-
-# Run the function
-#initial_segment_test()
-
 #data.save_dcm_dir_to_png_dir("atlas", "atlas pngs")
 #data.save_dcm_dir_to_png_dir("registered", "reg pngs")
 
@@ -391,6 +339,28 @@ def create_seg_images_from_image(images_dict, coords_dict):
         
     print(f"Size of output images:  {len(output_images)}")
     return output_images
+
+def filter_noise_from_images(images_dict, noise_coords_dict):
+    # Ensure the noise coordinates dictionary has keys that exist in the images dictionary
+    if not set(noise_coords_dict.keys()).issubset(set(images_dict.keys())):
+        raise ValueError("Keys in noise_coords_dict should be a subset of images_dict.")
+    
+    # Create a copy of the images dictionary to modify and return
+    filtered_images = {k: np.copy(v) for k, v in images_dict.items()}
+
+    # For each brain region in the noise_coords_dict
+    for region, coords_list in noise_coords_dict.items():
+        # Get the 3D image for the region
+        
+        # Iterate over the coordinates in coords_list
+        for x, y, z in coords_list:
+            # Ensure the coordinates are within the image's bounds
+            if (0 <= x < filtered_images[region].shape[0]) and \
+               (0 <= y < filtered_images[region].shape[1]) and \
+               (0 <= z < filtered_images[region].shape[2]):
+                filtered_images[region][x, y, z] = 0  # Set the voxel to black
+    
+    return filtered_images
 
 
 #this would take a dict of atlas segmented images, and then further refine them with coordinates output by an 

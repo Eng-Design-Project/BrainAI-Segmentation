@@ -86,6 +86,7 @@ def get_surrounding_slices(original_slice, sub_arrays, slice_index, depth):
                 start_idx = max(0, idx - surrounding_depth)
                 end_idx = min(len(sub_array), idx + surrounding_depth + 1)
                 surrounding_slices = sub_array[start_idx:end_idx]
+                break  # You can break here since you've found the slice and don't need to check further
     if len(surrounding_slices) != depth:
         # Handle edge cases by padding with zeros
         padding_slices = depth - len(surrounding_slices)
@@ -93,6 +94,7 @@ def get_surrounding_slices(original_slice, sub_arrays, slice_index, depth):
         pad_after = padding_slices - pad_before
         surrounding_slices = np.pad(surrounding_slices, ((pad_before, pad_after), (0, 0), (0, 0)), 'constant')
     return surrounding_slices
+
 
 
 def normalizeTF(volume3dDict):

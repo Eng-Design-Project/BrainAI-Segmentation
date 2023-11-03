@@ -53,7 +53,7 @@ def normalize_np_dict(volume3dDict):
 def buildPixelModel(window_size=3):
     # Assumes input is a 3D patch of size [window_size, window_size, window_size]
     model = tf.keras.Sequential([
-        tf.keras.layers.InputLayer(input_shape=(window_size, window_size, window_size)),
+        tf.keras.layers.InputLayer(input_shape=(window_size, window_size, window_size, 1)),
         tf.keras.layers.Conv3D(32, (window_size, window_size, window_size), activation='relu', padding='valid'),
         tf.keras.layers.Flatten(),
         tf.keras.layers.Dense(128, activation='relu'),
@@ -102,8 +102,8 @@ def train_model(model, windows, user_score, labels=None):
 # not tested yet -Kevin
 def executeDL(dict_of_np_arrays, user_score=0, model=buildPixelModel()):
     
-    #should only have to normalize data once?
-    normalized_data = normalize_np_dict(dict_of_np_arrays)
+    #should only have to normalize data once, and we only need to pass dict_of_np_arrays once
+    normalized_data = normalize_np_dict(dict_of_np_arrays) 
 
     #should only have to compile once?
     model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics = ["accuracy"])
@@ -138,44 +138,68 @@ def executeDL(dict_of_np_arrays, user_score=0, model=buildPixelModel()):
 #   if windows are a class attribute, than we wouldn't need to keep the entire image in memory
 class CustomClassifier:
     def __init__(self, initial_model=None, labeled_data=None):
-        self.model = initial_model if initial_model else self.buildPixelModel()
+        self.model = initial_model if initial_model else buildPixelModel()
         self.classification_dict = {}
         self.normalized_data = None
         self.labeled_data = labeled_data
+        self.windows = None
 
-
-    def executeDL(self, dict_of_np_arrays, user_score=0):
-        self.normalized_data = normalize_np_dict(dict_of_np_arrays)
+    def executeDL(self, dict_of_np_arrays=None, user_score=0):
+        if self.normalized_data == None:
+            self.normalized_data = normalize_np_dict(dict_of_np_arrays)
 
         # No need to compile multiple times, so we check if it's compiled.
         if not hasattr(self.model, 'optimizer'):
             self.model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
 
         for region, seg_volume in self.normalized_data.items():
-            windows, indices = extract_windows(seg_volume)
-            windows = windows[..., np.newaxis]  # Adding a channel dimension
+            if self.windows == None:
+                windows, indices = extract_windows(seg_volume)
+                self.windows = windows[..., np.newaxis]  # Adding a channel dimension
 
             # Using the labeled_data for the specific region if available
             region_labels = self.labeled_data.get(region) if self.labeled_data else None
             #labeled data needs to be redone, to fit with the input data expected
 
-
             train_model(self.model, windows, user_score, region_labels)
             
+            #make predictions
             predictions = self.model.predict(windows)
+
+            #average predicted probability for positive class
+            avg_prediction = np.mean(predictions[:, 1])
+
+            #what datastruct is predictions? does this round or just make things 1? Find the highest preds?
             predicted_labels = np.argmax(predictions, axis=1)
+
+            #Define a loss based on the user's score
+            # We can use mean squared error here, but other choices might be appropriate depending on the problem
+            loss = (avg_prediction - user_score) ** 2
+
+            # Update the model
+            # This part is tricky without labeled data; we need a way to compute gradients
+            # One option is to use a library like TensorFlow's 'tape' mechanism
+            with tf.GradientTape() as tape:
+                tape.watch(self.model.trainable_variables)
+                # Repredict to get the model's outputs as TensorFlow tensors
+                predictions_tf = self.model(windows, training=True)
+                avg_prediction_tf = tf.reduce_mean(predictions_tf[:, 1])
+                loss_tf = (avg_prediction_tf - user_score) ** 2
+                grads = tape.gradient(loss_tf, self.model.trainable_variables)
+                optimizer = tf.keras.optimizers.Adam()
+                optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
 
             classified_indices = indices[predicted_labels == 1]
             self.classification_dict[region] = classified_indices
 
         return self.classification_dict
-
+    
 
 
 if __name__ == '__main__':
    print("running dl module")
    classifier = CustomClassifier()
-
+   
 
 '''
 #class not needed
