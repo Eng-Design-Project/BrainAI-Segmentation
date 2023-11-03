@@ -581,7 +581,7 @@ def sitk_dict_to_png_dict(img_dict):
         region_dict[i] = get_3d_image(os.path.join(directory, i))
 
     return region_dict'''
-def subfolders_to_3d_array_dictionary(directory):
+def subfolders_to_dictionary(directory):
     region_dict = {}
     for i in os.listdir(directory):
         region_dict[i] = get_3d_image(os.path.join(directory, i))
