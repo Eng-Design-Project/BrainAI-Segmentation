@@ -405,24 +405,24 @@ class Core:
             if data.segmentation_results:
                 #the first argument should be a pre-atlas segmented scan, the 2nd argument should be a string of the chosen algo
                 voxel_dict = clustering.execute_seg_clustering(data.segmentation_results, 'test')
-                # data.segmentation_results = segmentation.filter_noise_from_images(data.segmentation_results, voxel_dict)
+                data.segmentation_results = segmentation.filter_noise_from_images(data.segmentation_results, voxel_dict)
                 # # returns a dict on np arrays 
                 # # display function? 
-                # for region, image in data.segmentation_results.items():
-                #     data.display_3d_array_slices(image, 10)
+                for region, image in data.segmentation_results.items():
+                    data.display_3d_array_slices(image, 10)
                     
         if seg_var == "Whole Brain":
             # note, when it comes to whole brain, only the DBSCAN algorithm works at the moment
             #the if statement below checks if the folder is not empty. It should be unnecessary later when I've added more logic.
             if folder:
                 new_img = data.get_3d_array_from_file(folder)
-                # voxel_dict = {}
-                # voxel_dict['Skull'] = clustering.execute_whole_clustering(new_img, "dbscan_3d")
-                # new_img_dict = {}
-                # new_img_dict['Skull'] = new_img
-                # new_img_dict = segmentation.filter_noise_from_images(new_img_dict, voxel_dict)
-                # for region, image in new_img_dict.items():
-                #     data.display_3d_array_slices(image, 10)
+                voxel_dict = {}
+                voxel_dict['Skull'] = clustering.execute_whole_clustering(new_img, "dbscan_3d")
+                new_img_dict = {}
+                new_img_dict['Skull'] = new_img
+                new_img_dict = segmentation.filter_noise_from_images(new_img_dict, voxel_dict)
+                for region, image in new_img_dict.items():
+                    data.display_3d_array_slices(image, 10)
                 # # # display function?
         
         # Close the popup window
