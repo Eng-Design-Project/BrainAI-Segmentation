@@ -432,7 +432,9 @@ def dbscan_with_atlas(volume):
         if label != -1:  # Exclude noise label
             members = db2_coords[labels == label]
             center = members.mean(axis=0)
-            db2_cluster_centers.append(center)
+            # db2_cluster_centers.append(center)
+
+            # FINISH THIS 
     
     return db2, np.array(db2_cluster_centers)
 
