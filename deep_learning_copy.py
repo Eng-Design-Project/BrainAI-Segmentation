@@ -76,7 +76,7 @@ def unet(input_size=(5, 128, 128, 1)):  # Notice the change in the last dimensio
 
 
 
-def get_surrounding_slices(original_slice, sub_arrays, slice_index, depth):
+def get_surrounding_slices(original_slice, sub_arrays, depth):
     surrounding_depth = depth // 2
     surrounding_slices = []
     for sub_array in sub_arrays:
@@ -85,6 +85,7 @@ def get_surrounding_slices(original_slice, sub_arrays, slice_index, depth):
                 start_idx = max(0, idx - surrounding_depth)
                 end_idx = min(len(sub_array), idx + surrounding_depth + 1)
                 surrounding_slices = sub_array[start_idx:end_idx]
+                break  # You can break here since you've found the slice and don't need to check further
     if len(surrounding_slices) != depth:
         # Handle edge cases by padding with zeros
         padding_slices = depth - len(surrounding_slices)
@@ -92,6 +93,7 @@ def get_surrounding_slices(original_slice, sub_arrays, slice_index, depth):
         pad_after = padding_slices - pad_before
         surrounding_slices = np.pad(surrounding_slices, ((pad_before, pad_after), (0, 0), (0, 0)), 'constant')
     return surrounding_slices
+
 
 
 def normalizeTF(volume3dDict):
@@ -132,19 +134,15 @@ def dlAlgorithm(segmentDict, depth=5):
     # Define the U-Net model
     model = unet(input_size=(depth, 128, 128, 1))
 
-    #early_stopping = EarlyStopping(patience=5, verbose=1)
-    #model_checkpoint = ModelCheckpoint("best_model.keras", save_best_only=True, verbose=1)
-    #callbacks_list = [early_stopping, model_checkpoint]
-
     loss_list = []
     all_triplets = []  # <-- Store all the segmented triplets here
 
     # First loop for segmentation
-    for sub_array in normalizedDict.items():
+    for key, sub_array in normalizedDict.items():
         sub_arrays_split = split_into_subarrays(sub_array, depth)
         
         for idx, sub_arr in enumerate(sub_arrays_split):
-            surrounding_slices = get_surrounding_slices(sub_arr[depth//2], sub_arrays_split, idx, depth)
+            surrounding_slices = get_surrounding_slices(sub_arr[depth//2], sub_arrays_split, depth)
             model = load_model("current_model.keras", custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
             
             sub_boundary_array = find_boundary(surrounding_slices)
@@ -180,6 +178,7 @@ def dlAlgorithm(segmentDict, depth=5):
     plt.ylabel('Loss')
     plt.xlabel('Batch')
     plt.show()
+
 
 
 
