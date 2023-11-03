@@ -595,9 +595,7 @@ class Core:
         # Display a message to inform the user
         
         # Open a dialog to select a folder path
-        folder_path = filedialog.askdirectory(title="Select Folder",
-            message="Please select a folder for your task."
-        )
+        folder_path = filedialog.askdirectory(title="Select Folder")
         # If a folder is selected, store it and update the folder label
         if folder_path:
             print("Selected folder:", folder_path)
@@ -680,10 +678,7 @@ class Core:
         png_dict = data.sitk_dict_to_png_dict(seg_results)
 
         # Ask the user to select a folder for saving the results
-        save_folder = filedialog.askdirectory(
-            title="Select Save Folder",
-            message="Please select a folder to save the results."
-        )
+        save_folder = filedialog.askdirectory(title="Select Save Folder")
 
         if save_folder:
             # Prompt the user to enter a file name within the GUI
