@@ -126,14 +126,16 @@ def show_slices(triplets):
     plt.suptitle("Original and Segmented")
     plt.show()
 
-def dlAlgorithm(segmentDict, depth=5, epochs=3):
-    
+def dlAlgorithm(numpyImagesDict, depth=5, epochs=3):
+    #dustin
+    #we were converting to a dict of np arrays, don't need to, should pass it 
+
+
     # SITK TO PYDICOM - MD
     # original:
     '''
     numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()}
     '''
-    numpyImagesDict = {key: img.pixel_array for key, img in segmentDict.items()} 
     # if tf doesn't have auto rescaling, comment out the above line and use this instead:
     '''
     numpyImagesDict = {}
@@ -201,9 +203,6 @@ def dlAlgorithm(segmentDict, depth=5, epochs=3):
 
 
 if __name__ == "__main__":
-    sitk_images_dict = {
-        "image1": data.get_3d_image("scan1"),
-        "image2": data.get_3d_image("scan2"),
-    }
-
-    dlAlgorithm(sitk_images_dict)
+    
+    #before this, we generate a dict of images by loading "atl seg dcms" or similar with the function in data (get 3d arrays from file)
+    #dlAlgorithm(images_dict)

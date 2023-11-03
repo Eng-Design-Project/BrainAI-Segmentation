@@ -101,40 +101,13 @@ def save_2d_images_list(image_list, directory):
         # Save the image
         img.save(file_path)
 
-# SITK TO PYDICOM - MD
-# original:
-'''
-def get_3d_image(directory):
-    # Get a list of all DICOM files in the directory
-    scan_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")]
-    # Read in the image series
-    image = sitk.ReadImage(scan_files)
-    return image
-'''
-def get_3d_image(directory):
-    # Get a list of all DICOM files in the directory
-    scan_files = sorted([os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")])
-    slices = [ ]
-    for s in scan_files:
-        dicom_slice = pydicom.dcmread(s)
-        numpy_slice = dicom_slice.pixel_array
-
-        if ('RescaleSlope' in dicom_slice) and ('RescaleIntercept' in dicom_slice):
-            slope = float(dicom_slice.RescaleSlope)
-            intercept = float(dicom_slice.RescaleIntercept)
-            numpy_slice = slope * numpy_slice + intercept
-
-        slices.append(numpy_slice)
-    
-    image = np.stack(slices, axis=0) 
-    return image
-
 # folder of DCM images as input
-def get_3d_array_from_file(folder_path):
-    image_files = [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))] # gather files
-    slices = [pydicom.dcmread(os.path.join(folder_path, f)) for f in image_files] # read each file
+def get_3d_image(directory):
+    image_files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))] # gather files
+    slices = [pydicom.dcmread(os.path.join(directory, f)) for f in image_files] # read each file
     slices.sort(key=lambda x: float(x.ImagePositionPatient[2])) # sorting and maintaining correct order
     return np.stack([s.pixel_array for s in slices])
+
     
 # SITK TO PYDICOM - MD
 # original:
@@ -159,14 +132,13 @@ def view_sitk_3d_image(image, numSlices, displayText):
         axes[i].axis('off')
     plt.show()
 '''
-def view_sitk_3d_image(image, numSlices, displayText):
-    array = image.pixel_array
+def view_3d_image(image, numSlices, displayText):
 
     # Calculate the step size
-    step = array.shape[0] // numSlices
+    step = image.shape[0] // numSlices
     
     # Generate the slices
-    slices = [array[i*step, :, :] for i in range(numSlices)]
+    slices = [image[i*step, :, :] for i in range(numSlices)]
 
     #display the slices
     fig, axes = plt.subplots(1, numSlices, figsize=(18, 18))
@@ -187,8 +159,8 @@ def display_seg_images(image_dict):
         view_sitk_3d_image(sitk_image, 5, region)
 '''
 def display_seg_images(image_dict):
-    for region, dicom_image in image_dict.items():
-        view_sitk_3d_image(dicom_image, 5, region)
+    for region, image in image_dict.items():
+        view_3d_image(image, 5, region)
 
 # SITK TO PYDICOM - MD
 # original:
@@ -612,7 +584,7 @@ def sitk_dict_to_png_dict(img_dict):
 def subfolders_to_3d_array_dictionary(directory):
     region_dict = {}
     for i in os.listdir(directory):
-        region_dict[i] = get_3d_array_from_file(os.path.join(directory, i))
+        region_dict[i] = get_3d_image(os.path.join(directory, i))
     return region_dict
 
 # SITK TO PYDICOM - MD
@@ -693,11 +665,6 @@ def DCMs_to_sitk_img_dict(directory):
     return region_images
     
 
-# the following code tests the "subfolders_to_dictionary()" function
-def test_subfolders_to_dictionary(directory):
-    regions = subfolders_to_dictionary(directory)
-    for key, value in regions.items():
-        view_sitk_3d_image(value, 15, key)
 #test_store_seg_img_on_file("brain1")
 #test_subfolders_to_dictionary("brain1")
 
@@ -913,4 +880,27 @@ def full_copy_metadata(metadata_dcm_dir, target_dcm_dir):
         
         metadata_img.save_as(target_files[i])
 #full_copy_metadata("scipy_reg_image_dcm", "scipy_reg_image_dcm")
+'''
+
+
+#this is an alternate way to get np arrays from dcm folder,
+#  may be better/worse, unsure until other one gives us an error
+'''
+def get_3d_image(directory):
+    # Get a list of all DICOM files in the directory
+    scan_files = sorted([os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")])
+    slices = [ ]
+    for s in scan_files:
+        dicom_slice = pydicom.dcmread(s)
+        numpy_slice = dicom_slice.pixel_array
+
+        if ('RescaleSlope' in dicom_slice) and ('RescaleIntercept' in dicom_slice):
+            slope = float(dicom_slice.RescaleSlope)
+            intercept = float(dicom_slice.RescaleIntercept)
+            numpy_slice = slope * numpy_slice + intercept
+
+        slices.append(numpy_slice)
+    
+    image = np.stack(slices, axis=0) 
+    return image
 '''
