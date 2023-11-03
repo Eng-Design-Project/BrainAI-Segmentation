@@ -6,13 +6,12 @@ import pydicom
 import os
 from sklearn.cluster import DBSCAN, KMeans, AgglomerativeClustering
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics.pairwise import euclidean_distances
+# from sklearn.metrics.pairwise import euclidean_distances
 from scipy.ndimage import gaussian_filter
-from scipy.cluster.hierarchy import dendrogram, linkage
+# from scipy.cluster.hierarchy import dendrogram, linkage
 from skimage import morphology, measure, feature, exposure
-from skimage.filters import gaussian, median, threshold_local, sobel
-from skimage.morphology import ball
-from skimage.feature import greycomatrix, greycoprops
+from skimage.filters import gaussian, threshold_local, sobel
+from skimage.feature import graycomatrix, graycoprops
 import data
 
 ## DBSCAN WITHOUT ATLAS ##
@@ -303,30 +302,49 @@ if __name__ == "__main__":
     print(skull_cluster_coordinates) 
 
 
+
 ## SHARED FUNCTIONS ##
 
 
 # 3d clahe enhancement w sliding window
-def clahe_enhance(volume, kernel_size=(3, 3, 3)):
+# takes np array, input has to be 3d volume
+# outputs enhanced 3d volume array
+def clahe_enhance(volume, kernel_size=(3, 3, 3)): # 'tuple' kernel size 
 
+    # get half dimensions for padding and indexing
     half_depth = kernel_size[0] // 2
     half_height = kernel_size[1] // 2
     half_width = kernel_size[2] // 2
 
-    # padded for edge cases
+    # input volume gets padded for edge cases
     padded = np.pad(volume, ((half_depth, half_depth), (half_height, half_height), (half_width, half_width)))
+    
+    # intiialize emppty volume for a place to store enhanced data
     enhanced = np.zeros_like(volume)
+    
+    # volume dimensions of input
     depth, height, width = volume.shape
+
+    # looping through each of the voxels in the volume
     for z in range(depth):
         for y in range(height):
             for x in range(width):
+
+                # extracting a local block centered at the current voxel
                 local_block = padded[z:z+2*half_depth+1, y:y+2*half_height+1, x:x+2*half_width+1]
+
+                # applying adaptive histogram equalization to the local block
                 local_enhanced = exposure.equalize_adapthist(local_block)
+
+                # assigning the center voxel of enhanced block to corresponding voxel in enhanced volume
                 enhanced[z, y, x] = local_enhanced[half_depth, half_height, half_width]
 
     return enhanced
 
-
+# GLCM (Gray-Level Co-occurence Matrix)
+# computes texture features
+# takes np array, input has to be 3d volume
+# outputs array of texture features
 def texture_features(volume):
     # dimensions
     depth, height, width = volume.shape
@@ -334,15 +352,20 @@ def texture_features(volume):
     # list to store features
     all_features = []
     
+    # loop through each slice in volume
     for i in range(depth):
         slice_ = volume[i, :, :]  # Axial slice
-        glcm = greycomatrix(slice_, [1], [0], 256, symmetric=True, normed=True)
+        
+        # computes GLCM for the slice
+        glcm = graycomatrix(slice_, [1], [0], 256, symmetric=True, normed=True)
+
+        # extracting texture features
         features = [
-            greycoprops(glcm, 'contrast')[0, 0],
-            greycoprops(glcm, 'dissimilarity')[0, 0],
-            greycoprops(glcm, 'homogeneity')[0, 0],
-            greycoprops(glcm, 'energy')[0, 0],
-            greycoprops(glcm, 'correlation')[0, 0]
+            graycoprops(glcm, 'contrast')[0, 0],
+            graycoprops(glcm, 'dissimilarity')[0, 0],
+            graycoprops(glcm, 'homogeneity')[0, 0],
+            graycoprops(glcm, 'energy')[0, 0],
+            graycoprops(glcm, 'correlation')[0, 0]
         ]
 
         all_features.append(features)
@@ -467,11 +490,6 @@ def db2_result_string(db2_coordinates, avg_brightness_list):
     # run "km_execute" to execute the algorithm
     # call "km_result_string" to display output
 
-''''
-def apply_median_filter(volume):
-    return median(volume, footprint=ball(1))
-''''
-
 def km_preprocess(volume):
     
     gaussian_filtered_volume = gaussian_filter(volume, sigma=1)
@@ -487,10 +505,10 @@ def kmeans_clustering(volume, n_clusters=4, n_init='auto', max_iter=1000):
     apply_texture_features = texture_features(volume)
     reshaped_volume = volume.reshape(-1, 1)
     reshaped_features = np.repeat(apply_texture_features, volume.shape[1]*volume.shape[2], axis=0)
-    combined_data = np.hstack([reshaped_volume, reshaped_features])
+    km_combined_data = np.hstack([reshaped_volume, reshaped_features])
 
     kmeans = KMeans(n_clusters=n_clusters, init='k-means++', n_init=n_init, max_iter=max_iter)
-    labels = kmeans.fit_predict(combined_data)
+    labels = kmeans.fit_predict(km_combined_data)
     return labels.reshape(volume.shape), kmeans.cluster_centers_
 
 def km_calculate_brightness(km_cluster_centers):
@@ -529,73 +547,64 @@ def km_result_string(km_coordinates, avg_brightness):
 
 
 ## Hierarchical ##
+# from core:
+    # run "hr_execute" to execute the algorithm
+    # call "hr_result_string" to display output
 
-def load_volume(directory):
-    slices = [pydicom.dcmread(os.path.join(directory, s)) for s in os.listdir(directory)]
+def hr_preprocess(volume):
 
-    # Extract numerical value from the filename and use it for sorting
-    slices.sort(key=lambda x: int(x.filename.split('_')[1].split('.')[0]))
-
-    volume = np.stack([s.pixel_array for s in slices])
-    return volume
-
-
-def preprocess_volume(volume):
-    scaler = StandardScaler()
-    # Adjust reshape for 3D
-    standardized_volume = scaler.fit_transform(volume.reshape(-1, volume.shape[2])).reshape(volume.shape)
-    return standardized_volume
-
-def extract_features(volume):
-    # Intensity feature
-    intensity = volume.reshape(-1, volume.shape[2])
-    # Gradient feature (remains 3D)
-    grad_x, grad_y, grad_z = np.gradient(volume)
+    gaussian_filtered_volume = apply_gaussian_filter(volume)
     
-    combined_features = np.concatenate([
-        intensity,
-        grad_x.reshape(-1, volume.shape[2]),
-        grad_y.reshape(-1, volume.shape[2]),
-        grad_z.reshape(-1, volume.shape[2])
-    ], axis=1)
-    
-    return combined_features
+    gradient_mag = np.sqrt(np.square(sobel(gaussian_filtered_volume, axis=0)) + np.square(sobel(gaussian_filtered_volume, axis=1)) + np.square(sobel(gaussian_filtered_volume, axis=2)))
 
-def perform_clustering(features, n_clusters):
-    clustering = AgglomerativeClustering(n_clusters=n_clusters, affinity='euclidean', linkage='ward').fit(features)
-    return clustering.labels_
+    clahe_enhanced_volume = clahe_enhance(gradient_mag)
 
-def extract_cluster_coordinates(labels, n_clusters):
-    clusters_coordinates = {}
-    for cluster in range(n_clusters):
-        clusters_coordinates[cluster] = np.argwhere(labels == cluster)
-    return clusters_coordinates
+    opened_volume = morphology.opening(clahe_enhanced_volume, morphology.ball(3))
+    return opened_volume
 
-# Load, preprocess, extract
-brain_volume = load_volume('/content/brain')  # path to brain dir
-skull_volume = load_volume('/content/skull')  # path to skull dir
+def hierarchical_clustering(volume, n_clusters=4):
+    # extract features
+    apply_texture_features = texture_features(volume)
+    reshaped_volume = volume.reshape(-1, 1)
+    reshaped_features = np.repeat(apply_texture_features, volume.shape[1]*volume.shape[2], axis=0)
+    hr_combined_data = np.hstack([reshaped_volume, reshaped_features])
 
-print(f"Shape of brain_volume: {brain_volume.shape}")
-print(f"Shape of skull_volume: {skull_volume.shape}")
+    # perform hierarchical clustering
+    clustering = AgglomerativeClustering(n_clusters=n_clusters, affinity='euclidean', linkage='ward')
+    labels = clustering.fit_predict(hr_combined_data)
+    return labels.reshape(volume.shape)
 
-if brain_volume.shape != skull_volume.shape:
-    raise ValueError("Brain and Skull volumes aren't the same. Make sure they both have the same # of slices.")
+def hr_calculate_brightness(hr_labeled_volume):
+    avg_brightness = {}
+    unique_labels = np.unique(hr_labeled_volume)
+    for label in unique_labels:
+        avg_brightness[label] = np.mean(hr_labeled_volume[hr_labeled_volume == label])
+    return avg_brightness
 
-combined_volume = np.concatenate([brain_volume, skull_volume])
-combined_volume = preprocess_volume(combined_volume)
-features = extract_features(combined_volume)
+def hr_extract_coordinates(hr_labeled_volume):
+    hr_coordinates = {}
+    for label in np.unique(hr_labeled_volume):
+        hr_coords = np.argwhere(hr_labeled_volume == label)
+        hr_coordinates[label] = hr_coords
+    return hr_coordinates
 
-Z = linkage(features, method='ward')
-plt.figure(figsize=(10, 7))
-dendrogram(Z)
-plt.show()
+def hr_execute(volume):
+    hr_preprocessed_volume = hr_preprocess(volume)
+    hr_labeled_volume = hr_clustering(hr_preprocessed_volume)
+    hr_coordinates = hr_extract_coordinates(hr_labeled_volume)
+    avg_brightness = hr_calculate_brightness(hr_labeled_volume)
+    return hr_coordinates, hr_labeled_volume, avg_brightness
 
+def hr_result_string(hr_coordinates, avg_brightness):
+    hr_result = "Average Cluster Brightness:\n"
+    for key, value in avg_brightness.items():
+        hr_result += f"{key} : {value}\n"
 
-n_clusters = int(input("Number of clusters: "))
-labels = perform_clustering(features, n_clusters)
-labels_volume = labels.reshape(combined_volume[1:-1].shape)
+    hr_result += "\n3D Coordinates of Clusters:\n"
+    for key, value in hr_coordinates.items():
+        hr_result += f"{key} : {value}\n"
 
-clusters_coordinates = extract_cluster_coordinates(labels_volume, n_clusters)
+    return hr_result
 
 #Dustin:
 #The main functions bundle helper functions (like pixel_data) and 
