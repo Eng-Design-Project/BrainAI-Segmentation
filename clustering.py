@@ -380,7 +380,7 @@ def apply_gaussian_filter(volume, sigma=1):
 ## DBSCAN WITH ATLAS ##
 # from core:
     # run "db2_execute" to execute the algorithm
-    # call "db2_result_string" to display output
+    # call "db2_output" to display output
 
 def db2_preprocess(volume):
 
@@ -464,23 +464,28 @@ def db2_execute(volumes):
     
     return db2_coordinates, avg_brightness_list
 
-def db2_result_string(db2_coordinates, avg_brightness_list):
+def db2_output(db2_coordinates, avg_brightness_list):
     total_clusters = sum([len(db2_cluster_coords) for db2_cluster_coords in db2_coordinates])
+
+    # dict to store clusters and corresponding coordinates
+    db2_dict = {}
+    db2_cluster_count = 1
+    for db2_volume_cluster_coords in db2_coordinates:
+        for db2_cluster_coord in db2_volume_cluster_coords:
+            db2_dict[f"cluster {db2_cluster_count}"] = np.array(db2_cluster_coord)
+            db2_cluster_count += 1
+
     db2_results = f"Number of Clusters Found: {total_clusters}\n"
-    
     db2_results += "Average Cluster Brightness:\n"
     for idx, avg_brightness in enumerate(avg_brightness_list):
         for key, value in avg_brightness.items():
             db2_results += f"{key} : {value}\n"
-
     db2_results += "\n3D Coordinates of Clusters:\n"
-    db2_cluster_count = 1
-    for db2_volume_cluster_coords in db2_coordinates:
-        for db2_cluster_coord in db2_volume_cluster_coords:
-            db2_results += f"cluster {db2_cluster_count}: {db2_cluster_coord}\n"
-            db2_cluster_count += 1
+    for key, coords in db2_dict.items():
+        db2_results += f"{key}: {coords}\n"
+    
 
-    return db2_results
+    return db2_results, db2_dict
 
 
 
