@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import SimpleITK as sitk
 import skimage
 import os
 import pydicom
@@ -101,39 +100,13 @@ def save_2d_images_list(image_list, directory):
         # Save the image
         img.save(file_path)
 
-def get_3d_image(directory):
-    # Get a list of all DICOM files in the directory
-    scan_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")]
-    # Read in the image series
-    image = sitk.ReadImage(scan_files)
-    return image
 
 # folder of DCM images as input
-def get_3d_array_from_file(folder_path):
-    image_files = [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))] # gather files
-    slices = [pydicom.dcmread(os.path.join(folder_path, f)) for f in image_files] # read each file
+def get_3d_image(directory):
+    image_files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))] # gather files
+    slices = [pydicom.dcmread(os.path.join(directory, f)) for f in image_files] # read each file
     slices.sort(key=lambda x: float(x.ImagePositionPatient[2])) # sorting and maintaining correct order
     return np.stack([s.pixel_array for s in slices])
-
-def view_sitk_3d_image(image, numSlices, displayText):
-    array = sitk.GetArrayFromImage(image)
-
-    # Calculate the step size
-    step = array.shape[0] // numSlices
-    
-    # Generate the slices
-    slices = [array[i*step, :, :] for i in range(numSlices)]
-
-    #display the slices
-    fig, axes = plt.subplots(1, numSlices, figsize=(18, 18))
-
-    # Set the title for the plot
-    fig.suptitle(displayText, fontsize=16)
-
-    for i, slice in enumerate(slices):
-        axes[i].imshow(slice, cmap='gray')
-        axes[i].axis('off')
-    plt.show()
 
 def view_np_3d_image(np_array_image, numSlices, displayText):
     array = np_array_image
@@ -150,27 +123,37 @@ def view_np_3d_image(np_array_image, numSlices, displayText):
         axes[i].axis('off')
     plt.show()
 
-def display_seg_images(image_dict):
-    for region, sitk_image in image_dict.items():
-        view_sitk_3d_image(sitk_image, 5, region)
 
 def display_seg_np_images(image_dict):
     for region, np_image in image_dict.items():
         view_np_3d_image(np_image, 5, region)
 
-#note: simple ITK does not get all metadata, only most useful metadata for registration
-def view_slice_metadata_from_directory(directory):
-    scan_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")]
+def view_metadata_from_directory(directory):
+    # List all files in the given directory that have a .dcm extension
+    scan_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.lower().endswith(".dcm")]
+    
     for filename in scan_files:
-        image = sitk.ReadImage(filename)
-        print(image.GetMetaData("0020|0032"))
+        # Read the DICOM file
+        dicom_data = pydicom.dcmread(filename)
+        
+        # Print all the available metadata
+        print(f"Metadata for {filename}:")
+        for metadata in dicom_data.dir():
+            try:
+                value = getattr(dicom_data, metadata)
+                print(f"{metadata}: {value}")
+            except AttributeError:
+                # In case the metadata is not present in the DICOM file, we skip it
+                continue
+        
+        # Add an empty line for better readability between different files
+        print("\n")
 
 #takes all the dcm files in a directory, and returns a list of numpy pixel arrays of dimensions 224x224
 #note, image registration (for the atlas segmentation) cannot be done
-#  after an image has been converted to an array: the meta data used by sitk is lost
+#function not used anywhere, and returns a list of slices. Keep it?
 def resize_and_convert_to_3d_image(directory):
-    image=get_3d_image(directory)
-    array = sitk.GetArrayFromImage(image)
+    array=get_3d_image(directory)
     new_images = []
     for i in range(0, array.shape[0]):
         new_images.append(resize(array[i,:,:], (224, 224), anti_aliasing=True))
@@ -178,19 +161,22 @@ def resize_and_convert_to_3d_image(directory):
 
 #takes all of the dcm files in a directory, and saves them as png files in (string)new_dir
 def save_dcm_dir_to_png_dir(directory, new_dir):
-    #create a directory called new_dir
+    # Create a directory called new_dir if it doesn't exist
     if not os.path.exists(new_dir):
-        os.mkdir(new_dir)
+        os.makedirs(new_dir)
 
-    # Get a list of all DICOM files in the directory
-    scan_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".dcm")]
-    # convert each file to a PNG and save it to the directory
-    for i in range(0, len(scan_files)):
-        image = sitk.ReadImage(scan_files[i])
-        png_file = sitk.GetArrayFromImage(image)[0,:,:]
-        output_file = os.path.basename(scan_files[i]).split(".")[0] + ".png"
-        output_file_path = os.path.join(new_dir, output_file)
-        plt.imsave(output_file_path, png_file, cmap='gray')
+    # Assuming get_3d_image returns a 3D NumPy array from all DICOM files in the directory
+    image_3d = get_3d_image(directory)
+    
+    # Iterate over each slice in the 3D image array
+    for i, image_slice in enumerate(image_3d):
+        # Convert the slice to an 8-bit grayscale image
+        image_slice_normalized = (np.clip(image_slice, 0, np.max(image_slice)) / np.max(image_slice) * 255).astype(np.uint8)
+        # Create a PIL image from the NumPy array
+        img = Image.fromarray(image_slice_normalized)
+        # Construct the output filename for each slice
+        slice_filename = f"slice_{i:03}.png"
+        img.save(os.path.join(new_dir, slice_filename))
 
 
 
@@ -203,7 +189,7 @@ def get_filepath(directory, index):
         return None
 
 #takes sitk image and saves to directory as dcm files
-def save_sitk_3d_img_to_dcm(image, new_dir):
+def save_3d_img_to_dcm(image, new_dir):
     # Check if the directory exists, if not, create it
     if not os.path.exists(new_dir):
         os.makedirs(new_dir)
@@ -341,7 +327,7 @@ def rescale_image(input_image):
 def rescale_image_test(orig_dir):
     orig_img = get_3d_image(orig_dir)
     new_img = rescale_image(orig_img)
-    save_sitk_3d_img_to_dcm(new_img, "rescaled test")
+    save_3d_img_to_dcm(new_img, "rescaled test")
 
 #rescale_image_test("registered")
 
@@ -359,7 +345,7 @@ def store_seg_img_on_file(dict, new_dir):
         sub_dir = os.path.join(new_dir, key)
         os.makedirs(sub_dir)
 
-        save_sitk_3d_img_to_dcm(dict[key], sub_dir)
+        save_3d_img_to_dcm(dict[key], sub_dir)
         #print("key:", key)
 
 def test_store_seg_img_on_file(new_dir):
@@ -453,7 +439,7 @@ def create_seg_images(image, region_dict):
 def test_subfolders_to_dictionary(directory):
     regions = subfolders_to_dictionary(directory)
     for key, value in regions.items():
-        view_sitk_3d_image(value, 15, key)
+        view_np_3d_image(value, 15, key)
 #test_store_seg_img_on_file("brain1")
 #test_subfolders_to_dictionary("brain1")
 
@@ -538,7 +524,7 @@ def contains_only_dcms(directory):
 
 if __name__ == "__main__":
     test_dir = "scan1"
-    test_pydicom_arr = get_3d_array_from_file(test_dir)
+    test_pydicom_arr = get_3d_image(test_dir)
     test_sitk_image = get_3d_image(test_dir)
     test_sitk_arr = sitk.GetArrayFromImage(test_sitk_image)
     display_3d_array_slices(test_pydicom_arr, 20)

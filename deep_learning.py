@@ -204,14 +204,14 @@ class CustomClassifierSingleModel:
 def subfolders_to_3d_array_dictionary(directory):
     region_dict = {}
     for i in os.listdir(directory):
-        region_dict[i] = data.get_3d_array_from_file(os.path.join(directory, i))
+        region_dict[i] = data.get_3d_image(os.path.join(directory, i))
     return region_dict
 
 if __name__ == '__main__':
    print("running dl module")
    classifier = CustomClassifierSingleModel()
    #need dict of np arrays
-   test_data_input = {"scan1": data.get_3d_array_from_file("scan1"), "scan2": data.get_3d_array_from_file("scan2"),}
+   test_data_input = {"scan1": data.get_3d_image("scan1"), "scan2": data.get_3d_image("scan2"),}
    classif_dict = classifier.executeDL(0, test_data_input)
    for keys, values in classif_dict.items():
        print(keys, ": ", values)

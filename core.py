@@ -426,7 +426,7 @@ class Core:
             # note, when it comes to whole brain, only the DBSCAN algorithm works at the moment
             #the if statement below checks if the folder is not empty. It should be unnecessary later when I've added more logic.
             if folder:
-                new_img = data.get_3d_array_from_file(folder)
+                new_img = data.get_3d_image(folder)
                 voxel_dict = {}
                 voxel_dict['Skull'] = clustering.execute_whole_clustering(new_img, "dbscan_3d")
                 new_img_dict = {}
@@ -982,7 +982,7 @@ class Core:
         if (data.contains_only_dcms(folder)):
             # convert each file to a PNG and save it to list
             png_list = []
-            np_3d = data.get_3d_array_from_file(folder)
+            np_3d = data.get_3d_image(folder)
             png_list = data.convert_3d_numpy_to_png_list(np_3d)
 
             #create the popup

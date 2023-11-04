@@ -68,7 +68,7 @@ def test_scipy_register_images(atlas, image):
     #convert registered array to sitk image
     reg_image = array_to_image_with_ref(reg_image, sitk_moving_image)
     #save registered image as dcm first, then as png
-    data.save_sitk_3d_img_to_dcm(reg_image, "scipy_reg_image_dcm")
+    data.save_3d_img_to_dcm(reg_image, "scipy_reg_image_dcm")
     data.save_dcm_dir_to_png_dir("scipy_reg_image_dcm", "scipy_reg_png")
 
     #note: the problem may be with sitk registration where the dcm's have different values 
@@ -203,7 +203,7 @@ def test_atlas_segment_hardcoded():
     #data.view_sitk_3d_image(input_image, 5, "input image")
     #data.view_sitk_3d_image(registered_image, 5, "registered image")
 
-    data.save_sitk_3d_img_to_dcm(registered_image, "registered")
+    data.save_3d_img_to_dcm(registered_image, "registered")
     data.save_dcm_dir_to_png_dir("registered", "reg pngs")
 #test_atlas_segment_hardcoded()
 
@@ -317,7 +317,7 @@ def DCMs_to_sitk_img_dict(directory):
     region_dict = generate_regions()
     region_images = create_seg_images_from_image(image, region_dict)
     #display_regions_from_dict(region_images)
-    data.display_seg_images(region_images)
+    data.display_seg_np_images(region_images)
     
 #DCMs_to_sitk_img_dict("scan1")
 
@@ -422,7 +422,7 @@ def test_encode_atlas_colors():
     #print(region_to_coord_dict)
     #convert 3d array image to sitk image
     sitk_image = sitk.GetImageFromArray(image_3d)
-    data.view_sitk_3d_image(sitk_image, 5, "redbluegreen")
+    data.view_np_3d_image(sitk_image, 5, "redbluegreen")
 
     #create image dict from coords dict and sitk_image
     final_dict = create_seg_images_from_image(sitk_image, region_to_coord_dict)
@@ -437,7 +437,7 @@ def test_encode_atlas_colors():
     #         #RuntimeError: filter weights array has incorrect shape.
     #         np_image = expand_roi(np_original, np_image)
     #     final_dict[region] = sitk.GetImageFromArray(np_image)
-    #data.display_seg_images(final_dict)
+    #data.display_seg_np_images(final_dict)
     print(image_3d.shape)
     print(sitk_image.GetSize())
     print(np_original.shape)
