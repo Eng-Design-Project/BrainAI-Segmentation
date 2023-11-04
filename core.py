@@ -287,6 +287,10 @@ class Core:
             label = tk.Label(popup_window, text="Select clustering parameters:")
             label.pack(pady=10)
 
+            # Add a separator for the first category
+            separator1 = ttk.Separator(popup_window, orient="horizontal")
+            separator1.pack(fill="x", padx=20, pady=5)
+
             segment_var = tk.StringVar()
             segment_var.set(None)
             whole_brain = tk.Radiobutton(popup_window, text="Whole Brain", variable=segment_var, value="Whole Brain")
@@ -295,6 +299,10 @@ class Core:
             segment.pack()
             #Note: We need to grey out or otherwise deselect options for any algos but DBSCAN if whole brain selected 
             #temporarily, just have DBSCAN be the default value
+
+            # Add a separator for the second category
+            separator2 = ttk.Separator(popup_window, orient="horizontal")
+            separator2.pack(fill="x", padx=20, pady=5)
 
             # Create radio buttons for clustering algorithm options
             algorithm_var = tk.StringVar()
@@ -305,6 +313,10 @@ class Core:
             dbscan_option.pack()
             hierarchical_option = tk.Radiobutton(popup_window, text="Hierarchical", variable=algorithm_var, value="Hierarchical")
             hierarchical_option.pack()
+
+            # Add a separator for the third category
+            separator3 = ttk.Separator(popup_window, orient="horizontal")
+            separator3.pack(fill="x", padx=20, pady=5)
 
             # Create radio buttons for data source options
             source_var = tk.StringVar()
