@@ -289,7 +289,7 @@ def execute_seg_clustering(input, algo):
 #I'm already working on creating function shortcuts and combining factors for easy use as a sub-module instead.
 if __name__ == "__main__":
     folder_path = input("Enter folder path: ") # get folder
-    volume = data.get_3d_array_from_file(folder_path) # create 3d volume
+    volume = data.get_3d_image(folder_path) # create 3d volume
 
     # apply dbscan to 3d and get labels, overall coordinates, and binary masks
     labeled_volume, cluster_coords, brain_mask, skull_mask = dbscan_3d(volume)

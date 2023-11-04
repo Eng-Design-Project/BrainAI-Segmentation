@@ -14,7 +14,7 @@ def subfolders_to_np_dictionary(directory):
     region_dict = {}
     for i in os.listdir(directory):
         # print(i)
-        region_dict[i] = data.get_3d_array_from_file(os.path.join(directory, i))
+        region_dict[i] = data.get_3d_image(os.path.join(directory, i))
 
     return region_dict
 
@@ -25,14 +25,14 @@ image1 = sitk.GetArrayFromImage(image1)
 #data.display_3d_array_slices(image1, 10)
 
 #Testing functions to display numpy 3d images (works)
-image2 = data.get_3d_array_from_file("scan1")
+image2 = data.get_3d_image("scan1")
 #data.display_3d_array_slices(image2, 10)
 
 
-# now I want to get sitk dict, display it, then numpy dict and display it
-sitk_dict = data.subfolders_to_dictionary("atl_segmentation_DCMs")
+# now I want to get np dict, display it
+np_dict = data.subfolders_to_dictionary("atl_segmentation_DCMs")
 # this should display 5 slices
-data.display_seg_images(sitk_dict)
+data.display_seg_np_images(np_dict)
 
 
 # statement below doesn't work, I presume because the segmented DCMs lack the relevant metadata (we use pydicom.dcmread() to convert DCMs into np arrays)
@@ -44,8 +44,6 @@ data.display_seg_images(sitk_dict)
 # I want a function to convert a dict of regions:sitk images to a dict of regions:np_arrays
 # I should find a function that takes an sitk image and turns it into a dictionary
 
-np_dict = data.convert_sitk_dict_to_numpy(sitk_dict)
-data.display_seg_np_images(np_dict)
 #data.view_np_3d_image(np_dict["Brain"],10, "brain")
 
 

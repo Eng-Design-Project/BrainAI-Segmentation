@@ -204,26 +204,17 @@ class Core:
         self.image_scoring_button.pack(pady=20)
 
         # Advanced segmentation button
-        self.advanced_segmentation_button = tk.Button(self.master, text="Advanced Segmentation", command=lambda: self.change_buttons([self.deep_learning_button, self.clustering_button, self.save_message_label, self.advanced_back_button], [self.advanced_segmentation_button, self.atlas_segment_button, self.show_image_results_button, self.view_DCMS_btn, self.execute_clustering_button, self.save_message_label]))
+        self.advanced_segmentation_button = tk.Button(self.master, text="Advanced Segmentation", command=lambda: self.change_buttons([self.deep_learning_button, self.clustering_button, self.save_message_label, self.advanced_back_button], [self.advanced_segmentation_button, self.atlas_segment_button, self.show_image_results_button, self.view_DCMS_btn, self.save_message_label]))
         self.advanced_segmentation_button.pack(pady=20)
 
         # Clustering button
-        self.clustering_button = tk.Button(self.master, text="Clustering", command=lambda:(self.advanced_algo.set("Clustering"), self.change_buttons([self.execute_clustering_button, self.save_message_label, self.clustering_back_button],[self.advanced_segmentation_button, self.deep_learning_button, self.clustering_button, self.save_message_label, self.advanced_back_button])))
+        self.clustering_button = tk.Button(self.master, text="Clustering", command=self.clustering_click)
 
         # Deep learning button
-        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:(self.advanced_algo.set("Deep Learning"), self.change_buttons([self.execute_deep_learning, self.save_message_label, self.deeplearning_back_button],[self.deep_learning_button, self.clustering_button, self.execute_clustering_button, self.save_message_label, self.advanced_back_button])))
-
-        # Execute deep learning button
-        self.execute_deep_learning = tk.Button(self.master, text="Execute Deep Learning", command=lambda:self.execute_deep_learning_click())
+        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:self.deep_learning_click())
 
         # Advanced segmentation back button
         self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.atlas_segment_button, self.image_scoring_button, self.advanced_segmentation_button, self.show_image_results_button, self.view_DCMS_btn, self.save_message_label],[self.image_scoring_button, self.deep_learning_button, self.clustering_button, self.save_message_label, self.advanced_back_button]))
-
-        # Clustering back button
-        self.clustering_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.save_message_label, self.advanced_back_button],[self.results_label, self.execute_clustering_button, self.image_label, self.previous_button, self.next_button, self.save_message_label, self.clustering_back_button]))
-
-        # Deep learning back button
-        self.deeplearning_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.deep_learning_button, self.clustering_button, self.save_message_label, self.advanced_back_button],[self.execute_deep_learning, self.image_label ,self.previous_button, self.next_button, self.save_message_label, self.deeplearning_back_button]))
 
         """self.image_file_path = 'mytest.png'
         self.image_button = tk.Button(self.master, text="Display Image", command=self.display_file_png)
@@ -240,12 +231,6 @@ class Core:
         #self.advanced_segmentation_button = tk.Button(self.master, text="Advanced Segmentation", command=lambda: self.change_buttons([], [self.atlas_segment_button, self.show_image_results_button, self.show_folder_results_button]))
         #self.advanced_segmentation_button.pack(pady=20)
 
-        
-
-        # Add a button to execute clustering
-        self.execute_clustering_button = tk.Button(self.master, text="Execute Clustering", command=self.execute_clustering)
-        #self.execute_clustering_button.pack(pady=20)
-
         self.image_paths = []  # List to store image file paths
         self.current_image_index = 0  # Index of the currently displayed image
 
@@ -257,27 +242,8 @@ class Core:
 
         self.save_message_label = tk.Label(self.master, text="")
         self.save_message_label.pack_forget()
-    
-    def execute_clustering(self):
-        # we can probably combine execute clustering and open_clustering_options_popup
-        #when user hits clustering (we can remove execute clustering button before it) button
-        #calls open_clustering_options_popup
-        #user selects fullscan /segscan
-        #user selects algo (save as string, string fed to data.execute~~(input, string)) 
-        #user selects from memory or from file
-        #handle_clustering_selection is called: it either takes 
-        # the three selections as params or they are class attributes (params is better imo)
-        #further comments on handle clustering selection  
-
-
         
-        # Open a clustering options popup
-
-
-        #replace whole function with open_clustering_options_etc
-        self.open_clustering_options_popup()
-
-    def open_clustering_options_popup(self):
+    def clustering_click(self):
     
         # Create a popup window for clustering options
         popup_window = tk.Toplevel(self.master)
@@ -393,10 +359,8 @@ class Core:
                 if seg_var =="Segment":
                     #check if save folder matches expected structure
                     if data.is_segment_results_dir(folder):
-                        #the function below sets data.segmentation_results to an sitk image dict
+                        #the function below sets data.segmentation_results to an 3d np array image dict
                         data.set_seg_results(folder)
-                        #now I convert it to np array dict
-                        data.segmentation_results = data.convert_sitk_dict_to_numpy(data.segmentation_results)
                     else:
                         tk.messagebox.showwarning(title="Invalid Selection", message="The folder you selected does not match the expected structure. Select a folder with sub-folders containg DCM files.")
                         # in the future, add logic to query to user if they want to do atlas seg first,
@@ -426,7 +390,7 @@ class Core:
             # note, when it comes to whole brain, only the DBSCAN algorithm works at the moment
             #the if statement below checks if the folder is not empty. It should be unnecessary later when I've added more logic.
             if folder:
-                new_img = data.get_3d_array_from_file(folder)
+                new_img = data.get_3d_image(folder)
                 voxel_dict = {}
                 voxel_dict['Skull'] = clustering.execute_whole_clustering(new_img, "dbscan_3d")
                 new_img_dict = {}
@@ -507,15 +471,7 @@ class Core:
             self.current_image_index = (self.current_image_index + 1) % len(self.image_paths)
             self.show_current_image()
 
-    def execute_deep_learning_click(self):
-        #replace this whole function by just directly calling open_dl_etc
-        self.open_deeplearning_options_popup()
-
-
-    def open_deeplearning_options_popup(self):
-        
-        
-        
+    def deep_learning_click(self):
         #wrap all of this in an if statement that checks if data.segmentation results is empty ( and run the logic)
         #then we call the deep learning function with the segmentation results passed as a parameter
     #if (data.segmentation_results=={}):
@@ -570,7 +526,7 @@ class Core:
         confirm_button = tk.Button(popup_window, text="Execute Deeplearning", command=lambda: self.handle_deeplearning_selection(popup_window, segment_var.get(), algorithm_var.get(), source_var.get()))
         confirm_button.pack(pady=20)
 
-        #if seg results loaded from file, have to convert nested folder directory to dict of sitk images
+        #if seg results loaded from file, have to convert nested folder directory to dict of 3d np arrays
         #alternative is running atlas seg
 
         # else:
@@ -599,10 +555,8 @@ class Core:
                 if seg_var =="Segment":
                     #check if save folder matches expected structure
                     if data.is_segment_results_dir(folder):
-                        #the function below sets data.segmentation_results to an sitk image dict
+                        #the function below sets data.segmentation_results to an 3d np array image dict
                         data.set_seg_results(folder)
-                        #now I convert it to np array dict
-                        data.segmentation_results = data.convert_sitk_dict_to_numpy(data.segmentation_results)
                     else:
                         tk.messagebox.showwarning(title="Invalid Selection", message="The folder you selected does not match the expected structure. Select a folder with sub-folders containg DCM files.")
                         # in the future, add logic to query to user if they want to do atlas seg first,
@@ -655,13 +609,13 @@ class Core:
 
     def U_Net(self):
             # Define a dictionary of SimpleITK images (adjust as needed)
-        sitk_images_dict = {
+        images_dict = {
             "image1": data.get_3d_image("scan1"),
             "image2": data.get_3d_image("scan2"),
         }
 
         # Call the dlAlgorithm function from deep_learning_copy module
-        deep_learning_copy.dlAlgorithm(sitk_images_dict)
+        deep_learning_copy.dlAlgorithm(images_dict)
 
     def custom_askdirectory(title):
         #might replace other usses of askdirectory, to display a message
@@ -698,7 +652,7 @@ class Core:
             return  # Exit the function or handle the invalid folder as needed   
                
         # use functions in data to read the atlas and 
-        #   the image in question into memory here as sitk images
+        #   the image in question into memory here as 3d np array images
         image = data.get_3d_image(self.selected_folder)
         atlas_path = data.get_atlas_path()
         atlas = data.get_3d_image(atlas_path)
@@ -711,9 +665,6 @@ class Core:
         # Check if the selected folder is a valid segment results directory
         
 
-        #I want a function that converts the sitk image dicts to dicts with pngs
-        png_dict = data.sitk_dict_to_png_dict(seg_results)
-
         # Ask the user to select a folder for saving the results
         save_folder = filedialog.askdirectory(title="Select Save Folder")
 
@@ -723,9 +674,9 @@ class Core:
             
             if file_name:
                 # Save the segmentation results with the user-specified file name
-                data.store_seg_img_on_file(seg_results, f"{save_folder}/{file_name}.DCMs")
+                data.store_seg_img_on_file(seg_results, self.selected_folder, f"{save_folder}/{file_name}.DCMs")
                 data.store_seg_png_on_file(seg_results, f"{save_folder}/{file_name}.PNGs")
-            # save dict of sitk images to data global seg results
+            # save dict of 3d np array images to data global seg results
             # Show a message to inform the user that the folder was selected for saving
             self.save_message = "Selected folder for saving: " + save_folder
             self.save_message_label = tk.Label(self.master, text=self.save_message)
@@ -733,80 +684,9 @@ class Core:
             data.segmentation_results = seg_results
         # Set a flag to indicate that atlas segmentation has been performed
         
-        # Create a popup window for selecting segmentation type
-        popup_window = tk.Toplevel(self.master)
-        popup_window.title("Select Segmentation Type")
 
-        # Initialize variables to keep track of the current index for "Brain" and "Skull"
-        brain_index = 0
-        skull_index = 0
-        current_segmentation = "Brain"  # Initialize with "Brain" as the default
+        self.show_image_results(seg_results)
 
-        def update_image():
-            nonlocal brain_index, skull_index, current_segmentation
-            if current_segmentation == "Brain":
-                image_list = png_dict['Brain']
-                index = brain_index
-            else:
-                image_list = png_dict['Skull']
-                index = skull_index
-
-            image = image_list[index]
-            photo = ImageTk.PhotoImage(image)
-            image_label.configure(image=photo)
-            image_label.image = photo
-
-        def handle_brain_skull_selection(segmentation_type):
-            nonlocal current_segmentation
-            if segmentation_type == "Brain":
-                if current_segmentation == "Brain":
-                    return  # If already on "Brain," do nothing
-                current_segmentation = "Brain"
-                update_image()
-            else:
-                if current_segmentation == "Skull":
-                    return  # If already on "Skull," do nothing
-                current_segmentation = "Skull"
-                update_image()
-
-        def handle_previous():
-            nonlocal brain_index, skull_index
-            if current_segmentation == "Brain":
-                brain_index = (brain_index - 1) % len(png_dict['Brain'])
-            else:
-                skull_index = (skull_index - 1) % len(png_dict['Skull'])
-            update_image()
-
-        def handle_next():
-            nonlocal brain_index, skull_index
-            if current_segmentation == "Brain":
-                brain_index = (brain_index + 1) % len(png_dict['Brain'])
-            else:
-                skull_index = (skull_index + 1) % len(png_dict['Skull'])
-            update_image()
-
-        # Create a label to display the image
-        image_label = tk.Label(popup_window)
-        image_label.pack()
-
-        # Create a frame for the "Previous" and "Next" buttons
-        button_frame = tk.Frame(popup_window)
-        button_frame.pack()
-
-        # Create buttons for "Previous" and "Next" in the popup window
-        previous_button = tk.Button(button_frame, text="Previous", command=handle_previous)
-        next_button = tk.Button(button_frame, text="Next", command=handle_next)
-        previous_button.pack(side="left", padx=10)
-        next_button.pack(side="right", padx=10)
-
-        # Create buttons for "Brain" and "Skull" in the popup window
-        brain_button = tk.Button(popup_window, text="Brain", command=lambda: handle_brain_skull_selection("Brain"))
-        skull_button = tk.Button(popup_window, text="Skull", command=lambda: handle_brain_skull_selection("Skull"))
-        brain_button.pack(pady=10)
-        skull_button.pack(pady=10)
-
-        # Initialize the initial segmentation type to "Brain"
-        update_image()
 
     def show_popup_message(self, message, close_callback=None):
         # Create a new popup window
@@ -897,23 +777,23 @@ class Core:
     def show_deep_learning_buttons(self):
         self.deep_learning_page.show_buttons()"""
 
-    def show_image_results(self):
+    def show_image_results(self, image_dict=None):
         # This function will eventually display segmentation results for an image
         # You can add your image processing and display logic here
         # can take a directory (a folder containing sub-folders, each subfolder containing dcms) as input and then 
         # use PIL to turn them into images to display in a popup, similar to how ImageScoringPopup is now
-        folder = filedialog.askdirectory(title="Select folder with subfolders containing DCM files")
-        while data.is_segment_results_dir(folder) != True:
-            tk.messagebox.showwarning(title="Invalid Selection", message=
-            "The folder you selected does not match the expected structure. Select a folder with sub-folders containg DCM files.")
+        if image_dict == None:
             folder = filedialog.askdirectory(title="Select folder with subfolders containing DCM files")
-
-        image_dict = data.subfolders_to_dictionary(folder)
-        pngs_dict = data.sitk_dict_to_png_dict(image_dict)
+            while data.is_segment_results_dir(folder) != True:
+                tk.messagebox.showwarning(title="Invalid Selection", message=
+                "The folder you selected does not match the expected structure. Select a folder with sub-folders containg DCM files.")
+                folder = filedialog.askdirectory(title="Select folder with subfolders containing DCM files")
+            image_dict = data.subfolders_to_dictionary(folder)
+        pngs_dict = data.array_dict_to_png_dict(image_dict)
 
         #below is the same code that was used for the atlas_segment popup
         popup_window = tk.Toplevel(self.master)
-        popup_window.title("Select Segmentation Type")
+        popup_window.title("Results of Segmentation")
         brain_index = 0
         skull_index = 0
         current_segmentation = "Brain"  # Initialize with "Brain" as the default
@@ -982,7 +862,7 @@ class Core:
         if (data.contains_only_dcms(folder)):
             # convert each file to a PNG and save it to list
             png_list = []
-            np_3d = data.get_3d_array_from_file(folder)
+            np_3d = data.get_3d_image(folder)
             png_list = data.convert_3d_numpy_to_png_list(np_3d)
 
             #create the popup

@@ -1,4 +1,3 @@
-import SimpleITK as sitk
 import os
 import tensorflow as tf
 import numpy as np
@@ -6,14 +5,12 @@ from scipy.ndimage import convolve
 import data
 
 #dummy input data
-sitk_images_dict = {
-    "image1": data.get_3d_image("scan1"), # gets 3d sitk image from a folder of DCM images
+images_dict = {
+    "image1": data.get_3d_image("scan1"), # gets 3d np array image from a folder of DCM images
     "image2": data.get_3d_image("scan2"),   
     # Add other images...
 }
 
-#for the dummyDL functiom
-numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in sitk_images_dict.items()}
 
 #for the dummyDL function
 #labeled data is tricky, because it should probably be in the same format as the input data + a 1 or 0 label
@@ -204,60 +201,19 @@ class CustomClassifierSingleModel:
 def subfolders_to_3d_array_dictionary(directory):
     region_dict = {}
     for i in os.listdir(directory):
-        region_dict[i] = data.get_3d_array_from_file(os.path.join(directory, i))
+        region_dict[i] = data.get_3d_image(os.path.join(directory, i))
     return region_dict
 
 if __name__ == '__main__':
    print("running dl module")
    classifier = CustomClassifierSingleModel()
    #need dict of np arrays
-   test_data_input = {"scan1": data.get_3d_array_from_file("scan1"), "scan2": data.get_3d_array_from_file("scan2"),}
+   test_data_input = {"scan1": data.get_3d_image("scan1"), "scan2": data.get_3d_image("scan2"),}
    classif_dict = classifier.executeDL(0, test_data_input)
    for keys, values in classif_dict.items():
        print(keys, ": ", values)
    
 
-'''
-#class not needed
-class DeepLearningModule:
-    def __init__(self):
-        self.atlas_segmentation_data = {}
-        self.user_score1 = -1
-        self.user_score2 = -2
-
-    def load_regions(self, region_data):
-        for region_name, sitk_name in region_data.items():
-            try:
-                region_image = sitk.ReadImage(sitk_name)
-                print(f"Loaded {region_name} from {sitk_name}")
-            except Exception as e:
-                print(f"Error loading {region_name} from {sitk_name}: {e}")
-
-    def load_atlas_data(self, atlas_data1, atlas_data2):
-        for folder_path in [atlas_data1, atlas_data2]:
-            for filename in os.listdir(folder_path):
-                file_path = os.path.join(folder_path, filename)
-                try:
-                    atlas_image = sitk.ReadImage(file_path)
-                    self.atlas_segmentation_data[filename] = atlas_image
-                    print(f"Loaded atlas data from {file_path}")
-                except Exception as e:
-                    print(f"Error loading atlas data from {file_path}: {e}")
-
-
-# Existing user score global variables and function
-#will prob be removed, user score will be supplied to dl algo as argument from core
-user_score1 = -1
-user_score2 = -2
-
-#will be removed, user score updated in core
-def get_user_score(x1, x2):
-    global user_score1, user_score2
-    user_score1 = x1
-    user_score2 = x2
-    print("score 1 is: ", user_score1)
-    print("score 2 is: ", user_score2)
-'''
 
 
 '''
