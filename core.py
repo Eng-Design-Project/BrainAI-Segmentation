@@ -208,10 +208,10 @@ class Core:
         self.advanced_segmentation_button.pack(pady=20)
 
         # Clustering button
-        self.clustering_button = tk.Button(self.master, text="Clustering", command=self.execute_clustering)
+        self.clustering_button = tk.Button(self.master, text="Clustering", command=self.clustering_click)
 
         # Deep learning button
-        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:self.execute_deep_learning_click())
+        self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:self.deep_learning_click())
 
         # Advanced segmentation back button
         self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.atlas_segment_button, self.image_scoring_button, self.advanced_segmentation_button, self.show_image_results_button, self.view_DCMS_btn, self.save_message_label],[self.image_scoring_button, self.deep_learning_button, self.clustering_button, self.save_message_label, self.advanced_back_button]))
@@ -243,7 +243,7 @@ class Core:
         self.save_message_label = tk.Label(self.master, text="")
         self.save_message_label.pack_forget()
         
-    def execute_clustering(self):
+    def clustering_click(self):
     
         # Create a popup window for clustering options
         popup_window = tk.Toplevel(self.master)
@@ -471,7 +471,7 @@ class Core:
             self.current_image_index = (self.current_image_index + 1) % len(self.image_paths)
             self.show_current_image()
 
-    def execute_deep_learning_click(self):
+    def deep_learning_click(self):
         #wrap all of this in an if statement that checks if data.segmentation results is empty ( and run the logic)
         #then we call the deep learning function with the segmentation results passed as a parameter
     #if (data.segmentation_results=={}):
