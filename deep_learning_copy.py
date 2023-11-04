@@ -171,7 +171,7 @@ def dlAlgorithm(segmentDict, depth=5):
         if proceed.lower() != 'y':
             break  # Exit the function entirely
 
-    model = load_model("best_model.keras", custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
+
     
     plt.plot(loss_list)
     plt.title('Model Loss')
