@@ -709,8 +709,6 @@ class Core:
             self.save_message_label.pack()
             data.segmentation_results = seg_results       
         # Set a flag to indicate that atlas segmentation has been performed
-        self.show_image_results(seg_results)
-        # Set a flag to indicate that atlas segmentation has been performed
         self.atlas_segmentation_completed = True
         print("Atlas segmentation completed")  # Add this line for debugging
         self.change_buttons([self.select_folder_button, self.folder_label, self.atlas_segment_button, self.image_scoring_button, self.advanced_segmentation_button, self.show_image_results_button, self.view_DCMS_btn, self.save_message_label], self.master)
