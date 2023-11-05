@@ -682,9 +682,7 @@ class Core:
         print("Internal Atlas Segmentation")
         internal_color_atlas = data.get_2d_png_array_list("Color Atlas internal")
         internal_seg_results = segmentation.execute_internal_atlas_seg(data.segmentation_results, internal_color_atlas)
-        #save results
-        data.segmentation_results = internal_seg_results
-        
+        #save results, to file and data.seg results        
         self.save_seg_results(internal_seg_results)
         
         #display results
