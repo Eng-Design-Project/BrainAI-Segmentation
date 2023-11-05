@@ -715,10 +715,7 @@ class Core:
         print("Atlas segmentation completed")  # Add this line for debugging
         self.change_buttons([self.select_folder_button, self.folder_label, self.atlas_segment_button, self.image_scoring_button, self.advanced_segmentation_button, self.show_image_results_button, self.view_DCMS_btn, self.save_message_label], self.master)
 
-        # Add this method to handle the "Internal Atlas Segmentation" button click
-    def execute_internal_atlas_seg(self):
-        # Implement the functionality for "Internal Atlas Segmentation" here
-        pass
+    
 
     def show_popup_message(self, message, close_callback=None):
         # Create a new popup window
