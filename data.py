@@ -442,7 +442,7 @@ segmentation_results= None
 
 # this function sets the global variable segmentation_results to a dictionary of regions:3d np arrays
 # It takes an optional argument of a directory of DCMS. If no directory is passed, it uses "atl_segmentation_DCMs"
-def set_seg_results(directory = "atl_segmentation_DCMs"):
+def set_seg_results_with_dir(directory = "atl_segmentation_DCMs"):
     global segmentation_results
 
     segmentation_results = subfolders_to_dictionary(directory)
