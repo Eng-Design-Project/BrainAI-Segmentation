@@ -362,13 +362,18 @@ def create_seg_images_from_dict(images_dict, coords_dict):
 #                     print(region, + ": ", + pixel_color)
 #     return region_coords_dict"""
 
-def encode_atlas_colors(image_list: list) -> dict:
-    # Hard-coded colors to region
-    color_to_region_dict = {
-        (237, 28, 36): 'Skull',   # Redish
-        (0, 162, 232): 'Brain',   # Blueish
-        # ... add other colors and regions as required
-    }
+
+def encode_atlas_colors(image_list: list, color_to_region_dict: dict) -> dict:
+    """
+    Create a dictionary mapping regions to their corresponding coordinates based on exact color matches.
+
+    Args:
+    - image_list: List of 2D numpy arrays representing slices of the 3D image.
+    - color_to_region_dict: Dictionary mapping exact colors to region names.
+
+    Returns:
+    - Dictionary mapping region names to lists of coordinates where those regions are found.
+    """
     # Initialize the output dictionary with region names as keys and empty lists as values
     region_coords_dict = {region: [] for region in color_to_region_dict.values()}
 
@@ -376,20 +381,14 @@ def encode_atlas_colors(image_list: list) -> dict:
     for z, image_2d in enumerate(image_list):
         for y in range(image_2d.shape[0]):
             for x in range(image_2d.shape[1]):
-                pixel_color = tuple(image_2d[y, x])  # note, yx from 2d arrays
-                # If the pixel color exists in the dictionary, add its coordinate to the respective list
-                # if pixel_color != (0, 0, 0):
-                #     print(pixel_color)
-                max_channel = max(pixel_color)
-                if max_channel > 100:
-                    if pixel_color.index(max_channel) == 0:  # Red channel is largest
-                        pixel_color = (237, 28, 36)
-                    elif pixel_color.index(max_channel) == 2:  # Blue channel is largest
-                        pixel_color = (0, 162, 232)
+                # Get the pixel color as a tuple
+                pixel_color = tuple(image_2d[y, x])
+
+                # If the pixel color exactly exists in the dictionary, add its coordinate to the respective list
                 if pixel_color in color_to_region_dict:
                     region = color_to_region_dict[pixel_color]
-                    region_coords_dict[region].append([x, y, z])  
-    #print(region_coords_dict["Brain"])
+                    region_coords_dict[region].append([x, y, z])
+
     return region_coords_dict
 
 
@@ -407,7 +406,12 @@ def test_encode_atlas_colors():
     # Fill the right with green
     image_3d[:, :, 2*width//3:] = [0, 255, 0]
     #get a dict of regions and coords
-    region_to_coord_dict = encode_atlas_colors(image_3d)
+    color_to_region_dict = {
+        (237, 28, 36): 'Skull',   # Redish
+        (0, 162, 232): 'Brain',   # Blueish
+        # ... add other colors and regions as required
+    }
+    region_to_coord_dict = encode_atlas_colors(image_3d, color_to_region_dict)
     #print(region_to_coord_dict)
     data.view_np_3d_image(image_3d, 5, "redbluegreen")
 
@@ -434,7 +438,12 @@ def execute_atlas_seg(atlas, atlas_colors, image):
     reg_image = scipy_register_images(atlas, image)
     
     #coordinates of region based on atlas
-    region_to_coord_dict = encode_atlas_colors(atlas_colors)
+    color_to_region_dict = {
+        (237, 28, 36): 'Skull',   # Redish
+        (0, 162, 232): 'Brain',   # Blueish
+        # ... add other colors and regions as required
+    }
+    region_to_coord_dict = encode_atlas_colors(atlas_colors, color_to_region_dict)
 
     #create image dict from coords dict and 3d array image
     final_dict = create_seg_images_from_image(reg_image, region_to_coord_dict)
@@ -445,6 +454,30 @@ def execute_atlas_seg(atlas, atlas_colors, image):
 
     return final_dict
 
+#can only be done after normal atlas seg
+def execute_internal_atlas_seg(image_dict: dict, internal_color_atlas: list) -> dict:
+    print("executing internal atlas seg")
+    internal_dict = {}
+    for region in image_dict.keys():
+        if region == "Brain":
+            print("Segmenting Brain")
+            color_to_region_dict = {
+                (236, 28, 36): 'White Matter',   # Red
+                (184, 61, 186): 'Frontal',   # Pink
+                (63, 72, 204): 'Temporal',   # Blue
+                (185, 122, 86): 'Occipital',   # Brown
+                # ... add other colors and regions as required
+            }
+
+            internal_color_atlas_coords = encode_atlas_colors(internal_color_atlas, color_to_region_dict)
+            internal_dict = create_seg_images_from_image(image_dict[region], internal_color_atlas_coords)
+
+
+    return internal_dict
+
+
+
+
 if __name__ == "__main__":
     atlas_path = data.get_atlas_path()
     atlas = data.get_3d_image(atlas_path)
@@ -454,12 +487,17 @@ if __name__ == "__main__":
     color_atlas = data.get_2d_png_array_list("color atlas")
     seg_results = execute_atlas_seg(atlas, color_atlas, image)
     
+    internal_color_atlas = data.get_2d_png_array_list("Color Atlas internal")
+    internal_seg_results = execute_internal_atlas_seg(seg_results, internal_color_atlas)
+
+    data.display_seg_np_images(internal_seg_results)
+
     #test_encode_atlas_colors()
 
     #data.display_seg_np_images(seg_results)
 
-    data.store_seg_img_on_file(seg_results, "scan1", "dustin atlas tes one million")
-    data.store_seg_png_on_file(seg_results,"dustin atlas tes one million pngs")
+    #data.store_seg_img_on_file(seg_results, "scan1", "dustin atlas tes one million")
+    #data.store_seg_png_on_file(seg_results,"dustin atlas tes one million pngs")
 
     # coords_dict = {
     # "Brain": [(x, y, z) for x in range(30) for y in range(128) for z in range(46)]
