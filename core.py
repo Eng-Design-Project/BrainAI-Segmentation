@@ -180,8 +180,9 @@ class Core:
         self.popup_window = None  # Add this line to define popup_window
         self.results_label = tk.Label(self.master, text="")
         self.results_label.pack_forget()  # Hide the label by default
+        self.atlas_segmentation_completed = False  # Initialize the attribute as False
 
-        self.master.title("Image Analysis Tool")
+        self.master.title("QuickSeg")
         self.style = ttk.Style()
         self.style.configure("TButton", font=("Helvetica", 12))
         self.advanced_algo =tk.StringVar() #this will be set to either 'Deep Learning' or 'Clustering' depending on the button click
@@ -199,12 +200,16 @@ class Core:
         self.atlas_segment_button = tk.Button(self.master, text="Atlas Segment", command=self.atlas_segment)
         self.atlas_segment_button.pack(pady=20)
 
+        # Initialize the Internal Atlas Segmentation button (hidden initially)
+        self.internal_atlas_segment_button = tk.Button(self.master, text="Internal Atlas Segmentation", command=self.execute_internal_atlas_seg)
+        self.internal_atlas_segment_button.pack_forget()
+        
         # Image scoring button
         self.image_scoring_button = tk.Button(self.master, text="Score Images", command=self.open_image_scoring_popup)
         self.image_scoring_button.pack(pady=20)
 
         # Advanced segmentation button
-        self.advanced_segmentation_button = tk.Button(self.master, text="Advanced Segmentation", command=lambda: self.change_buttons([self.deep_learning_button, self.clustering_button, self.save_message_label, self.advanced_back_button], [self.advanced_segmentation_button, self.atlas_segment_button, self.show_image_results_button, self.view_DCMS_btn, self.save_message_label]))
+        self.advanced_segmentation_button = tk.Button(self.master, text="Advanced Segmentation", command=lambda: self.change_buttons([self.select_folder_button, self.folder_label, self.image_scoring_button, self.deep_learning_button, self.clustering_button, self.save_message_label, self.advanced_back_button], self.master))
         self.advanced_segmentation_button.pack(pady=20)
 
         # Clustering button
@@ -214,7 +219,7 @@ class Core:
         self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:self.deep_learning_click())
 
         # Advanced segmentation back button
-        self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.atlas_segment_button, self.image_scoring_button, self.advanced_segmentation_button, self.show_image_results_button, self.view_DCMS_btn, self.save_message_label],[self.image_scoring_button, self.deep_learning_button, self.clustering_button, self.save_message_label, self.advanced_back_button]))
+        self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.select_folder_button, self.folder_label, self.atlas_segment_button, self.image_scoring_button, self.advanced_segmentation_button, self.show_image_results_button, self.view_DCMS_btn, self.save_message_label], self.master))
 
         """self.image_file_path = 'mytest.png'
         self.image_button = tk.Button(self.master, text="Display Image", command=self.display_file_png)
@@ -630,7 +635,7 @@ class Core:
         selected_directory = filedialog.askdirectory(parent=dialog, title=title)
         dialog.destroy()  # Close the custom dialog
 
-        return selected_directory        
+        return selected_directory            
 
     def atlas_segment(self):
         print("Atlas Segmentation called")
@@ -681,12 +686,18 @@ class Core:
             self.save_message = "Selected folder for saving: " + save_folder
             self.save_message_label = tk.Label(self.master, text=self.save_message)
             self.save_message_label.pack()
-            data.segmentation_results = seg_results
+            data.segmentation_results = seg_results       
         # Set a flag to indicate that atlas segmentation has been performed
-        
-
         self.show_image_results(seg_results)
+        # Set a flag to indicate that atlas segmentation has been performed
+        self.atlas_segmentation_completed = True
+        print("Atlas segmentation completed")  # Add this line for debugging
+        self.change_buttons([self.select_folder_button, self.folder_label, self.atlas_segment_button, self.image_scoring_button, self.advanced_segmentation_button, self.show_image_results_button, self.view_DCMS_btn, self.save_message_label], self.master)
 
+        # Add this method to handle the "Internal Atlas Segmentation" button click
+    def execute_internal_atlas_seg(self):
+        # Implement the functionality for "Internal Atlas Segmentation" here
+        pass
 
     def show_popup_message(self, message, close_callback=None):
         # Create a new popup window
@@ -916,11 +927,21 @@ class Core:
         else:
             tk.messagebox.showwarning(title="Invalid Selection", message="Select a folder containg only DCM files.") 
 
-    def change_buttons(self, show_list, hide_list):
-        for button in hide_list:
-            button.pack_forget()
+    def change_buttons(self, show_list, parent):
+        self.forget_all_packed_widgets(parent)
         for button in show_list:
-            button.pack(pady=20) 
+            button.pack(pady=20)
+            if button == self.atlas_segment_button and self.atlas_segmentation_completed == True:
+                self.internal_atlas_segment_button.pack(pady=20)    
+        # Check if the "Advanced Segmentation Back" button is clicked and the "Atlas Segmentation" is not complete
+        #if self.advanced_segmentation_button in show_list and not self.atlas_segmentation_completed:
+         #   self.internal_atlas_segment_button.pack_forget()  
+               
+
+    def forget_all_packed_widgets(self, parent):
+        for widget in parent.winfo_children():
+            if widget.winfo_manager() == 'pack':
+                widget.pack_forget()        
 
     def full_scan(self):
         #   while (self.selected_folder != dcm folder):
