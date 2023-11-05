@@ -365,7 +365,7 @@ class Core:
                     #check if save folder matches expected structure
                     if data.is_segment_results_dir(folder):
                         #the function below sets data.segmentation_results to an 3d np array image dict
-                        data.set_seg_results(folder)
+                        data.set_seg_results_with_dir(folder)
                     else:
                         tk.messagebox.showwarning(title="Invalid Selection", message="The folder you selected does not match the expected structure. Select a folder with sub-folders containg DCM files.")
                         # in the future, add logic to query to user if they want to do atlas seg first,
@@ -561,7 +561,7 @@ class Core:
                     #check if save folder matches expected structure
                     if data.is_segment_results_dir(folder):
                         #the function below sets data.segmentation_results to an 3d np array image dict
-                        data.set_seg_results(folder)
+                        data.set_seg_results_with_dir(folder)
                     else:
                         tk.messagebox.showwarning(title="Invalid Selection", message="The folder you selected does not match the expected structure. Select a folder with sub-folders containg DCM files.")
                         # in the future, add logic to query to user if they want to do atlas seg first,
@@ -669,7 +669,28 @@ class Core:
         # save them as dcms to the nested folder
         # Check if the selected folder is a valid segment results directory
         
+        #save seg results to file, and to data.segmentation_results
+        self.save_seg_results(seg_results)
+        
+        #display seg results
+        self.show_image_results(seg_results)
 
+        #here to test execute internal_atlas_seg
+        #self.execute_internal_atlas_seg()
+
+    def execute_internal_atlas_seg(self):
+        print("Internal Atlas Segmentation")
+        internal_color_atlas = data.get_2d_png_array_list("Color Atlas internal")
+        internal_seg_results = segmentation.execute_internal_atlas_seg(data.segmentation_results, internal_color_atlas)
+        #save results
+        data.segmentation_results = internal_seg_results
+        
+        self.save_seg_results(internal_seg_results)
+        
+        #display results
+        self.show_image_results(internal_seg_results)
+
+    def save_seg_results(self, seg_results):
         # Ask the user to select a folder for saving the results
         save_folder = filedialog.askdirectory(title="Select Save Folder")
 
@@ -787,84 +808,144 @@ class Core:
 
     def show_deep_learning_buttons(self):
         self.deep_learning_page.show_buttons()"""
-
     def show_image_results(self, image_dict=None):
-        # This function will eventually display segmentation results for an image
-        # You can add your image processing and display logic here
-        # can take a directory (a folder containing sub-folders, each subfolder containing dcms) as input and then 
-        # use PIL to turn them into images to display in a popup, similar to how ImageScoringPopup is now
-        if image_dict == None:
+        # This function will display segmentation results for an image
+
+        if image_dict is None:
             folder = filedialog.askdirectory(title="Select folder with subfolders containing DCM files")
-            while data.is_segment_results_dir(folder) != True:
-                tk.messagebox.showwarning(title="Invalid Selection", message=
-                "The folder you selected does not match the expected structure. Select a folder with sub-folders containg DCM files.")
+            while not data.is_segment_results_dir(folder):
+                tk.messagebox.showwarning(
+                    title="Invalid Selection",
+                    message="The folder you selected does not match the expected structure. Select a folder with sub-folders containing DCM files.")
                 folder = filedialog.askdirectory(title="Select folder with subfolders containing DCM files")
             image_dict = data.subfolders_to_dictionary(folder)
+        
         pngs_dict = data.array_dict_to_png_dict(image_dict)
 
-        #below is the same code that was used for the atlas_segment popup
         popup_window = tk.Toplevel(self.master)
         popup_window.title("Results of Segmentation")
-        brain_index = 0
-        skull_index = 0
-        current_segmentation = "Brain"  # Initialize with "Brain" as the default
+
+        # New dictionary to keep track of indexes for each segmentation type
+        segmentation_indexes = {region: 0 for region in pngs_dict.keys()}
+        current_segmentation = next(iter(pngs_dict))  # Initialize with the first key
 
         def update_image():
-            nonlocal brain_index, skull_index, current_segmentation
-            if current_segmentation == "Brain":
-                image_list = pngs_dict['Brain']
-                index = brain_index
-            else:
-                image_list = pngs_dict['Skull']
-                index = skull_index
+            index = segmentation_indexes[current_segmentation]
+            image_list = pngs_dict[current_segmentation]
             image = image_list[index]
             photo = ImageTk.PhotoImage(image)
             image_label.configure(image=photo)
             image_label.image = photo
 
-        def handle_brain_skull_selection(segmentation_type):
+        def handle_segment_selection(segmentation_type):
             nonlocal current_segmentation
-            if segmentation_type == "Brain":
-                if current_segmentation == "Brain":
-                    return  # If already on "Brain," do nothing
-                current_segmentation = "Brain"
-                update_image()
-            else:
-                if current_segmentation == "Skull":
-                    return  # If already on "Skull," do nothing
-                current_segmentation = "Skull"
-                update_image()
+            current_segmentation = segmentation_type
+            update_image()
 
         def handle_previous():
-            nonlocal brain_index, skull_index
-            if current_segmentation == "Brain":
-                brain_index = (brain_index - 1) % len(pngs_dict['Brain'])
-            else:
-                skull_index = (skull_index - 1) % len(pngs_dict['Skull'])
+            segmentation_indexes[current_segmentation] = (segmentation_indexes[current_segmentation] - 1) % len(pngs_dict[current_segmentation])
             update_image()
 
         def handle_next():
-            nonlocal brain_index, skull_index
-            if current_segmentation == "Brain":
-                brain_index = (brain_index + 1) % len(pngs_dict['Brain'])
-            else:
-                skull_index = (skull_index + 1) % len(pngs_dict['Skull'])
+            segmentation_indexes[current_segmentation] = (segmentation_indexes[current_segmentation] + 1) % len(pngs_dict[current_segmentation])
             update_image()
 
         image_label = tk.Label(popup_window)
         image_label.pack()
         button_frame = tk.Frame(popup_window)
         button_frame.pack()
+
+        # Create Previous/Next buttons
         previous_button = tk.Button(button_frame, text="Previous", command=handle_previous)
         next_button = tk.Button(button_frame, text="Next", command=handle_next)
         previous_button.pack(side="left", padx=10)
         next_button.pack(side="right", padx=10)
-        brain_button = tk.Button(popup_window, text="Brain", command=lambda: handle_brain_skull_selection("Brain"))
-        skull_button = tk.Button(popup_window, text="Skull", command=lambda: handle_brain_skull_selection("Skull"))
-        brain_button.pack(pady=10)
-        skull_button.pack(pady=10)
+
+        # Create buttons for each region in the image dictionary
+        for region in pngs_dict.keys():
+            btn = tk.Button(popup_window, text=region, command=lambda r=region: handle_segment_selection(r))
+            btn.pack(pady=2)  # Adjust padding as needed
+
         update_image()
         popup_window.geometry("300x300")  # Adjust width and height as needed
+
+    # def show_image_results(self, image_dict=None):
+    #     # This function will eventually display segmentation results for an image
+    #     # You can add your image processing and display logic here
+    #     # can take a directory (a folder containing sub-folders, each subfolder containing dcms) as input and then 
+    #     # use PIL to turn them into images to display in a popup, similar to how ImageScoringPopup is now
+    #     if image_dict == None:
+    #         folder = filedialog.askdirectory(title="Select folder with subfolders containing DCM files")
+    #         while data.is_segment_results_dir(folder) != True:
+    #             tk.messagebox.showwarning(title="Invalid Selection", message=
+    #             "The folder you selected does not match the expected structure. Select a folder with sub-folders containg DCM files.")
+    #             folder = filedialog.askdirectory(title="Select folder with subfolders containing DCM files")
+    #         image_dict = data.subfolders_to_dictionary(folder)
+    #     pngs_dict = data.array_dict_to_png_dict(image_dict)
+
+    #     #below is the same code that was used for the atlas_segment popup
+    #     popup_window = tk.Toplevel(self.master)
+    #     popup_window.title("Results of Segmentation")
+    #     brain_index = 0
+    #     skull_index = 0
+    #     current_segmentation = "Brain"  # Initialize with "Brain" as the default
+
+    #     def update_image():
+    #         nonlocal brain_index, skull_index, current_segmentation
+    #         if current_segmentation == "Brain":
+    #             image_list = pngs_dict['Brain']
+    #             index = brain_index
+    #         else:
+    #             image_list = pngs_dict['Skull']
+    #             index = skull_index
+    #         image = image_list[index]
+    #         photo = ImageTk.PhotoImage(image)
+    #         image_label.configure(image=photo)
+    #         image_label.image = photo
+
+    #     def handle_brain_skull_selection(segmentation_type):
+    #         nonlocal current_segmentation
+    #         if segmentation_type == "Brain":
+    #             if current_segmentation == "Brain":
+    #                 return  # If already on "Brain," do nothing
+    #             current_segmentation = "Brain"
+    #             update_image()
+    #         else:
+    #             if current_segmentation == "Skull":
+    #                 return  # If already on "Skull," do nothing
+    #             current_segmentation = "Skull"
+    #             update_image()
+
+    #     def handle_previous():
+    #         nonlocal brain_index, skull_index
+    #         if current_segmentation == "Brain":
+    #             brain_index = (brain_index - 1) % len(pngs_dict['Brain'])
+    #         else:
+    #             skull_index = (skull_index - 1) % len(pngs_dict['Skull'])
+    #         update_image()
+
+    #     def handle_next():
+    #         nonlocal brain_index, skull_index
+    #         if current_segmentation == "Brain":
+    #             brain_index = (brain_index + 1) % len(pngs_dict['Brain'])
+    #         else:
+    #             skull_index = (skull_index + 1) % len(pngs_dict['Skull'])
+    #         update_image()
+
+    #     image_label = tk.Label(popup_window)
+    #     image_label.pack()
+    #     button_frame = tk.Frame(popup_window)
+    #     button_frame.pack()
+    #     previous_button = tk.Button(button_frame, text="Previous", command=handle_previous)
+    #     next_button = tk.Button(button_frame, text="Next", command=handle_next)
+    #     previous_button.pack(side="left", padx=10)
+    #     next_button.pack(side="right", padx=10)
+    #     brain_button = tk.Button(popup_window, text="Brain", command=lambda: handle_brain_skull_selection("Brain"))
+    #     skull_button = tk.Button(popup_window, text="Skull", command=lambda: handle_brain_skull_selection("Skull"))
+    #     brain_button.pack(pady=10)
+    #     skull_button.pack(pady=10)
+    #     update_image()
+    #     popup_window.geometry("300x300")  # Adjust width and height as needed
 
     def view_DCMs_from_file(self):
         # This function will eventually display DCMs from file
