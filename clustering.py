@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import pydicom
 import os
 from sklearn.cluster import DBSCAN, KMeans, AgglomerativeClustering
+from skimage.exposure import equalize_adapthist
+from skimage import exposure, img_as_ubyte
 from sklearn.preprocessing import StandardScaler
 # from sklearn.metrics.pairwise import euclidean_distances
 from scipy.ndimage import gaussian_filter
@@ -281,25 +283,7 @@ def execute_seg_clustering(input, algo):
         
     return output_coords
 
-# used as main sript, this helps a lot with testing and pinpointing errors.
-#I'm already working on creating function shortcuts and combining factors for easy use as a sub-module instead.
-if __name__ == "__main__":
-    folder_path = input("Enter folder path: ") # get folder
-    volume = data.get_3d_image(folder_path) # create 3d volume
 
-    # apply dbscan to 3d and get labels, overall coordinates, and binary masks
-    labeled_volume, cluster_coords, brain_mask, skull_mask = dbscan_3d(volume)
-
-    # find brain and skull coordinates
-    brain_cluster_coordinates, skull_cluster_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
-
-    display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
-
-    print("3D Brain Cluster Coordinates:")
-    print(brain_cluster_coordinates)
-
-    print("3D Skull Cluster Coordinates:")
-    print(skull_cluster_coordinates) 
 
 
 ## SHARED FUNCTIONS ##
@@ -308,37 +292,50 @@ if __name__ == "__main__":
 # 3d clahe enhancement w sliding window
 # takes np array, input has to be 3d volume
 # outputs enhanced 3d volume array
-def clahe_enhance(volume, kernel_size=(3, 3, 3)): # 'tuple' kernel size for the windowing operation
 
-    # get half dimensions for padding and indexing
-    half_depth = kernel_size[0] // 2
-    half_height = kernel_size[1] // 2
-    half_width = kernel_size[2] // 2
 
-    # input volume gets padded for edge cases
-    padded = np.pad(volume, ((half_depth, half_depth), (half_height, half_height), (half_width, half_width)))
-    
-    # intiialize emppty volume for a place to store enhanced data
-    enhanced = np.zeros_like(volume)
-    
-    # getting volume dimensions of the input
-    depth, height, width = volume.shape
 
-    # looping through each voxel in the volume
-    for z in range(depth):
-        for y in range(height):
-            for x in range(width):
-
-                # extracting a local block centered at the current voxel
-                local_block = padded[z:z+2*half_depth+1, y:y+2*half_height+1, x:x+2*half_width+1]
-
-                # applying adaptive histogram equalization to the local block
-                local_enhanced = exposure.equalize_adapthist(local_block)
-
-                # assigning the center voxel of enhanced block to corresponding voxel in enhanced volume
-                enhanced[z, y, x] = local_enhanced[half_depth, half_height, half_width]
-
+def clahe_enhance(volume, kernel_size=(3, 3, 3)):
+    # Assume volume is a 3D array with shape (depth, height, width)
+    # You can apply CLAHE on a per-slice basis if the volume is too large
+    enhanced = np.empty_like(volume, dtype=np.uint8)  # change dtype to uint8 if you want 8-bit output
+    for i in range(volume.shape[0]):
+        # Apply CLAHE to each slice
+        slice_enhanced = exposure.equalize_adapthist(volume[i], kernel_size=kernel_size[1:])
+        # Rescale the result to the range [0, 255] and convert to 8-bit unsigned integers
+        enhanced[i] = img_as_ubyte(slice_enhanced)
     return enhanced
+# def clahe_enhance(volume, kernel_size=(3, 3, 3)): # 'tuple' kernel size for the windowing operation
+
+#     # get half dimensions for padding and indexing
+#     half_depth = kernel_size[0] // 2
+#     half_height = kernel_size[1] // 2
+#     half_width = kernel_size[2] // 2
+
+#     # input volume gets padded for edge cases
+#     padded = np.pad(volume, ((half_depth, half_depth), (half_height, half_height), (half_width, half_width)))
+    
+#     # intiialize emppty volume for a place to store enhanced data
+#     enhanced = np.zeros_like(volume)
+    
+#     # getting volume dimensions of the input
+#     depth, height, width = volume.shape
+
+#     # looping through each voxel in the volume
+#     for z in range(depth):
+#         for y in range(height):
+#             for x in range(width):
+
+#                 # extracting a local block centered at the current voxel
+#                 local_block = padded[z:z+2*half_depth+1, y:y+2*half_height+1, x:x+2*half_width+1]
+
+#                 # applying adaptive histogram equalization to the local block
+#                 local_enhanced = exposure.equalize_adapthist(local_block)
+
+#                 # assigning the center voxel of enhanced block to corresponding voxel in enhanced volume
+#                 enhanced[z, y, x] = local_enhanced[half_depth, half_height, half_width]
+
+#     return enhanced
 
 # GLCM (Gray-Level Co-occurence Matrix)
 # computes texture features
@@ -599,7 +596,7 @@ def hr_preprocess(volume):
     opened_volume = morphology.opening(clahe_enhanced_volume, morphology.ball(3))
     return opened_volume
 
-def hierarchical_clustering(volume, n_clusters=4):
+def hr_clustering(volume, n_clusters=4):
     # extract features
     apply_texture_features = texture_features(volume)
     reshaped_volume = volume.reshape(-1, 1)
@@ -684,3 +681,40 @@ clusters_coordinates = extract_cluster_coordinates(labels_volume, n_clusters)
 #all the "main" functions should be labeled so they can be implemented
 #it also seems like you made many helper functions that do the same thing: loading a volume, normalizing, etc
 # clustering shouldn't need to access any directories
+
+
+# used as main sript, this helps a lot with testing and pinpointing errors.
+#I'm already working on creating function shortcuts and combining factors for easy use as a sub-module instead.
+if __name__ == "__main__":
+    #folder_path = input("Enter folder path: ") # get folder
+    folder_path = "scan1"
+    volume = data.get_3d_image(folder_path) # create 3d volume
+    print("test0")
+
+    km_preprocessed_volume = km_preprocess(volume)
+    print("test")
+
+    km_labeled_volume, km_cluster_centers = kmeans_clustering(km_preprocessed_volume)
+    print("test2")
+    km_coordinates = km_extract_coordinates(km_labeled_volume)
+    print("test3")
+    avg_brightness = km_calculate_brightness(km_cluster_centers)
+
+    #km_coordinates, km_labeled_volume, avg_brightness = km_execute(volume)
+    print(km_output(km_coordinates, avg_brightness))
+    print("test4")
+
+    # apply dbscan to 3d and get labels, overall coordinates, and binary masks
+    #labeled_volume, cluster_coords, brain_mask, skull_mask = dbscan_3d(volume)
+
+    # find brain and skull coordinates
+    #brain_cluster_coordinates, skull_cluster_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
+
+    #display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
+
+    # print("3D Brain Cluster Coordinates:")
+    # print(brain_cluster_coordinates)
+
+    # print("3D Skull Cluster Coordinates:")
+    # print(skull_cluster_coordinates) 
+
