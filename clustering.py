@@ -379,6 +379,13 @@ def apply_gaussian_filter(volume, sigma=1):
 # from core:
     # run "db2_execute" to execute the algorithm
     # call "db2_output" to display output
+def db2_(volume, kernel_size=(3, 3, 3)):
+    # You can apply CLAHE on a per-slice basis if the volume is too large
+    enhanced = np.empty_like(volume, dtype=np.float64)
+    for i in range(volume.shape[0]):
+        enhanced[i] = equalize_adapthist(volume[i], kernel_size=kernel_size[1:])
+    return enhanced
+
 
 def db2_preprocess(volume):
 
@@ -391,7 +398,7 @@ def db2_preprocess(volume):
 
     # enhancement w clahe
     # provides better results with using the gradient madnitude than without
-    clahe_enhanced_volume = clahe_enhance(gradient_mag)
+    clahe_enhanced_volume = db2_clahe_enhance(gradient_mag)
 
     # apply morphological opening - spherical structure elements
     # helps with noise
