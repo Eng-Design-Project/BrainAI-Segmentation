@@ -379,7 +379,7 @@ def apply_gaussian_filter(volume, sigma=1):
 # from core:
     # run "db2_execute" to execute the algorithm
     # call "db2_output" to display output
-def db2_(volume, kernel_size=(3, 3, 3)):
+def db2_clahe_enhance(volume, kernel_size=(3, 3, 3)):
     # You can apply CLAHE on a per-slice basis if the volume is too large
     enhanced = np.empty_like(volume, dtype=np.float64)
     for i in range(volume.shape[0]):
