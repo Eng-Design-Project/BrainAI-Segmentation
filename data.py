@@ -450,6 +450,20 @@ def set_seg_results_with_dir(directory = "atl_segmentation_DCMs"):
     
 # set_seg_results()
 
+def average_pixel_brightness_3d(images):
+    # Ensure the input is a numpy array
+    if not isinstance(images, np.ndarray):
+        raise ValueError("Input must be a numpy array")
+
+    # Ensure the input is a 3D array
+    if len(images.shape) != 3:
+        raise ValueError("Input must be a 3D array of grayscale images")
+
+    # Calculate the average pixel brightness for all images
+    average_brightness = np.mean(images, axis=(1, 2))
+    return average_brightness
+
+
 def is_segment_results_dir(directory):
     """
     Validates if a given directory matches the specified structure and format.
