@@ -395,14 +395,13 @@ class Core:
             #the if statement below checks if data.segmentation_results is not empty. It should be unnecessary later when I've added more logic.
             if data.segmentation_results:
                 #the first argument should be a pre-atlas segmented scan, the 2nd argument should be a string of the chosen algo
-                # voxel_dict = clustering.execute_seg_clustering(data.segmentation_results, 'test')
-                # data.segmentation_results = segmentation.filter_noise_from_images(data.segmentation_results, voxel_dict)
-                # # returns a dict on np arrays 
-                # # display function? 
-                for region, image in data.segmentation_results.items():
-                    coords_dict = clustering.execute_seg_clustering(image, algorithm, 2)
-                    clustered_dict = segmentation.create_seg_images_from_image(volume, coords_dict)
-                    self.show_image_results(clustered_dict)
+                
+                dict_of_coords_dicts = clustering.execute_seg_clustering(data.segmentation_results, algorithm, 5)
+                for region in data.segmentation_results.keys():
+                    cluster_dict = segmentation.create_seg_images_from_image(data.segmentation_results[region], dict_of_coords_dicts[region])
+                    self.show_image_results(cluster_dict)
+                    # for cluster in clustered_dict.keys():
+                    #     self.show_image_results(clustered_dict[cluster])
                     
         if seg_var == "Whole Brain":
             # note, when it comes to whole brain, only the DBSCAN algorithm works at the moment
@@ -417,7 +416,9 @@ class Core:
                 #seg brain with cluster coords
                 clustered_dict = segmentation.create_seg_images_from_image(volume, coords_dict)
 
-                self.save_seg_results(clustered_dict)
+                #saving clusters breaks: cluster names are integers
+                #self.save_seg_results(clustered_dict)
+                
                 self.show_image_results(clustered_dict)
         
         # Close the popup window
