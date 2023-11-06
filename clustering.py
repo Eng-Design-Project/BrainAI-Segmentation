@@ -491,6 +491,8 @@ def kmeans_clustering(volume, n_clusters=4, n_init='auto', max_iter=1000):
 
     # matches labels to original volume shape, and returns them
     return labels.reshape(volume.shape), kmeans.cluster_centers_
+#kmeans(and probably all the algos) are busted: they don't exclude zero-value clusters
+
 
 # same brightness function, except this one's based on centers instead
 def km_calculate_brightness(km_cluster_centers):
@@ -707,7 +709,7 @@ def execute_seg_clustering(input, algo, n_clusters):
     output: a dictionary of region : voxel coordinate lists
     """
     # initialize dictionary to store output
-    output_coords = {}
+    output_coords_dict = {}
 
     #dict of strings that correspond to functions
     algos_dict = {
@@ -717,11 +719,13 @@ def execute_seg_clustering(input, algo, n_clusters):
     }
     
     for region, scan in input.items():
-        output_coords[region] = algos_dict[algo](scan, n_clusters)
+        output_coords, labeled_volume, avg_brightness = algos_dict[algo](scan, n_clusters)
+        output_coords = convert_to_lists(output_coords)
+        output_coords_dict[region] = output_coords
 
-    output_coords = convert_to_lists(output_coords)
+    
         
-    return output_coords
+    return output_coords_dict
 
 
 
