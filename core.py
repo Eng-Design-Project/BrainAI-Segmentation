@@ -294,7 +294,7 @@ class Core:
         source_var.set(None)  # Set an initial value that does not correspond to any option
         file_option = tk.Radiobutton(popup_window, text="From File", variable=source_var, value="file")
         file_option.pack()
-        memory_option = tk.Radiobutton(popup_window, text="From Memory (most recent Segmentation Results)", variable=source_var, value="memory")
+        memory_option = tk.Radiobutton(popup_window, text="From Memory (recent Seg Results or selected file)", variable=source_var, value="memory")
         memory_option.pack()
 
         # Create a button to confirm the selection and execute clustering
@@ -540,7 +540,7 @@ class Core:
         source_var.set(None)  # Set an initial value that does not correspond to any option
         file_option = tk.Radiobutton(popup_window, text="From File", variable=source_var, value="file")
         file_option.pack()
-        memory_option = tk.Radiobutton(popup_window, text="From Memory (most recent Segmentation Results)", variable=source_var, value="memory")
+        memory_option = tk.Radiobutton(popup_window, text="From Memory (recent Seg Results or selected file)", variable=source_var, value="memory")
         memory_option.pack()
 
         # Create a button to confirm the selection and execute clustering
