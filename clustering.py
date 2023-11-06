@@ -377,8 +377,8 @@ def apply_gaussian_filter(volume, sigma=1):
 
 ## DBSCAN WITH ATLAS ##
 # from core:
-    # run "db2_execute" to execute the algorithm
-    # call "db2_output" to display output
+    # run "_execute" to execute the algorithm
+    # call "_output" to display output
 
 def db2_preprocess(volume):
 
@@ -440,8 +440,10 @@ def dbscan_with_atlas(volume):
             members = db2_coords[labels == label]
             center = members.mean(axis=0)
             db2_cluster_centers.append(center)
+
+    db2_labeled_volume = "test"
     
-    return db2, np.array(db2_cluster_centers)
+    return db2, np.array(db2_cluster_centers), db2_labeled_volume
 
 def db2_calculate_brightness(volume, db2_coords, labels):
     avg_brightness = {}
@@ -457,19 +459,23 @@ def db2_calculate_brightness(volume, db2_coords, labels):
 def db2_execute(volumes):
     db2_coordinates = []
     avg_brightness_list = []
+    db2_labeled_volumes = []
     
     for volume in volumes:
         db2_preprocessed_volume = db2_preprocess(volume)
         db2_thresholded_volume = db2_thresholding(db2_preprocessed_volume)
 
-        db2, db2_cluster_coords = dbscan_with_atlas(db2_thresholded_volume)
+        db2, db2_cluster_coords, db2_labeled_volume = dbscan_with_atlas(db2_thresholded_volume)
+        db2_labeled_volumes.append(db2_labeled_volume)
 
         avg_brightness = db2_calculate_brightness(volume, np.column_stack(np.where(db2_thresholded_volume > 0)), db2.labels_)
         avg_brightness_list.append(avg_brightness)
 
         db2_coordinates.append(db2_cluster_coords)
+
+        
     
-    return db2_coordinates, avg_brightness_list
+    return db2_coordinates, avg_brightness_list, db2_labeled_volumes
 
 # returns output as a string
 # i'm working on having the coordinates be in a similar format to the one you showed last night
