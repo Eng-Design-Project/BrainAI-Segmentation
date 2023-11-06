@@ -15,6 +15,7 @@ from skimage import morphology, measure, feature, exposure
 from skimage.filters import gaussian, threshold_local, sobel
 from skimage.feature import graycomatrix, graycoprops
 import data
+import segmentation
 
 ## DBSCAN WITHOUT ATLAS ##
 
@@ -227,61 +228,7 @@ def execute_clustering(sitk_dict, algo):
 '''
 
 
-#moved to bottom, just to keep sep from everything else
-def execute_whole_clustering(input, algo):
-    """
-    input: an entire scan (3d np array) and a string representing the chosen algo
-    selects the algo from a dictionary of corresponding functions
-    output: a dictionary of region : voxel coordinate lists
-    """
-     # initialize dictionary to store output
-    output_coords = {}
 
-    #dict of strings that correspond to functions
-    algos_dict = {
-        'dbscan_3d': dbscan_3d
-    } 
-
-    # perform dbscan and get labeled volume, coordinates, and binary masks for each slice in the output dictionary
-    labeled_volume, cluster_coords, brain_mask, skull_mask = algos_dict[algo](input)
-
-    # determine coordinates
-    brain_cluster_coordinates, skull_cluster_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
-
-    # dictionary to store output coordinates
-    output_coords["skull"] = skull_cluster_coordinates
-    #display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
-    #dbscan optimized for entire brain, not atlas segments, currently outputs brain coords as opposed to "skull coords"
-        
-    return output_coords
-
-def tester_algo(input_array):
-    """
-    input: np array
-    prints
-    output: format for the output of any clustering algo
-    """
-    print("clustering testing algo")
-    test_coords = [[x, y, z] for x in range(0, 30) for y in range(0, 30) for z in range(0, 30)]
-    return test_coords
-
-
-def execute_seg_clustering(input, algo):
-    """
-    input: an pre-atlas segmented scan (dict of 3d np arrays) and a string representing the chosen algo
-    selects the algo from a dictionary of corresponding functions
-    output: a dictionary of region : voxel coordinate lists
-    """
-    # initialize dictionary to store output
-    output_coords = {}
-    algos_dict = {
-        'test': tester_algo
-    } 
-    
-    for region, scan in input.items():
-        output_coords[region] = algos_dict[algo](scan)
-        
-    return output_coords
 
 
 
@@ -463,38 +410,32 @@ def db2_calculate_brightness(volume, db2_coords, labels):
     return avg_brightness
 
 # this would be called from core to execute all of the above
-def db2_execute(volumes):
-    db2_coordinates = []
-    avg_brightness_list = []
-    db2_labeled_volumes = []
+def db2_execute(volume, n_clusters):
     
-    for volume in volumes:
-        db2_preprocessed_volume = db2_preprocess(volume)
-        db2_thresholded_volume = db2_thresholding(db2_preprocessed_volume)
-
-        db2, db2_cluster_coords, db2_labeled_volume = dbscan_with_atlas(db2_thresholded_volume)
-        db2_labeled_volumes.append(db2_labeled_volume)
-
-        avg_brightness = db2_calculate_brightness(volume, np.column_stack(np.where(db2_thresholded_volume > 0)), db2.labels_)
-        avg_brightness_list.append(avg_brightness)
-
-        db2_coordinates.append(db2_cluster_coords)
-
-        
     
-    return db2_coordinates, avg_brightness_list, db2_labeled_volumes
+    print("test")
+    db2_preprocessed_volume = db2_preprocess(volume)
+    print("test")
+    db2_thresholded_volume = db2_thresholding(db2_preprocessed_volume)
+    print("test")
+
+    db2, db2_cluster_coords, db2_labeled_volume = dbscan_with_atlas(db2_thresholded_volume)
+    print("test")
+    avg_brightness = db2_calculate_brightness(volume, np.column_stack(np.where(db2_thresholded_volume > 0)), db2.labels_)
+    print("test")
+    
+    return db2_cluster_coords, avg_brightness, db2_thresholded_volume
 
 # returns output as a string
 # i'm working on having the coordinates be in a similar format to the one you showed last night
 # it's a pretty simple change, but i left it like this for now since this is what's been tested to work fully
-def db2_output(db2_coordinates, avg_brightness_list):
+def db2_output(db2_coordinates, avg_brightness):
     total_clusters = sum([len(db2_cluster_coords) for db2_cluster_coords in db2_coordinates])
     db2_results = f"Number of Clusters Found: {total_clusters}\n"
     
     db2_results += "Average Cluster Brightness:\n"
-    for idx, avg_brightness in enumerate(avg_brightness_list):
-        for key, value in avg_brightness.items():
-            db2_results += f"{key} : {value}\n"
+    for key, value in avg_brightness.items():
+        db2_results += f"{key} : {value}\n"
 
     db2_results += "\n3D Coordinates of Clusters:\n"
     db2_cluster_count = 1
@@ -686,22 +627,102 @@ labels_volume = labels.reshape(combined_volume[1:-1].shape)
 clusters_coordinates = extract_cluster_coordinates(labels_volume, n_clusters)
 '''
 
-#Dustin:
-#The main functions bundle helper functions (like pixel_data) and 
-# the actual clustering algo (like dbscan_with_atlas), which is fine,
-# but it needs to take an np array(3d volume) is input for it to be usable
-# by the universal "execute clustering" function(s)
-#all the "main" functions should be labeled so they can be implemented
-#it also seems like you made many helper functions that do the same thing: loading a volume, normalizing, etc
-# clustering shouldn't need to access any directories
 
 def convert_to_lists(dict_of_arrays):
     dict_of_lists = {}
     for key, array in dict_of_arrays.items():
+        # Swap the first and third columns (axis)
+        array[:, [0, 2]] = array[:, [2, 0]]
+
         # Convert each 2D array into a list of lists
         list_of_lists = array.tolist()
         dict_of_lists[key] = list_of_lists
     return dict_of_lists
+
+#moved to bottom, just to keep sep from everything else
+def execute_whole_clustering(input, algo, n_clusters):
+    """
+    input: an entire scan (3d np array) and a string representing the chosen algo
+    selects the algo from a dictionary of corresponding functions
+    output: a dictionary of region : voxel coordinate lists
+    """
+     # initialize dictionary to store output
+    output_coords = {}
+
+    #dict of strings that correspond to functions
+    algos_dict = {
+        'DBSCAN': db2_execute,
+        'K-Means': km_execute,
+        'Hierarchical': hr_execute
+    } 
+
+    output_coords, labeled_volume, avg_brightness = algos_dict[algo](input, n_clusters)
+    
+    output_coords = convert_to_lists(output_coords)
+    
+    return output_coords
+
+def execute_whole_clustering_old(input, algo):
+    """
+    input: an entire scan (3d np array) and a string representing the chosen algo
+    selects the algo from a dictionary of corresponding functions
+    output: a dictionary of region : voxel coordinate lists
+    """
+     # initialize dictionary to store output
+    output_coords = {}
+
+    #dict of strings that correspond to functions
+    algos_dict = {
+        'dbscan_3d': dbscan_3d
+    } 
+
+    # perform dbscan and get labeled volume, coordinates, and binary masks for each slice in the output dictionary
+    labeled_volume, cluster_coords, brain_mask, skull_mask = algos_dict[algo](input)
+
+    # determine coordinates
+    brain_cluster_coordinates, skull_cluster_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
+
+    # dictionary to store output coordinates
+    output_coords["skull"] = skull_cluster_coordinates
+    #display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
+    #dbscan optimized for entire brain, not atlas segments, currently outputs brain coords as opposed to "skull coords"
+        
+    return output_coords
+
+def tester_algo(input_array):
+    """
+    input: np array
+    prints
+    output: format for the output of any clustering algo
+    """
+    print("clustering testing algo")
+    test_coords = [[x, y, z] for x in range(0, 30) for y in range(0, 30) for z in range(0, 30)]
+    return test_coords
+
+
+def execute_seg_clustering(input, algo, n_clusters):
+    """
+    input: an pre-atlas segmented scan (dict of 3d np arrays) and a string representing the chosen algo
+    selects the algo from a dictionary of corresponding functions
+    output: a dictionary of region : voxel coordinate lists
+    """
+    # initialize dictionary to store output
+    output_coords = {}
+
+    #dict of strings that correspond to functions
+    algos_dict = {
+        'DBSCAN': db2_execute,
+        'K-Means': km_execute,
+        'Hierarchical': hr_execute
+    }
+    
+    for region, scan in input.items():
+        output_coords[region] = algos_dict[algo](scan, n_clusters)
+
+    output_coords = convert_to_lists(output_coords)
+        
+    return output_coords
+
 
 
 # used as main sript, this helps a lot with testing and pinpointing errors.
@@ -711,9 +732,10 @@ if __name__ == "__main__":
     folder_path = "scan1"
     volume = data.get_3d_image(folder_path) # create 3d volume
 
-    km_coordinates, km_labeled_volume, avg_brightness = km_execute(volume, 2)
-    print(km_output(km_coordinates, avg_brightness))
-    print("test4")
+    coordinates = execute_whole_clustering(volume, "DBSCAN", 2)
+
+    clustered_dict = segmentation.create_seg_images_from_image(volume, coordinates)
+    data.display_seg_np_images(clustered_dict)
 
     # apply dbscan to 3d and get labels, overall coordinates, and binary masks
     #labeled_volume, cluster_coords, brain_mask, skull_mask = dbscan_3d(volume)

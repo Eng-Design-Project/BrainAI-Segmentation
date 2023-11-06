@@ -351,17 +351,24 @@ class Core:
                 if not data.segmentation_results:
                     #note, data.segmentation results is set after atlas_segment() function is called
                     tk.messagebox.showwarning(title="Invalid Selection", message="No segmentation in memory, you need to select from file.")
-                    #add more logic here; add a file dialog for the user to select from file
+                    source = "file"
             if seg_var == "Whole Brain":
                 if not self.selected_folder:
-                    tk.messagebox.showwarning(title="Invalid Selection", message="No segmentation in memory, you need to select from file.")
-                    #add more logic here; add a file dialog for the user to select from file
+                    tk.messagebox.showwarning(title="Invalid Selection", message="No Scan in memory, you need to select from file.")
+                    source = "file"                
+                elif not data.contains_only_dcms(self.selected_folder):
+                    tk.messagebox.showwarning(title="Invalid Selection", message="You need to select from file containing only DCMs.")
+                    source = "file"
+                else:
+                    volume = data.get_3d_image(self.selected_folder)
+
+
 
         if source == "file":
-            data.segmentation_results = None 
-            while not data.segmentation_results: #note, this may result in infinite loop
-                folder = filedialog.askdirectory(title="Select folder with segmentation results")
-                if seg_var =="Segment":
+            if seg_var == "Segment":
+                data.segmentation_results = None
+                while not data.segmentation_results: #note, this may result in infinite loop, need some flag if window closed
+                    folder = filedialog.askdirectory(title="Select folder with segmentation results")
                     #check if save folder matches expected structure
                     if data.is_segment_results_dir(folder):
                         #the function below sets data.segmentation_results to an 3d np array image dict
@@ -370,12 +377,16 @@ class Core:
                         tk.messagebox.showwarning(title="Invalid Selection", message="The folder you selected does not match the expected structure. Select a folder with sub-folders containg DCM files.")
                         # in the future, add logic to query to user if they want to do atlas seg first,
                         # if contains_only_dcms(selection) == true
-                if seg_var =="Whole Brain":
-                    if data.contains_only_dcms(folder):
-                        break
-                    else:
-                        tk.messagebox.showwarning(title="Invalid Selection", message="Select a folder containing only DCM files.")
+            if seg_var == "Whole Brain":
+                folder = filedialog.askdirectory(title="Select folder with dcms")
+                while not data.contains_only_dcms(folder):#note, this may result in infinite loop, need some flag if window closed
+                    tk.messagebox.showwarning(title="Invalid Selection", message="Select a folder containing only DCM files.")
+                    folder = filedialog.askdirectory(title="Select folder with dcms")
+                volume = data.get_3d_image(folder)
+        
             
+            
+                
         #implement in popup selection later
         #if (seg scan && !seg_results) || (full scan && !selected_file)
             #user shouldn't been able to select 'from memory'
@@ -384,26 +395,30 @@ class Core:
             #the if statement below checks if data.segmentation_results is not empty. It should be unnecessary later when I've added more logic.
             if data.segmentation_results:
                 #the first argument should be a pre-atlas segmented scan, the 2nd argument should be a string of the chosen algo
-                voxel_dict = clustering.execute_seg_clustering(data.segmentation_results, 'test')
-                data.segmentation_results = segmentation.filter_noise_from_images(data.segmentation_results, voxel_dict)
+                # voxel_dict = clustering.execute_seg_clustering(data.segmentation_results, 'test')
+                # data.segmentation_results = segmentation.filter_noise_from_images(data.segmentation_results, voxel_dict)
                 # # returns a dict on np arrays 
                 # # display function? 
                 for region, image in data.segmentation_results.items():
-                    data.display_3d_array_slices(image, 10)
+                    coords_dict = clustering.execute_seg_clustering(image, algorithm, 2)
+                    clustered_dict = segmentation.create_seg_images_from_image(volume, coords_dict)
+                    self.show_image_results(clustered_dict)
                     
         if seg_var == "Whole Brain":
             # note, when it comes to whole brain, only the DBSCAN algorithm works at the moment
             #the if statement below checks if the folder is not empty. It should be unnecessary later when I've added more logic.
             if folder:
-                new_img = data.get_3d_image(folder)
-                voxel_dict = {}
-                voxel_dict['Skull'] = clustering.execute_whole_clustering(new_img, "dbscan_3d")
-                new_img_dict = {}
-                new_img_dict['Skull'] = new_img
-                new_img_dict = segmentation.filter_noise_from_images(new_img_dict, voxel_dict)
-                for region, image in new_img_dict.items():
-                    data.display_3d_array_slices(image, 10)
-                # # # display function?
+                
+
+                #cluster coordinates returned, not noise, actual clusters for now
+                #could user select number of clusters?
+                coords_dict = clustering.execute_whole_clustering(volume, algorithm, 5)
+                
+                #seg brain with cluster coords
+                clustered_dict = segmentation.create_seg_images_from_image(volume, coords_dict)
+
+                self.save_seg_results(clustered_dict)
+                self.show_image_results(clustered_dict)
         
         # Close the popup window
         popup_window.destroy()
