@@ -62,10 +62,43 @@ image1 = np.array([[10, 20, 30],
 
 image2 = np.array([[100, 110, 120],
                       [130, 140, 150],
-                      [160, 170, 180]])
+                      [160, 170, 180]],)
 
-grayscale_images = np.array([image1, image2])
+image3 = np.array([[100, 110, 120],
+                      [130, 140, 150],
+                      [160, 170, 180]],)
+
+grayscale_images = np.array([image1, image2, image3])
 
 # Calculate the average pixel brightness for all images
-avg_brightness = data.average_pixel_brightness_3d(grayscale_images)
+avg_brightness = data.array_of_average_pixel_brightness_3d(grayscale_images)
 print(f"Average Pixel Brightness for Each Image: {avg_brightness}")
+
+scan1 = data.get_3d_image("scan1") #output should be a numpy 3d array
+# Calculate the average pixel brightness for all images
+avg_bright = data.array_of_average_pixel_brightness_3d(scan1)
+print(f"Average Pixel Brightness for 3d Image: {avg_bright}")
+print("type: ", type(avg_bright))
+print(avg_bright[0])
+print(scan1.shape)
+print(scan1[0].shape)
+
+def average_brightness(image):
+    # Ensure the input image is a numpy array
+    if not isinstance(image, np.ndarray):
+        raise ValueError("Input image must be a numpy array")
+
+    # Ensure the image is 2D (grayscale)
+    if len(image.shape) != 2:
+        raise ValueError("Input image must be grayscale (2D array)")
+
+    # Calculate the average pixel brightness
+    average_brightness = np.mean(image)
+    return average_brightness
+
+av = average_brightness(scan1[0])
+print(av)
+print(image1.shape)
+
+avgg = data.average_overall_brightness_3d(scan1)
+print(avgg)

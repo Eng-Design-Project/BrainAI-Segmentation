@@ -450,19 +450,46 @@ def set_seg_results_with_dir(directory = "atl_segmentation_DCMs"):
     
 # set_seg_results()
 
-def average_pixel_brightness_3d(images):
+#this function takes a 3d numpy image, returns a single number as the average of (46) averages
+def average_overall_brightness_3d(image):
+    # Ensure the input is a numpy array
+    if not isinstance(image, np.ndarray):
+        raise ValueError("Input must be a numpy array")
+    
+    # Ensure the input is a 3D array with shape (46, 128, 128)
+    # if images.shape != (46, 128, 128):
+    #     raise ValueError("Input must have shape (46, 128, 128) for 46 grayscale images with dimensions 128x128")
+
+    # Calculate the average pixel brightness for each image
+    image_averages = np.mean(image, axis=(1, 2))
+    # Calculate the overall average by averaging the image averages
+    overall_average_brightness = np.mean(image_averages)
+    return overall_average_brightness
+
+# if the argument is a 3d image with 46 slices, this function will return a numpy array with 46 averages
+# each average can be accessed by typical indexing, e.g. average_brightness[0] returns first average, ...[45] returns last, etc.
+def array_of_average_pixel_brightness_3d(images):
     # Ensure the input is a numpy array
     if not isinstance(images, np.ndarray):
         raise ValueError("Input must be a numpy array")
-
     # Ensure the input is a 3D array
     if len(images.shape) != 3:
         raise ValueError("Input must be a 3D array of grayscale images")
-
     # Calculate the average pixel brightness for all images
     average_brightness = np.mean(images, axis=(1, 2))
     return average_brightness
 
+# this function returns the brightness of a single 2d grayscale numpy image
+def avg_brightness_2d(image):
+    # Ensure the input image is a numpy array
+    if not isinstance(image, np.ndarray):
+        raise ValueError("Input image must be a numpy array")
+    # Ensure the image is 2D (grayscale)
+    if len(image.shape) != 2:
+        raise ValueError("Input image must be grayscale (2D array)")
+    # Calculate the average pixel brightness
+    average_brightness = np.mean(image)
+    return average_brightness
 
 def is_segment_results_dir(directory):
     """
