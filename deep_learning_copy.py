@@ -127,6 +127,7 @@ def show_slices(triplets):
     plt.suptitle("Original and Segmented")
     plt.show()
 
+# Change file path to your own file path to my_model.keras
 def dlAlgorithm(segmentDict, depth=5, model_path='C:\\Users\\Justin Rivera\\OneDrive\\Documents\\ED1\\BrainAI-Segmentation\\my_model.keras'):
     numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()}
     normalizedDict = normalizeTF(numpyImagesDict)
