@@ -557,9 +557,9 @@ def km_extract_coordinates(km_labeled_volume):
     return km_coordinates
 
 # this would be called from core to execute all of the above
-def km_execute(volume):
+def km_execute(volume, n_clusters):
     km_preprocessed_volume = km_preprocess(volume)
-    km_labeled_volume, km_cluster_centers = kmeans_clustering(km_preprocessed_volume)
+    km_labeled_volume, km_cluster_centers = kmeans_clustering(km_preprocessed_volume, n_clusters=n_clusters)
     km_coordinates = km_extract_coordinates(km_labeled_volume)
     avg_brightness = km_calculate_brightness(km_cluster_centers)
     return km_coordinates, km_labeled_volume, avg_brightness
@@ -682,6 +682,14 @@ clusters_coordinates = extract_cluster_coordinates(labels_volume, n_clusters)
 #it also seems like you made many helper functions that do the same thing: loading a volume, normalizing, etc
 # clustering shouldn't need to access any directories
 
+def convert_to_lists(dict_of_arrays):
+    dict_of_lists = {}
+    for key, array in dict_of_arrays.items():
+        # Convert each 2D array into a list of lists
+        list_of_lists = array.tolist()
+        dict_of_lists[key] = list_of_lists
+    return dict_of_lists
+
 
 # used as main sript, this helps a lot with testing and pinpointing errors.
 #I'm already working on creating function shortcuts and combining factors for easy use as a sub-module instead.
@@ -689,18 +697,8 @@ if __name__ == "__main__":
     #folder_path = input("Enter folder path: ") # get folder
     folder_path = "scan1"
     volume = data.get_3d_image(folder_path) # create 3d volume
-    print("test0")
 
-    km_preprocessed_volume = km_preprocess(volume)
-    print("test")
-
-    km_labeled_volume, km_cluster_centers = kmeans_clustering(km_preprocessed_volume)
-    print("test2")
-    km_coordinates = km_extract_coordinates(km_labeled_volume)
-    print("test3")
-    avg_brightness = km_calculate_brightness(km_cluster_centers)
-
-    #km_coordinates, km_labeled_volume, avg_brightness = km_execute(volume)
+    km_coordinates, km_labeled_volume, avg_brightness = km_execute(volume, 2)
     print(km_output(km_coordinates, avg_brightness))
     print("test4")
 
