@@ -377,8 +377,8 @@ def apply_gaussian_filter(volume, sigma=1):
 
 ## DBSCAN WITH ATLAS ##
 # from core:
-    # run "_execute" to execute the algorithm
-    # call "_output" to display output
+    # run "db2_execute" to execute the algorithm
+    # call "db2_output" to display output
 
 def db2_preprocess(volume):
 
