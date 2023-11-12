@@ -107,14 +107,23 @@ def save_2d_images_list(image_list, directory):
 def get_3d_image(directory):
     image_files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]  # gather files
     slices = [pydicom.dcmread(os.path.join(directory, f)) for f in image_files]  # read each file
-    
-    # Sort slices, but ensure the float conversion is safely handled
-    slices.sort(key=lambda x: float(getattr(x, 'ImagePositionPatient', [0,0,0])[2]))
-    
-    # Reverse the list so that the stack is in the opposite order
-    slices = slices[::-1]
-    
-    return np.stack([s.pixel_array for s in slices])
+
+    # Create a set to track unique ImagePositionPatient[2] values
+    unique_positions = set()
+    unique_slices = []
+
+    # Loop through each slice and add it to unique_slices if its position is unique
+    for s in slices:
+        position = float(s.ImagePositionPatient[2])
+        if position not in unique_positions:
+            unique_slices.append(s)
+            unique_positions.add(position)
+
+    # Sort the unique slices
+    unique_slices.sort(key=lambda x: float(x.ImagePositionPatient[2]))
+
+    return np.stack([s.pixel_array for s in unique_slices])
+
         
 # def get_3d_image(directory):
 #     image_files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))] # gather files
