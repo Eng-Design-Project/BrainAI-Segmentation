@@ -181,7 +181,7 @@ def dlAlgorithm(segmentDict, depth=5, model_path='C:\\Users\\Justin Rivera\\OneD
         batch_triplets = all_triplets[triplet_index:triplet_index + 3]
         for idx, triplet in enumerate(batch_triplets):
             print(f"Triplet {idx + 1 + triplet_index} Original Min: {triplet[0].min()}, Max: {triplet[0].max()}")
-            print(f"Triplet {idx + 1 + triplet_index} Prediction Min: {triplet[1].min()}, Max: {triplet[1].max()}")
+            print(f"Triplet {idx + 1 + triplet_index} Segmented Min: {triplet[1].min()}, Max: {triplet[1].max()}")
         show_slices(batch_triplets)
 
         triplet_index += 3

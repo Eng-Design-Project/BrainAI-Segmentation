@@ -1,20 +1,19 @@
 # "# ADJUSTABLE:" indicates all the values that can be changed
-# ROI: region of interest
 
-# All additional necessary libraries are in requirements.txt
 import numpy as np
 import matplotlib.pyplot as plt
 import pydicom
 import os
 from sklearn.cluster import DBSCAN, KMeans, AgglomerativeClustering
+from skimage.exposure import equalize_adapthist
+from skimage import exposure, img_as_ubyte
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics.pairwise import euclidean_distances, rbf_kernel
 from scipy.ndimage import gaussian_filter
-from scipy.cluster.hierarchy import dendrogram, linkage
 from skimage import morphology, measure, feature, exposure
-from skimage.filters import gaussian, median, threshold_local, sobel
-from skimage.morphology import ball
+from skimage.filters import gaussian, threshold_local, sobel
+from skimage.feature import graycomatrix, graycoprops
 import data
+import segmentation
 
 ## DBSCAN WITHOUT ATLAS ##
 
@@ -202,6 +201,9 @@ def display_slices(volume, labels, cluster_coords, brain_mask, skull_mask):
         # display full processed image
         display_rgb_image(rgb_img, z)
 
+# SITK TO PYDICOM - MD
+# original:
+'''
 def execute_clustering(sitk_dict, algo):
     output_coords = {} # initialize sitk dictionary to store output
     algos_dict = {
@@ -221,82 +223,114 @@ def execute_clustering(sitk_dict, algo):
         #display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
     #dbscan optimized for entire brain, not atlas segments, currently outputs brain coords as opposed to "skull coords"
     return output_coords
+'''
 
-# used as main sript, this helps a lot with testing and pinpointing errors.
-#I'm already working on creating function shortcuts and combining factors for easy use as a sub-module instead.
-if __name__ == "__main__":
-    folder_path = input("Enter folder path: ") # get folder
-    volume = data.get_3d_array_from_file(folder_path) # create 3d volume
 
-    # apply dbscan to 3d and get labels, overall coordinates, and binary masks
-    labeled_volume, cluster_coords, brain_mask, skull_mask = dbscan_3d(volume)
 
-    # find brain and skull coordinates
-    brain_cluster_coordinates, skull_cluster_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
 
-    display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
 
-    print("3D Brain Cluster Coordinates:")
-    print(brain_cluster_coordinates)
 
-    print("3D Skull Cluster Coordinates:")
-    print(skull_cluster_coordinates) 
 
 ## SHARED FUNCTIONS ##
 
 
 # 3d clahe enhancement w sliding window
+# takes np array, input has to be 3d volume
+# outputs enhanced 3d volume array
+
+
+
 def clahe_enhance(volume, kernel_size=(3, 3, 3)):
-
-    half_depth = kernel_size[0] // 2
-    half_height = kernel_size[1] // 2
-    half_width = kernel_size[2] // 2
-
-    # padded for edge cases
-    padded = np.pad(volume, ((half_depth, half_depth), (half_height, half_height), (half_width, half_width)))
-    enhanced = np.zeros_like(volume)
-    depth, height, width = volume.shape
-    for z in range(depth):
-        for y in range(height):
-            for x in range(width):
-                local_block = padded[z:z+2*half_depth+1, y:y+2*half_height+1, x:x+2*half_width+1]
-                local_enhanced = exposure.equalize_adapthist(local_block)
-                enhanced[z, y, x] = local_enhanced[half_depth, half_height, half_width]
-
+    # Assume volume is a 3D array with shape (depth, height, width)
+    # You can apply CLAHE on a per-slice basis if the volume is too large
+    enhanced = np.empty_like(volume, dtype=np.uint8)  # change dtype to uint8 if you want 8-bit output
+    for i in range(volume.shape[0]):
+        # Apply CLAHE to each slice
+        slice_enhanced = exposure.equalize_adapthist(volume[i], kernel_size=kernel_size[1:])
+        # Rescale the result to the range [0, 255] and convert to 8-bit unsigned integers
+        enhanced[i] = img_as_ubyte(slice_enhanced)
     return enhanced
+# def clahe_enhance(volume, kernel_size=(3, 3, 3)): # 'tuple' kernel size for the windowing operation
 
+#     # get half dimensions for padding and indexing
+#     half_depth = kernel_size[0] // 2
+#     half_height = kernel_size[1] // 2
+#     half_width = kernel_size[2] // 2
 
+#     # input volume gets padded for edge cases
+#     padded = np.pad(volume, ((half_depth, half_depth), (half_height, half_height), (half_width, half_width)))
+    
+#     # intiialize emppty volume for a place to store enhanced data
+#     enhanced = np.zeros_like(volume)
+    
+#     # getting volume dimensions of the input
+#     depth, height, width = volume.shape
+
+#     # looping through each voxel in the volume
+#     for z in range(depth):
+#         for y in range(height):
+#             for x in range(width):
+
+#                 # extracting a local block centered at the current voxel
+#                 local_block = padded[z:z+2*half_depth+1, y:y+2*half_height+1, x:x+2*half_width+1]
+
+#                 # applying adaptive histogram equalization to the local block
+#                 local_enhanced = exposure.equalize_adapthist(local_block)
+
+#                 # assigning the center voxel of enhanced block to corresponding voxel in enhanced volume
+#                 enhanced[z, y, x] = local_enhanced[half_depth, half_height, half_width]
+
+#     return enhanced
+
+# GLCM (Gray-Level Co-occurence Matrix)
+# computes texture features
+# takes np array, input has to be 3d volume
+# outputs array of texture features
 def texture_features(volume):
-    # dimensions
+    # get input volume dimensions
     depth, height, width = volume.shape
     
     # list to store features
     all_features = []
     
+    # loop through each slice in volume
     for i in range(depth):
-        slice_ = volume[i, :, :]  # Axial slice
-        glcm = greycomatrix(slice_, [1], [0], 256, symmetric=True, normed=True)
+        slice_ = volume[i, :, :]  # extracting axial slice
+        
+        # computes GLCM for the current slice
+        glcm = graycomatrix(slice_, [1], [0], 256, symmetric=True, normed=True)
+
+        # extracting texture features from the glcm
         features = [
-            greycoprops(glcm, 'contrast')[0, 0],
-            greycoprops(glcm, 'dissimilarity')[0, 0],
-            greycoprops(glcm, 'homogeneity')[0, 0],
-            greycoprops(glcm, 'energy')[0, 0],
-            greycoprops(glcm, 'correlation')[0, 0]
+            graycoprops(glcm, 'contrast')[0, 0],    # intensity comparison between neighboring voxels
+            graycoprops(glcm, 'dissimilarity')[0, 0],   # just like 'contrast', except less sensitive to big differences in gray level values
+            graycoprops(glcm, 'homogeneity')[0, 0], # closeness of elemnt distribution -- this is pretty much the same as the inverse difference moment
+            graycoprops(glcm, 'energy')[0, 0],  # this is identical to the 'angular second moment' feature i used in the old spectral algo -- sum of squared elements
+            graycoprops(glcm, 'correlation')[0, 0]  # joint probability occurence of joint pairs
         ]
 
         all_features.append(features)
 
     return np.array(all_features)
 
+# filter that applies smoothing to the volume
 def apply_gaussian_filter(volume, sigma=1):
     return gaussian(volume, sigma=sigma)
+
 
 
 
 ## DBSCAN WITH ATLAS ##
 # from core:
     # run "db2_execute" to execute the algorithm
-    # call "db2_result_string" to display output
+    # call "db2_output" to display output
+def db2_clahe_enhance(volume, kernel_size=(3, 3, 3)):
+    # You can apply CLAHE on a per-slice basis if the volume is too large
+    enhanced = np.empty_like(volume, dtype=np.float64)
+    for i in range(volume.shape[0]):
+        enhanced[i] = equalize_adapthist(volume[i], kernel_size=kernel_size[1:])
+    return enhanced
+
 
 def db2_preprocess(volume):
 
@@ -304,36 +338,45 @@ def db2_preprocess(volume):
     gaussian_filtered_volume = gaussian_filter(volume, sigma=1)
 
     # computing gradient magnitude w the sobel filter
+    # this finds the intensity rate of change and helps with highlighting edges
     gradient_mag = np.sqrt(np.square(sobel(gaussian_filtered_volume, axis = 0)) + np.square(sobel(gaussian_filtered_volume, axis = 1)) + np.square(sobel(gaussian_filtered_volume, axis = 2)))
 
     # enhancement w clahe
-    clahe_enhanced_volume = clahe_enhance(gradient_mag)
+    # provides better results with using the gradient madnitude than without
+    clahe_enhanced_volume = db2_clahe_enhance(gradient_mag)
 
-    # apply opening
-    opened_volume = morphology.opening(clahe_enhanced_volume, morphology.ball(3))
+    # apply morphological opening - spherical structure elements
+    # helps with noise
+    opened_volume = morphology.opening(clahe_enhanced_volume, morphology.ball(3)) # adjusted to work better w 3d volume
 
     return opened_volume
 
+# grayscale to binary conversion -- not a global; adjustables determine region sizes
+# works best since they have different illumination values 
+# helps the clustering algo analyze the image better, without changing illumination differences between regions
 def db2_thresholding(volume):
     block_size = 35
     db2_adaptive_thresholding = threshold_local(volume, block_size, offset=5)
     binary_adaptive = volume > db2_adaptive_thresholding
     return binary_adaptive
 
+# perform dbscan
 def dbscan_with_atlas(volume):
 
+    # extracting textures features
     apply_texture_features = texture_features(volume)
 
-    # bring non zero coordinates into volume
+    # extracting coordinates of non-zero voxels
+    # i'm working on one where it extracts the background voxels instead
     db2_coords = np.column_stack(np.where(volume > 0))
 
-    # fetch texture feature for each voxel
+    # getting the texture features of every non-zero voxel
     db2_iterate_texture_features = apply_texture_features[db2_coords[:, 0]]
 
-    # combine texture features with voxel coordinates 
+    # combine texture features with the corresponding voxel coordinates 
     db2_combined_texture_features = np.hstack((db2_coords, db2_iterate_texture_features))
 
-    # scale the combined features
+    # normalizing feature space
     db2_scaler = StandardScaler()
     db2_scaled_features = db2_scaler.fit_transform(db2_combined_texture_features)
 
@@ -349,45 +392,48 @@ def dbscan_with_atlas(volume):
             members = db2_coords[labels == label]
             center = members.mean(axis=0)
             db2_cluster_centers.append(center)
+
+    db2_labeled_volume = "test"
     
-    return db2, np.array(db2_cluster_centers)
+    return db2, np.array(db2_cluster_centers), db2_labeled_volume
 
 def db2_calculate_brightness(volume, db2_coords, labels):
     avg_brightness = {}
-    unique_labels = np.unique(labels)
-    for label in unique_labels:
+    db2_unique_labels = np.unique(labels)
+    for label in db2_unique_labels:
         if label != -1:  # Exclude noise label
             members = db2_coords[labels == label]
             brightness_values = volume[members[:,0], members[:,1], members[:,2]]
             avg_brightness[label] = np.mean(brightness_values)
     return avg_brightness
 
-
-def db2_execute(volumes):
-    db2_coordinates = []
-    avg_brightness_list = []
+# this would be called from core to execute all of the above
+def db2_execute(volume, n_clusters):
     
-    for volume in volumes:
-        db2_preprocessed_volume = db2_preprocess(volume)
-        db2_thresholded_volume = db2_thresholding(db2_preprocessed_volume)
-
-        db2, db2_cluster_coords = dbscan_with_atlas(db2_thresholded_volume)
-
-        avg_brightness = db2_calculate_brightness(volume, np.column_stack(np.where(db2_thresholded_volume > 0)), db2.labels_)
-        avg_brightness_list.append(avg_brightness)
-
-        db2_coordinates.append(db2_cluster_coords)
     
-    return db2_coordinates, avg_brightness_list
+    print("test")
+    db2_preprocessed_volume = db2_preprocess(volume)
+    print("test")
+    db2_thresholded_volume = db2_thresholding(db2_preprocessed_volume)
+    print("test")
 
-def db2_result_string(db2_coordinates, avg_brightness_list):
+    db2, db2_cluster_coords, db2_labeled_volume = dbscan_with_atlas(db2_thresholded_volume)
+    print("test")
+    avg_brightness = db2_calculate_brightness(volume, np.column_stack(np.where(db2_thresholded_volume > 0)), db2.labels_)
+    print("test")
+    
+    return db2_cluster_coords, avg_brightness, db2_thresholded_volume
+
+# returns output as a string
+# i'm working on having the coordinates be in a similar format to the one you showed last night
+# it's a pretty simple change, but i left it like this for now since this is what's been tested to work fully
+def db2_output(db2_coordinates, avg_brightness):
     total_clusters = sum([len(db2_cluster_coords) for db2_cluster_coords in db2_coordinates])
     db2_results = f"Number of Clusters Found: {total_clusters}\n"
     
     db2_results += "Average Cluster Brightness:\n"
-    for idx, avg_brightness in enumerate(avg_brightness_list):
-        for key, value in avg_brightness.items():
-            db2_results += f"{key} : {value}\n"
+    for key, value in avg_brightness.items():
+        db2_results += f"{key} : {value}\n"
 
     db2_results += "\n3D Coordinates of Clusters:\n"
     db2_cluster_count = 1
@@ -404,13 +450,9 @@ def db2_result_string(db2_coordinates, avg_brightness_list):
 ## K-MEANS ##
 # from core:
     # run "km_execute" to execute the algorithm
-    # call "km_result_string" to display output
+    # call "km_output" to display output
 
-''''
-def apply_median_filter(volume):
-    return median(volume, footprint=ball(1))
-''''
-
+# identical to db2 preprocessing 
 def km_preprocess(volume):
     
     gaussian_filtered_volume = gaussian_filter(volume, sigma=1)
@@ -422,37 +464,62 @@ def km_preprocess(volume):
     opened_volume = morphology.opening(clahe_enhanced_volume, morphology.ball(3))
     return opened_volume
 
+# apply kmeans to preprocessed data
+# initialize with specificied number of clusters to find
+# maximum iterations are normally lower, but since we don't have a large dataset (in terms of kmeans), 1000 gave the most consistent outputs
 def kmeans_clustering(volume, n_clusters=4, n_init='auto', max_iter=1000):
     apply_texture_features = texture_features(volume)
+
+    # reshaping volume into a 2d array
+    # each would be a different voxel
     reshaped_volume = volume.reshape(-1, 1)
+
+    # run texture features on each voxel
     reshaped_features = np.repeat(apply_texture_features, volume.shape[1]*volume.shape[2], axis=0)
-    combined_data = np.hstack([reshaped_volume, reshaped_features])
+    
+    # combines the intensity and voxel features
+    km_combined_data = np.hstack([reshaped_volume, reshaped_features])
 
+    # k-means++ is just the intialization method (set to auto so we dont need to actually change it each time we're running a new dataset)
     kmeans = KMeans(n_clusters=n_clusters, init='k-means++', n_init=n_init, max_iter=max_iter)
-    labels = kmeans.fit_predict(combined_data)
-    return labels.reshape(volume.shape), kmeans.cluster_centers_
+    
+    # fit model and combined data
+    # predict cluster labels for each voxel
+    labels = kmeans.fit_predict(km_combined_data)
 
+    # matches labels to original volume shape, and returns them
+    return labels.reshape(volume.shape), kmeans.cluster_centers_
+#kmeans(and probably all the algos) are busted: they don't exclude zero-value clusters
+
+
+# same brightness function, except this one's based on centers instead
 def km_calculate_brightness(km_cluster_centers):
     avg_brightness = {}
     for label, center in enumerate(km_cluster_centers):
         avg_brightness[label] = center[0]
     return avg_brightness
 
+# extracts 3d coordinates of voxels 
+# applied to each cluster label in the volume
 def km_extract_coordinates(km_labeled_volume):
     km_coordinates = {}
+
+    # this is where it iterates over each unique label in the volume
     for label in np.unique(km_labeled_volume):
         km_coords = np.argwhere(km_labeled_volume == label)
         km_coordinates[label] = km_coords
     return km_coordinates
 
-def km_execute(volume):
+# this would be called from core to execute all of the above
+def km_execute(volume, n_clusters):
     km_preprocessed_volume = km_preprocess(volume)
-    km_labeled_volume, km_cluster_centers = kmeans_clustering(km_preprocessed_volume)
+    km_labeled_volume, km_cluster_centers = kmeans_clustering(km_preprocessed_volume, n_clusters=n_clusters)
     km_coordinates = km_extract_coordinates(km_labeled_volume)
     avg_brightness = km_calculate_brightness(km_cluster_centers)
     return km_coordinates, km_labeled_volume, avg_brightness
 
-def km_result_string(km_coordinates, avg_brightness):
+# same set up as previous algo for getting the output info
+def km_output(km_coordinates, avg_brightness):
     km_result = "Average Cluster Brightness:\n"
     for key, value in avg_brightness.items():
         km_result += f"{key} : {value}\n"
@@ -462,54 +529,77 @@ def km_result_string(km_coordinates, avg_brightness):
         km_result += f"{key} : {value}\n"
 
     return km_result
-    
-
-
 
 
 ## Hierarchical ##
+# from core:
+    # run "hr_execute" to execute the algorithm
+    # call "hr_output" to display output
 
-def load_volume(directory):
-    slices = [pydicom.dcmread(os.path.join(directory, s)) for s in os.listdir(directory)]
+# anything uncommented/unexplained will have an identical function/process in the above algos
+# it'll have any necessary explanation there
 
-    # Extract numerical value from the filename and use it for sorting
-    slices.sort(key=lambda x: int(x.filename.split('_')[1].split('.')[0]))
+def hr_preprocess(volume):
 
-    volume = np.stack([s.pixel_array for s in slices])
-    return volume
-
-
-def preprocess_volume(volume):
-    scaler = StandardScaler()
-    # Adjust reshape for 3D
-    standardized_volume = scaler.fit_transform(volume.reshape(-1, volume.shape[2])).reshape(volume.shape)
-    return standardized_volume
-
-def extract_features(volume):
-    # Intensity feature
-    intensity = volume.reshape(-1, volume.shape[2])
-    # Gradient feature (remains 3D)
-    grad_x, grad_y, grad_z = np.gradient(volume)
+    gaussian_filtered_volume = apply_gaussian_filter(volume)
     
-    combined_features = np.concatenate([
-        intensity,
-        grad_x.reshape(-1, volume.shape[2]),
-        grad_y.reshape(-1, volume.shape[2]),
-        grad_z.reshape(-1, volume.shape[2])
-    ], axis=1)
-    
-    return combined_features
+    gradient_mag = np.sqrt(np.square(sobel(gaussian_filtered_volume, axis=0)) + np.square(sobel(gaussian_filtered_volume, axis=1)) + np.square(sobel(gaussian_filtered_volume, axis=2)))
 
-def perform_clustering(features, n_clusters):
-    clustering = AgglomerativeClustering(n_clusters=n_clusters, affinity='euclidean', linkage='ward').fit(features)
-    return clustering.labels_
+    clahe_enhanced_volume = clahe_enhance(gradient_mag)
 
-def extract_cluster_coordinates(labels, n_clusters):
-    clusters_coordinates = {}
-    for cluster in range(n_clusters):
-        clusters_coordinates[cluster] = np.argwhere(labels == cluster)
-    return clusters_coordinates
+    opened_volume = morphology.opening(clahe_enhanced_volume, morphology.ball(3))
+    return opened_volume
 
+def hr_clustering(volume, n_clusters=4):
+    # extract features
+    apply_texture_features = texture_features(volume)
+    reshaped_volume = volume.reshape(-1, 1)
+    reshaped_features = np.repeat(apply_texture_features, volume.shape[1]*volume.shape[2], axis=0)
+    hr_combined_data = np.hstack([reshaped_volume, reshaped_features])
+
+    # perform hierarchical clustering
+    # can do the euclidean affinity matrix and ward linkage through the same agglomerative clustering submodule
+    # this helps a bit with the memory issue since we're not runnign them separately anymore
+    clustering = AgglomerativeClustering(n_clusters=n_clusters, affinity='euclidean', linkage='ward') # ward minimizes the "within-cluster" variance
+    labels = clustering.fit_predict(hr_combined_data)
+    return labels.reshape(volume.shape)
+
+# although it's the same function as above, it's not the best yet since i'm still testing which hr cluster features would be best to call here
+def hr_calculate_brightness(hr_labeled_volume):
+    avg_brightness = {}
+    unique_labels = np.unique(hr_labeled_volume)
+    for label in unique_labels:
+        avg_brightness[label] = np.mean(hr_labeled_volume[hr_labeled_volume == label])
+    return avg_brightness
+
+def hr_extract_coordinates(hr_labeled_volume):
+    hr_coordinates = {}
+    for label in np.unique(hr_labeled_volume):
+        hr_coords = np.argwhere(hr_labeled_volume == label)
+        hr_coordinates[label] = hr_coords
+    return hr_coordinates
+
+def hr_execute(volume):
+    hr_preprocessed_volume = hr_preprocess(volume)
+    hr_labeled_volume = hr_clustering(hr_preprocessed_volume)
+    hr_coordinates = hr_extract_coordinates(hr_labeled_volume)
+    avg_brightness = hr_calculate_brightness(hr_labeled_volume)
+    return hr_coordinates, hr_labeled_volume, avg_brightness
+
+def hr_output(hr_coordinates, avg_brightness):
+    hr_result = "Average Cluster Brightness:\n"
+    for key, value in avg_brightness.items():
+        hr_result += f"{key} : {value}\n"
+
+    hr_result += "\n3D Coordinates of Clusters:\n"
+    for key, value in hr_coordinates.items():
+        hr_result += f"{key} : {value}\n"
+
+    return hr_result
+
+
+#hardcoded, all of clustering is going to be overwritten by MD anyway
+'''
 # Load, preprocess, extract
 brain_volume = load_volume('/content/brain')  # path to brain dir
 skull_volume = load_volume('/content/skull')  # path to skull dir
@@ -535,12 +625,131 @@ labels = perform_clustering(features, n_clusters)
 labels_volume = labels.reshape(combined_volume[1:-1].shape)
 
 clusters_coordinates = extract_cluster_coordinates(labels_volume, n_clusters)
+'''
 
-#Dustin:
-#The main functions bundle helper functions (like pixel_data) and 
-# the actual clustering algo (like dbscan_with_atlas), which is fine,
-# but it needs to take an np array(3d volume) is input for it to be usable
-# by the universal "execute clustering" function(s)
-#all the "main" functions should be labeled so they can be implemented
-#it also seems like you made many helper functions that do the same thing: loading a volume, normalizing, etc
-# clustering shouldn't need to access any directories
+
+def convert_to_lists(dict_of_arrays):
+    dict_of_lists = {}
+    for key, array in dict_of_arrays.items():
+        # Swap the first and third columns (axis)
+        array[:, [0, 2]] = array[:, [2, 0]]
+
+        # Convert each 2D array into a list of lists
+        list_of_lists = array.tolist()
+        dict_of_lists[key] = list_of_lists
+    return dict_of_lists
+
+#moved to bottom, just to keep sep from everything else
+def execute_whole_clustering(input, algo, n_clusters):
+    """
+    input: an entire scan (3d np array) and a string representing the chosen algo
+    selects the algo from a dictionary of corresponding functions
+    output: a dictionary of region : voxel coordinate lists
+    """
+     # initialize dictionary to store output
+    output_coords = {}
+
+    #dict of strings that correspond to functions
+    algos_dict = {
+        'DBSCAN': db2_execute,
+        'K-Means': km_execute,
+        'Hierarchical': hr_execute
+    } 
+
+    output_coords, labeled_volume, avg_brightness = algos_dict[algo](input, n_clusters)
+    
+    output_coords = convert_to_lists(output_coords)
+    
+    return output_coords
+
+def execute_whole_clustering_old(input, algo):
+    """
+    input: an entire scan (3d np array) and a string representing the chosen algo
+    selects the algo from a dictionary of corresponding functions
+    output: a dictionary of region : voxel coordinate lists
+    """
+     # initialize dictionary to store output
+    output_coords = {}
+
+    #dict of strings that correspond to functions
+    algos_dict = {
+        'dbscan_3d': dbscan_3d
+    } 
+
+    # perform dbscan and get labeled volume, coordinates, and binary masks for each slice in the output dictionary
+    labeled_volume, cluster_coords, brain_mask, skull_mask = algos_dict[algo](input)
+
+    # determine coordinates
+    brain_cluster_coordinates, skull_cluster_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
+
+    # dictionary to store output coordinates
+    output_coords["skull"] = skull_cluster_coordinates
+    #display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
+    #dbscan optimized for entire brain, not atlas segments, currently outputs brain coords as opposed to "skull coords"
+        
+    return output_coords
+
+def tester_algo(input_array):
+    """
+    input: np array
+    prints
+    output: format for the output of any clustering algo
+    """
+    print("clustering testing algo")
+    test_coords = [[x, y, z] for x in range(0, 30) for y in range(0, 30) for z in range(0, 30)]
+    return test_coords
+
+
+def execute_seg_clustering(input, algo, n_clusters):
+    """
+    input: an pre-atlas segmented scan (dict of 3d np arrays) and a string representing the chosen algo
+    selects the algo from a dictionary of corresponding functions
+    output: a dictionary of region : voxel coordinate lists
+    """
+    # initialize dictionary to store output
+    output_coords_dict = {}
+
+    #dict of strings that correspond to functions
+    algos_dict = {
+        'DBSCAN': db2_execute,
+        'K-Means': km_execute,
+        'Hierarchical': hr_execute
+    }
+    
+    for region, scan in input.items():
+        output_coords, labeled_volume, avg_brightness = algos_dict[algo](scan, n_clusters)
+        output_coords = convert_to_lists(output_coords)
+        output_coords_dict[region] = output_coords
+
+    
+        
+    return output_coords_dict
+
+
+
+# used as main sript, this helps a lot with testing and pinpointing errors.
+#I'm already working on creating function shortcuts and combining factors for easy use as a sub-module instead.
+if __name__ == "__main__":
+    #folder_path = input("Enter folder path: ") # get folder
+    folder_path = "scan1"
+    volume = data.get_3d_image(folder_path) # create 3d volume
+
+    coordinates = execute_whole_clustering(volume, "DBSCAN", 2)
+
+    clustered_dict = segmentation.create_seg_images_from_image(volume, coordinates)
+    data.display_seg_np_images(clustered_dict)
+
+    # apply dbscan to 3d and get labels, overall coordinates, and binary masks
+    #labeled_volume, cluster_coords, brain_mask, skull_mask = dbscan_3d(volume)
+
+    # find brain and skull coordinates
+    #brain_cluster_coordinates, skull_cluster_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
+
+    #display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
+
+    # print("3D Brain Cluster Coordinates:")
+    # print(brain_cluster_coordinates)
+
+    # print("3D Skull Cluster Coordinates:")
+    # print(skull_cluster_coordinates) 
+
