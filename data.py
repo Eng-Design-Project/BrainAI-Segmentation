@@ -102,8 +102,36 @@ def save_2d_images_list(image_list, directory):
         # Save the image
         img.save(file_path)
 
+''' old def get_3d_image(directory):
+# 
+#     image_files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))] # gather files
+#     slices = [pydicom.dcmread(os.path.join(directory, f)) for f in image_files] # read each file
+#     slices.sort(key=lambda x: float(x.ImagePositionPatient[2])) # sorting and maintaining correct order
+#     return np.stack([s.pixel_array for s in slices])
 
 # folder of DCM images as input
+# def get_3d_image(directory):
+#     image_files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]  # gather files
+#     slices = [pydicom.dcmread(os.path.join(directory, f)) for f in image_files]  # read each file
+
+#     # Create a set to track unique ImagePositionPatient[2] values
+#     unique_positions = set()
+#     unique_slices = []
+
+#     # Loop through each slice and add it to unique_slices if its position is unique
+#     for s in slices:
+#         position = float(s.ImagePositionPatient[2])
+#         if position not in unique_positions:
+#             unique_slices.append(s)
+#             unique_positions.add(position)
+
+#     # Sort the unique slices
+#     unique_slices.sort(key=lambda x: float(x.ImagePositionPatient[2]))
+
+#     return np.stack([s.pixel_array for s in unique_slices])
+'''
+
+
 def get_3d_image(directory):
     image_files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]  # gather files
     slices = [pydicom.dcmread(os.path.join(directory, f)) for f in image_files]  # read each file
@@ -121,8 +149,10 @@ def get_3d_image(directory):
 
     # Sort the unique slices
     unique_slices.sort(key=lambda x: float(x.ImagePositionPatient[2]))
+    output_arr = np.stack([s.pixel_array for s in unique_slices])
+    output_arr = output_arr[::-1, :, :]
 
-    return np.stack([s.pixel_array for s in unique_slices])
+    return output_arr
 
         
 # def get_3d_image(directory):
@@ -305,8 +335,25 @@ def convert_3d_numpy_to_png_list(np_3d):
 
 
 #just spits out "atlas"
-def get_atlas_path():
-    atlas_dir = "atlas"
+def get_atlas_path(size):
+
+    if size < 50: 
+        size = 0
+
+    if size > 50 and size < 100:
+        size = 1
+
+    if size >100:
+        return 0
+    
+
+    switch = {
+        0 : ("atlas" , "color atlas"),
+        1 : ("large atlas" , "color atlas large")
+    }
+
+    atlas_dir = switch[size]  #dictionary of different names
+    print(atlas_dir[0], atlas_dir[1])
     return atlas_dir
 
 def get_file_path():
