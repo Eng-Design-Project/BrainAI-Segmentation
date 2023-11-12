@@ -163,7 +163,7 @@ def dlAlgorithm(segmentDict, depth=5):
 
         for idx, triplet in enumerate(batch_triplets):
             print(f"Triplet {idx + 1} Original Min: {triplet[0].min()}, Max: {triplet[0].max()}")
-            print(f"Triplet {idx + 1} Prediction Min: {triplet[1].min()}, Max: {triplet[1].max()}")
+            print(f"Triplet {idx + 1} Segmented Min: {triplet[1].min()}, Max: {triplet[1].max()}")
 
         show_slices(batch_triplets)
 
