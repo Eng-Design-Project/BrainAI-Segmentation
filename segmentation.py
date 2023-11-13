@@ -440,9 +440,9 @@ def execute_atlas_seg(atlas, atlas_colors, image):
     #coordinates of region based on atlas
     color_to_region_dict = {
         (237, 28, 36): 'Skull',   # Redish
-        #(236, 28, 36): 'Skull',   # Redish
+        (236, 28, 36): 'Skull',   # Redish
         (0, 162, 232): 'Brain',   # Blueish
-        #(0, 168, 243): 'Brain',   # Blueish
+        (0, 168, 243): 'Brain',   # Blueish
         # ... add other colors and regions as required
     }
     region_to_coord_dict = encode_atlas_colors(atlas_colors, color_to_region_dict)
