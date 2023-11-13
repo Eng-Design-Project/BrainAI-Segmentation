@@ -792,7 +792,10 @@ class Core:
     
 
     def open_image_scoring_popup(self):
-        #should take PIL images as input instead of directories
+        #takes a 3d np array as input
+        #calls ImageScoringPopup with 3d np array
+        #works like show results function (displays slices of 3d array)
+        #gets user score like ImageScoringPopup does now
 
         image_paths = [
         "scan1_pngs/ADNI_003_S_1257_PT_ADNI_br_raw_20070510122011156_1_S32031_I54071.png",  # Replace with actual image paths
