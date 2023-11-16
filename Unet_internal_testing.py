@@ -238,18 +238,23 @@ def prepare_data_for_training(segmentDict, depth=5):
 
     return X_train, Y_train
 
-def visualize_segmentation(slice, prediction, color_mapping, title="Segmentation"):
-    # Convert the prediction to a label map (assuming the prediction is a softmax output)
-    label_map = np.argmax(prediction, axis=-1)
+def visualize_segmentation(slice, prediction, color_mapping=None, title="Segmentation"):
+    if color_mapping is None:
+        # Assuming prediction is a binary mask
+        color_image = np.squeeze(prediction)  # Remove any extra dimensions
+        color_image = color_image * 255       # Scale to [0, 255] for visualization
+    else:
+        # Convert the prediction to a label map (assuming the prediction is a softmax output)
+        label_map = np.argmax(prediction, axis=-1)
 
-    # Verify dimensions match
-    assert label_map.shape == slice.shape[:2], "Label map shape does not match slice shape"
+        # Verify dimensions match
+        assert label_map.shape == slice.shape[:2], "Label map shape does not match slice shape"
 
-    # Convert the label map to a color image
-    color_image = np.zeros((slice.shape[0], slice.shape[1], 3), dtype=np.uint8)
-    for class_idx, color in color_mapping.items():
-        mask = label_map == class_idx
-        color_image[mask] = color
+        # Convert the label map to a color image
+        color_image = np.zeros((slice.shape[0], slice.shape[1], 3), dtype=np.uint8)
+        for class_idx, color in enumerate(color_mapping.values()):
+            mask = (label_map == class_idx)
+            color_image[mask] = np.array(color, dtype=np.uint8)
 
     plt.figure(figsize=(8, 4))
     plt.subplot(1, 2, 1)
@@ -257,16 +262,13 @@ def visualize_segmentation(slice, prediction, color_mapping, title="Segmentation
     plt.title('Original')
 
     plt.subplot(1, 2, 2)
-    plt.imshow(color_image, origin='lower')  # Make sure to use the correct orientation
+    plt.imshow(color_image.T, cmap='gray' if color_mapping is None else None, origin='lower')
     plt.title(title)
     plt.show()
 
-
-
-
-def convert_to_binary_mask(prediction, threshold=0.5):
-    binary_mask = (prediction > threshold).astype(np.uint8)
-    return binary_mask
+# def convert_to_binary_mask(prediction, threshold=0.5):
+#     binary_mask = (prediction > threshold).astype(np.uint8)
+#     return binary_mask
 
 # Visualization function for internal segmentation
 def visualize_internal_segmentation(all_triplets, color_mapping):
@@ -297,11 +299,9 @@ def visualize_internal_segmentation(all_triplets, color_mapping):
 
 
 
-def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='brain_skull.keras', 
+def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='my_model.keras', 
                 multiclass_model_path='internal_segmentation.keras', 
                 segmentation_type='internal', 
-                X_train=None, Y_train=None, 
-                X_train_binary=None, Y_train_binary=None, 
                 color_mapping=None, atlas_dir=None,):
 
     normalizedDict = normalizeTF(segmentDict)
@@ -314,15 +314,7 @@ def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='brain_skull
             model_binary = load_model(binary_model_path, custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
         else:
             print("Creating and training a new binary segmentation model...")
-            if atlas_dir is not None and color_mapping is not None:
-                atlas_images, labels_one_hot = preprocess_color_atlas(atlas_dir, color_mapping)
-                model_internal = unet_internal(input_size=(128, 128, 3), num_classes=len(color_mapping))  # Ensure input_size matches here
-                history_internal = model_internal.fit(atlas_images, labels_one_hot, validation_split=0.1, epochs=25, batch_size=16)
-                model_internal.save(multiclass_model_path)
-            else:
-                print("Training data for binary segmentation is not provided.")
-                return  # Exit the function if training data is not available
-
+            
         # Binary Segmentation Visualization
         for key, sub_array in zip(file_names, normalizedDict.values()):
             print(f"Processing file: {key}")
@@ -331,13 +323,14 @@ def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='brain_skull
                 surrounding_slices = get_surrounding_slices(sub_arr[depth//2], sub_arrays_split, depth)
                 sub_arr_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
                 pred = model_binary.predict(sub_arr_exp)
+                print(f"Prediction stats - Min: {pred.min()}, Max: {pred.max()}, Mean: {pred.mean()}")
                 middle_index = depth // 2
-                # Convert predictions to binary mask
-                binary_mask = convert_to_binary_mask(pred[0][middle_index])
-                visualize_segmentation(surrounding_slices[middle_index], binary_mask, title="Binary Segmentation")
+                # Visualize the raw prediction
+                visualize_segmentation(surrounding_slices[middle_index], pred[0][middle_index], title="Binary Segmentation")
 
 
-    if segmentation_type == 'internal':
+    elif segmentation_type == 'internal':
+        # Load or train the internal segmentation model
         if os.path.exists(multiclass_model_path):
             print(f"Loading pre-trained internal model from {multiclass_model_path}...")
             model_internal = load_model(multiclass_model_path)
@@ -352,23 +345,48 @@ def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='brain_skull
                 print("Training data or color mapping for internal segmentation is not provided.")
                 return  # Exit the function if training data or color mapping is not available
 
-        # Internal Segmentation Visualization
+        # Perform segmentation for each region
+        segmented_regions = {region: [] for region in color_mapping.keys()}
+
         for file_name, sub_array in zip(file_names, normalizedDict.values()):
             print(f"Processing file: {file_name}")
             for slice_idx in range(sub_array.shape[0]):
                 single_slice = sub_array[slice_idx, :, :]
+
+                # Repeat the slice along the channel axis to create 3 channels and expand dimensions for batch size
                 single_slice_3_channels = np.repeat(single_slice[:, :, np.newaxis], 3, axis=2)
                 single_slice_expanded = np.expand_dims(single_slice_3_channels, axis=0)
+
                 pred = model_internal.predict(single_slice_expanded)
                 pred = np.squeeze(pred)  # Remove the batch dimension
-                print("Prediction shape:", pred.shape)  # This should now show (128, 128, 5)
-                assert pred.shape == (128, 128, 5), "Prediction shape mismatch"  # Ensure this matches the expected shape
-                visualize_segmentation(single_slice, pred, color_mapping, title="Internal Segmentation")
+
+                # Store each region's segmentation separately
+                for region, color in color_mapping.items():
+                    region_index = list(color_mapping.values()).index(color)
+                    region_mask = (np.argmax(pred, axis=-1) == region_index)
+                    segmented_regions[region].append(region_mask)
+
+
+        region_mapping = {1: "Frontal Lobe", 2: "Temporal Lobe", 3: "Occipital Lobe", 4: "White Matter"}
+
+        # Allow user to select a region to visualize
+        while True:
+            try:
+                selected_option = int(input("Select a region to view segmentation (1: Frontal, 2: Temporal, 3: Occipital, 4: White Matter): "))
+                selected_region = region_mapping.get(selected_option)
+                if selected_region:
+                    for slice_idx, segmentation in enumerate(segmented_regions[selected_region]):
+                        visualize_segmentation(normalizedDict[file_names[0]][slice_idx, :, :], segmentation, title=f"{selected_region} Segmentation")
+                    break
+                else:
+                    print("Invalid selection. Please enter a number between 1 and 4.")
+            except ValueError:
+                print("Invalid input. Please enter a number.")
     
         # Ask user if they want to see the trained images after training/loading the model
     # show_images_input = input("Do you want to see the trained images? (yes/no): ").strip().lower()
     # show_images = show_images_input == 'yes'
-        # Visualization for all triplets after processing both types
+
     # Visualization for all triplets after processing both types
     for i in range(0, len(all_triplets), 3):
         batch_triplets = all_triplets[i:i+3]
@@ -390,12 +408,13 @@ if __name__ == "__main__":
     # Define the atlas directory and color mapping for internal segmentation
     atlas_dir = 'C:\\Users\\Justin Rivera\\OneDrive\\Documents\\ED1\\BrainAI-Segmentation\\atl_segmentation_PNGs\\Brain'
     color_mapping = {
-        (236, 28, 36): 0,  # Red - White Matter
-        (0, 168, 243): 1,  # Blue - Temporal lobe
-        (185, 122, 86): 2, # Brown - Occipital lobe
-        (184, 61, 186): 3, # Pink - Frontal Lobe
-        # Add other colors and regions as required
+        "White Matter": (236, 28, 36),  # Red
+        "Temporal Lobe": (0, 168, 243),  # Blue
+        "Occipital Lobe": (185, 122, 86),  # Brown
+        "Frontal Lobe": (184, 61, 186),  # Pink
+        # Add other regions and colors as required
     }
+
 
     # Example dictionary holding your image data
     sitk_images_dict = {
@@ -412,7 +431,7 @@ if __name__ == "__main__":
         dlAlgorithm(
             segmentDict=sitk_images_dict,
             file_names=file_names,
-            binary_model_path='brain_skull.keras',
+            binary_model_path='my_model.keras',
             multiclass_model_path='internal_segmentation.keras',
             segmentation_type=segmentation_type,
             atlas_dir=atlas_dir,
@@ -423,7 +442,7 @@ if __name__ == "__main__":
         dlAlgorithm(
             segmentDict=sitk_images_dict,
             file_names=file_names,
-            binary_model_path='brain_skull.keras',
+            binary_model_path='my_model.keras',
             multiclass_model_path='internal_segmentation.keras',
             segmentation_type=segmentation_type,
         )
