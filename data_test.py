@@ -6,6 +6,7 @@ import data
 import SimpleITK as sitk
 import os
 import numpy as np
+import matplotlib.pyplot as plt
 
 # first argument should be a higher level folder with brain region subfolders containing DCM files.
 # the output is a dictionary with brain region names as keys and np arrays(images) as values
@@ -70,18 +71,18 @@ image3 = np.array([[100, 110, 120],
 
 grayscale_images = np.array([image1, image2, image3])
 
-# Calculate the average pixel brightness for all images
-avg_brightness = data.array_of_average_pixel_brightness_3d(grayscale_images)
-print(f"Average Pixel Brightness for Each Image: {avg_brightness}")
+# # Calculate the average pixel brightness for all images
+# avg_brightness = data.array_of_average_pixel_brightness_3d(grayscale_images)
+# print(f"Average Pixel Brightness for Each Image: {avg_brightness}")
 
 scan1 = data.get_3d_image("scan1") #output should be a numpy 3d array
-# Calculate the average pixel brightness for all images
-avg_bright = data.array_of_average_pixel_brightness_3d(scan1)
-print(f"Average Pixel Brightness for 3d Image: {avg_bright}")
-print("type: ", type(avg_bright))
-print(avg_bright[0])
-print(scan1.shape)
-print(scan1[0].shape)
+# # Calculate the average pixel brightness for all images
+# avg_bright = data.array_of_average_pixel_brightness_3d(scan1)
+# print(f"Average Pixel Brightness for 3d Image: {avg_bright}")
+# print("type: ", type(avg_bright))
+# print(avg_bright[0])
+# print(scan1.shape)
+# print(scan1[0].shape)
 
 def average_brightness(image):
     # Ensure the input image is a numpy array
@@ -92,13 +93,30 @@ def average_brightness(image):
     if len(image.shape) != 2:
         raise ValueError("Input image must be grayscale (2D array)")
 
-    # Calculate the average pixel brightness
-    average_brightness = np.mean(image)
+    # Normalize image values to the range [0, 255]
+    normalized_image = (image - np.min(image)) / (np.max(image) - np.min(image)) * 255
+
+    # Calculate the average pixel brightness of the normalized image
+    average_brightness = np.mean(normalized_image)
+    
     return average_brightness
 
-av = average_brightness(scan1[0])
-print(av)
-print(image1.shape)
 
-avgg = data.average_overall_brightness_3d(scan1)
-print(avgg)
+pixarray = scan1[4]
+print("shape:")
+print(pixarray.shape) # 128 by 128
+
+plt.imshow(pixarray, 'gray', origin='upper')
+plt.show()
+# print("max:", np.max(pixarray))
+# print("whole array: ", repr(pixarray))
+
+# f = open("atext.txt", "a")
+# f.write(repr(pixarray))
+# f.close()
+
+print("mean:", np.mean(pixarray))
+normalized_av = average_brightness(pixarray) #note, this outputs the same as np.mean(), which is currently 1398.58...
+print("avg: ", data.avg_brightness_2d(pixarray))
+print("3d avg: ", data.array_of_average_pixel_brightness_3d(scan1))
+print("overall avg", data.average_overall_brightness_3d(scan1))
