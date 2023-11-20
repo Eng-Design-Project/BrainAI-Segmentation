@@ -11,17 +11,19 @@ from PIL import Image
 import glob
 from skimage.io import imread
 from skimage.transform import resize
+import pydicom
 
-def load_images_from_folder(folder, target_size=(128, 128)):
+def load_dcm_images_from_folder(folder, target_size=(128, 128)):
     images = []
-    for img_path in glob.glob(folder + '/*.png'):  # assuming images are in PNG format
-        img = imread(img_path, as_gray=True)  # Load as grayscale
+    for dcm_path in glob.glob(folder + '/*.dcm'):  # assuming images are in DCM format
+        dcm = pydicom.dcmread(dcm_path)
+        img = dcm.pixel_array
+        if img.dtype != np.float32:
+            img = img.astype(np.float32)
         img = resize(img, target_size, preserve_range=True)
         img = normalize_image(img)  # Normalize the image
         images.append(img[..., np.newaxis])  # Add channel dimension
     return np.array(images)
-
-
 
 
 def ensure_directory_exists(path):
@@ -193,29 +195,68 @@ def find_boundary(segment):
     segment_copy[~boundary] = 0  # Label the rest as 0
     return segment_copy
 
+'''def show_slices(triplets):
+    n = len(triplets)
+    fig, axes = plt.subplots(1, n, figsize=(n * 6, 6))
+    for i in range(n):
+        orig, pred = triplets[i]
+        axes[i].imshow(orig.T, cmap="gray", origin="lower")  # Display the original image
+         # Ensure the prediction is 2D
+        if pred.ndim > 2:
+             pred = np.squeeze(pred)  # Remove any singleton dimensions
+         # In case pred is still not 2D, take its max projection across the last dimension
+        if pred.ndim > 2:
+             pred = np.max(pred, axis=-1)
+        axes[i].imshow(pred.T, cmap="jet", alpha=0.5, origin="lower")  # Overlay the prediction
+    plt.suptitle("Original and Segmented")
+    plt.show()
+'''
 
 def show_slices(triplets):
     n = len(triplets)
-    fig, axes = plt.subplots(1, n * 2, figsize=(12, 6))
+    # Set up the matplotlib figure and axes, based on the number of triplets
+    fig, axes = plt.subplots(1, n, figsize=(n * 5, 5))
     for i in range(n):
         orig, pred = triplets[i]
-        axes[i * 2].imshow(orig.T, cmap="gray", origin="lower")
-        # Ensure that pred is 2D when passed to imshow
-        pred_2d = np.squeeze(pred)
-        if pred_2d.ndim > 2:
-            pred_2d = np.max(pred_2d, axis=0)  # Take the max projection along the first axis
-        axes[i * 2 + 1].imshow(pred_2d.T, cmap="gray", origin="lower")
+        # If pred is more than 2D, reduce to a 2D array. This assumes that the segmentation
+        # map is in the last layer.
+        if pred.ndim > 2:
+            pred = np.squeeze(pred)  # This should reduce it to 2D if there's an extra dimension
+        if pred.ndim > 2:  # If still more than 2D, take the max over the channels
+            pred = np.max(pred, axis=-1)
+
+        # Display the original image in grayscale
+        axes[i].imshow(orig.T, cmap="gray", origin="lower")
+        # Overlay the prediction on top of the original image in grayscale
+        # You can adjust the alpha value to make the overlay more or less transparent
+        axes[i].imshow(pred.T, cmap="gray", alpha=0.5, origin="lower")
+
     plt.suptitle("Original and Segmented")
     plt.show()
+
+
+
+
+# def show_slices(triplets):
+#     n = len(triplets)
+#     fig, axes = plt.subplots(1, n * 2, figsize=(12, 6))
+#     for i in range(n):
+#         orig, pred = triplets[i]
+#         axes[i * 2].imshow(orig.T, cmap="gray", origin="lower")
+#         pred_2d = np.squeeze(pred.T)
+#         axes[i * 2 + 1].imshow(pred_2d, cmap="gray", origin="lower")
+#     plt.suptitle("Original and Segmented")
+#     plt.show()
+
+
 
 def normalize_image(image):
     min_val = np.min(image)
     max_val = np.max(image)
-    # Avoid division by zero if the image is constant
     if max_val - min_val > 0:
         normalized_image = (image - min_val) / (max_val - min_val)
     else:
-        normalized_image = image - min_val  # Will result in an image of zeros
+        normalized_image = image - min_val
     return normalized_image
 
 
@@ -295,26 +336,24 @@ def visualize_internal_segmentation(original, prediction, title="Segmentation"):
 def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='my_model.keras',
                 internal_folder_paths=None, segmentation_type='internal', training_data=None):
 
-    normalizedDict = normalizeTF(segmentDict)
+    normalizedDict = normalizeTF(segmentDict) if segmentDict is not None else None
     all_triplets = []
 
-    
     if segmentation_type == 'skull':
         if os.path.exists(binary_model_path):
-            print(f"Loading pre-trained binary model from {binary_model_path}...")
             model_binary = load_model(binary_model_path, custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
+            for key, sub_array in zip(file_names, normalizedDict.values()):
+                sub_arrays_split = split_into_subarrays(sub_array, depth)
+                for idx, sub_arr in enumerate(sub_arrays_split):
+                    surrounding_slices = get_surrounding_slices(sub_arr[2], sub_arrays_split, depth)
+                    sub_arr_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
+                    pred = model_binary.predict(sub_arr_exp)
+                    middle_index = depth // 2
+                    slices_triplet = (surrounding_slices[middle_index], pred[0][middle_index])
+                    all_triplets.append(slices_triplet)
         else:
-            print("Creating and training a new binary segmentation model...")
-
-        for key, sub_array in zip(file_names, normalizedDict.values()):
-            print(f"Processing file: {key}")
-            sub_arrays_split = split_into_subarrays(sub_array, depth)
-            for idx, sub_arr in enumerate(sub_arrays_split):
-                surrounding_slices = get_surrounding_slices(sub_arr[depth // 2], sub_arrays_split, depth)
-                sub_arr_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
-                pred = model_binary.predict(sub_arr_exp)
-                middle_index = depth // 2
-                all_triplets.append((surrounding_slices[middle_index], pred[0][middle_index]))
+            print("Binary segmentation model path does not exist. Please check the path and try again.")
+            return
 
     elif segmentation_type == 'internal':
         models_internal = {}
@@ -325,56 +364,46 @@ def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='my_model.ke
             4: "White Matter"
         }
 
-        # Load or train models for each region
-        for region, folder_path in internal_folder_paths.items():
-            images = load_images_from_folder(folder_path)  # Always load images
-            X_train, Y_train = prepare_data_for_training(images, depth=depth, num_classes=5)  # Prepare data
-            
-            model_path = os.path.join(folder_path, f"{region.lower().replace(' ', '_')}_model.keras")
-            if os.path.exists(model_path):
-                print(f"Loading model for {region} from {model_path}...")
-                model = load_model(model_path)
-            else:
-                print(f"Training new model for {region}...")
+        region_selection = int(input("Select the region to visualize (1-Frontal, 2-Temporal, 3-Occipital, 4-White Matter): ").strip())
+        region_to_view = region_options.get(region_selection, None)
+        
+        if region_to_view:
+            folder_path = internal_folder_paths[region_to_view]
+            model_path = os.path.join(folder_path, f"{region_to_view.lower().replace(' ', '_')}_model.keras")
+            if not os.path.exists(model_path):
+                print(f"Training new model for {region_to_view}...")
+                images = load_dcm_images_from_folder(folder_path)
+                X_train, Y_train = prepare_data_for_training(images, depth=depth, num_classes=5)
                 model = unet_internal(input_size=(128, 128, 1), num_classes=5)
-                model.fit(X_train, Y_train, epochs=10, batch_size=16)
+                model.fit(X_train, Y_train, epochs=25, batch_size=16)
                 ensure_directory_exists(folder_path)
                 model.save(model_path)
-            models_internal[region] = model
-
-        # Visualization part
-        while True:
-            try:
-                region_selection = int(input("Select the region to visualize (1-Frontal, 2-Temporal, 3-Occipital, 4-White Matter): ").strip())
-                region_to_view = region_options.get(region_selection, None)
-            except ValueError:
-                print("Invalid input. Please enter a number between 1 and 4.")
-                continue
-
-            if region_to_view in models_internal:
-                model = models_internal[region_to_view]
-                for key, img_3d in segmentDict.items():
-                    print(f"Processing file: {key} for {region_to_view}")
-                    for slice_idx in range(img_3d.shape[2]):
-                        slice_2d = img_3d[:, :, slice_idx]
-                        # Resize each slice to (128, 128) if not already
-                        if slice_2d.shape != (128, 128):
-                            slice_2d = resize(slice_2d, (128, 128), preserve_range=True)
-                        slice_2d_normalized = np.expand_dims(np.expand_dims(slice_2d, axis=0), axis=-1) / 255.0
-                        pred = model.predict(slice_2d_normalized)
-                        visualize_segmentation(slice_2d, pred[0], title=f"Segmentation - {region_to_view}")
             else:
-                print("Region not recognized. Please enter a number between 1 and 4.")
+                print(f"Loading model for {region_to_view} from {model_path}...")
+                model = load_model(model_path)
+            
+            images = load_dcm_images_from_folder(folder_path)
+            for slice_idx in range(images.shape[0]):  # Iterate through each slice in the loaded images
+                slice_2d = images[slice_idx, :, :, 0]  # Adjust this line to correctly access the 2D slice
+                slice_2d_normalized = normalize_image(slice_2d)
+                slice_2d_normalized = np.expand_dims(slice_2d_normalized, axis=-1)
+                slice_2d_normalized = np.expand_dims(slice_2d_normalized, axis=0)
+                pred = model.predict(slice_2d_normalized)
+                all_triplets.append((slice_2d, pred[0])) 
 
-            continue_viewing = input("Would you like to visualize another region? (y/n): ").strip().lower()
-            if continue_viewing != 'y':
-                break
-
-
-    # Optionally, prompt the user to display the images, if desired
-    if all_triplets and input("Show processed images? (y/n): ").strip().lower() == 'y':
-        for original, prediction in all_triplets:
-            visualize_segmentation(original, prediction, title="Segmentation Results")
+    # Visualization loop
+    if all_triplets:
+        print("Processing complete, now displaying images.")
+        triplet_index = 0
+        while triplet_index < len(all_triplets):
+            batch_triplets = all_triplets[triplet_index:triplet_index + 3]
+            show_slices(batch_triplets)
+            triplet_index += 3
+            if triplet_index < len(all_triplets):
+                proceed = input("Would you like to see more slices? (y/n): ").strip().lower()
+                if proceed != 'y':
+                    break
+    print("All images have been processed.")
 
 
 
@@ -382,10 +411,10 @@ def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='my_model.ke
 if __name__ == "__main__":
     # Paths to the folders containing images for each brain region
     internal_folder_paths = {
-        "Frontal Lobe": "C:\\Users\\Justin Rivera\\OneDrive\\Documents\\ED1\\BrainAI-Segmentation\\Internal Segment Images Unet\\Frontal",
-        "Temporal Lobe": "C:\\Users\\Justin Rivera\\OneDrive\\Documents\\ED1\\BrainAI-Segmentation\\Internal Segment Images Unet\\Occipital",
-        "Occipital Lobe": "C:\\Users\\Justin Rivera\\OneDrive\\Documents\\ED1\\BrainAI-Segmentation\\Internal Segment Images Unet\\Temporal",
-        "White Matter": "C:\\Users\\Justin Rivera\\OneDrive\\Documents\\ED1\\BrainAI-Segmentation\\Internal Segment Images Unet\\White Matter"
+        "Frontal Lobe": "Internal Segment DCM unet\Frontal",
+        "Temporal Lobe": "Internal Segment DCM unet\Temporal",
+        "Occipital Lobe": "Internal Segment DCM unet\Occipital",
+        "White Matter": "Internal Segment DCM unet\White Matter",
     }
 
     # Example dictionary holding your image data for skull segmentation
