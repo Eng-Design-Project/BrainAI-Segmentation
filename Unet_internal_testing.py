@@ -8,9 +8,26 @@ import os
 from keras.models import load_model
 from tensorflow.keras.utils import to_categorical
 from PIL import Image
+import glob
+from skimage.io import imread
+from skimage.transform import resize
+
+def load_images_from_folder(folder, target_size=(128, 128)):
+    images = []
+    for img_path in glob.glob(folder + '/*.png'):  # assuming images are in PNG format
+        img = imread(img_path, as_gray=True)  # Load as grayscale
+        img = resize(img, target_size, preserve_range=True)
+        img = normalize_image(img)  # Normalize the image
+        images.append(img[..., np.newaxis])  # Add channel dimension
+    return np.array(images)
 
 
 
+
+def ensure_directory_exists(path):
+    directory = os.path.dirname(path)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
 
 # Function to split 3D images into smaller sub-arrays
 def split_into_subarrays(img_array, depth=5):
@@ -78,7 +95,7 @@ def unet(input_size=(5, 128, 128, 1)):  # Notice the change in the last dimensio
     model.compile(optimizer='adam', loss=weighted_binary_crossentropy, metrics=['accuracy'])
     return model
 
-def unet_internal(input_size=(128, 128, 3), num_classes=5): # num_classes should be 4
+def unet_internal(input_size=(128, 128, 1), num_classes=5):
     inputs = tf.keras.layers.Input(input_size)
 
     # Encoder layers (convolutions and pooling)
@@ -130,33 +147,6 @@ def unet_internal(input_size=(128, 128, 3), num_classes=5): # num_classes should
     return model
 
 
-def preprocess_color_atlas(atlas_dir, color_mapping):
-    # Initialize an empty list to hold the atlas images
-    atlas_images = []
-
-    # Assuming atlas images are stored as individual files in atlas_dir
-    for filename in os.listdir(atlas_dir):
-        if filename.endswith('.png'):  # or '.jpg', or whatever format they're in
-            filepath = os.path.join(atlas_dir, filename)
-            image = Image.open(filepath)
-            atlas_images.append(np.array(image))
-
-    # Assuming all images have the same shape, stack them into a single numpy array
-    atlas_images = np.stack(atlas_images, axis=0)
-
-    labels = np.zeros(atlas_images.shape[:-1], dtype=np.int32)
-    
-    # Assign labels based on color mapping
-    for color, label in color_mapping.items():
-        matches = np.all(atlas_images == np.array(color, dtype=np.uint8), axis=-1)
-        labels[matches] = label
-
-    # One-hot encode the labels
-    labels_one_hot = to_categorical(labels, num_classes=len(color_mapping) + 1)  # +1 for the background
-    
-    return atlas_images, labels_one_hot
-
-
 def get_surrounding_slices(original_slice, sub_arrays, depth):
     surrounding_depth = depth // 2
     surrounding_slices = []
@@ -176,7 +166,6 @@ def get_surrounding_slices(original_slice, sub_arrays, depth):
     return surrounding_slices
 
 
-
 def normalizeTF(volume3dDict):
     normalizedDict = {}
     for key, value in volume3dDict.items():
@@ -188,14 +177,22 @@ def normalizeTF(volume3dDict):
     return normalizedDict
 
 def find_boundary(segment):
-    segment_copy = segment.copy()  # Work on a copy to avoid modifying the original
-    kernel = np.ones((3, 3, 3))
-    kernel[1, 1, 1] = 0
+    # Check if the segment is 2D or 3D and choose the kernel accordingly
+    if segment.ndim == 3:  # 3D data
+        kernel = np.ones((3, 3, 3))
+    elif segment.ndim == 2:  # 2D data
+        kernel = np.ones((3, 3))
+    else:
+        raise ValueError("Unsupported segment dimensions")
+
+    kernel[(kernel.shape[0] // 2, kernel.shape[1] // 2)] = 0
+    segment_copy = segment.copy()
     boundary = convolve(segment_copy > 0, kernel) > 0
     boundary = boundary & (segment_copy > 0)
     segment_copy[boundary] = 1  # Label the boundary as 1
     segment_copy[~boundary] = 0  # Label the rest as 0
     return segment_copy
+
 
 def show_slices(triplets):
     n = len(triplets)
@@ -211,50 +208,48 @@ def show_slices(triplets):
     plt.suptitle("Original and Segmented")
     plt.show()
 
-def prepare_data_for_training(segmentDict, depth=5):
+def normalize_image(image):
+    min_val = np.min(image)
+    max_val = np.max(image)
+    # Avoid division by zero if the image is constant
+    if max_val - min_val > 0:
+        normalized_image = (image - min_val) / (max_val - min_val)
+    else:
+        normalized_image = image - min_val  # Will result in an image of zeros
+    return normalized_image
+
+
+def prepare_data_for_training(img_array, depth=5, num_classes=5):
     X_train = []
     Y_train = []
 
-    for key, img_array in segmentDict.items():
-        sub_arrays = split_into_subarrays(img_array, depth)
-        for sub_arr in sub_arrays:
-            # Assuming the middle slice of sub_arr is what you want to predict
-            middle_slice = sub_arr[depth // 2]
+    sub_arrays = [img_array[i:i + depth] for i in range(0, img_array.shape[0], depth) if i + depth <= img_array.shape[0]]
+    for sub_arr in sub_arrays:
+        middle_slice = sub_arr[depth // 2]
 
-            # Find the boundary of the middle slice
-            boundary = find_boundary(middle_slice)
+        # Generate the boundary and one-hot encode it
+        boundary = find_boundary(middle_slice)
+        boundary_one_hot = to_categorical(boundary, num_classes=num_classes)
 
-            # Surrounding slices will be your input, and boundary will be your label
-            X_train.append(sub_arr)
-            Y_train.append(boundary)
+        X_train.append(middle_slice[..., np.newaxis])  # Add channel dimension
+        Y_train.append(boundary_one_hot)
 
-    # Convert lists to numpy arrays
     X_train = np.array(X_train)
-    Y_train = np.array(Y_train)
-
-    # Expand dimensions to fit the model's expected input
-    X_train = np.expand_dims(X_train, axis=-1)
-    Y_train = np.expand_dims(Y_train, axis=-1)
+    Y_train = np.array(Y_train).reshape(-1, 128, 128, num_classes)
 
     return X_train, Y_train
 
-def visualize_segmentation(slice, prediction, color_mapping=None, title="Segmentation"):
-    if color_mapping is None:
-        # Assuming prediction is a binary mask
-        color_image = np.squeeze(prediction)  # Remove any extra dimensions
-        color_image = color_image * 255       # Scale to [0, 255] for visualization
-    else:
-        # Convert the prediction to a label map (assuming the prediction is a softmax output)
-        label_map = np.argmax(prediction, axis=-1)
 
-        # Verify dimensions match
-        assert label_map.shape == slice.shape[:2], "Label map shape does not match slice shape"
+def visualize_segmentation(slice, prediction, title="Segmentation"):
+    # Squeeze the prediction to remove the batch dimension
+    prediction = np.squeeze(prediction)
+    
+    # If the prediction has more than two dimensions, take the maximum projection across channels
+    if prediction.ndim > 2:
+        prediction = np.max(prediction, axis=-1)
 
-        # Convert the label map to a color image
-        color_image = np.zeros((slice.shape[0], slice.shape[1], 3), dtype=np.uint8)
-        for class_idx, color in enumerate(color_mapping.values()):
-            mask = (label_map == class_idx)
-            color_image[mask] = np.array(color, dtype=np.uint8)
+    # Normalize prediction to the range [0, 255] for visualization
+    prediction = (prediction * 255).astype(np.uint8)
 
     plt.figure(figsize=(8, 4))
     plt.subplot(1, 2, 1)
@@ -262,190 +257,161 @@ def visualize_segmentation(slice, prediction, color_mapping=None, title="Segment
     plt.title('Original')
 
     plt.subplot(1, 2, 2)
-    plt.imshow(color_image.T, cmap='gray' if color_mapping is None else None, origin='lower')
+    plt.imshow(prediction.T, cmap='gray', origin='lower')
     plt.title(title)
     plt.show()
+
+
 
 # def convert_to_binary_mask(prediction, threshold=0.5):
 #     binary_mask = (prediction > threshold).astype(np.uint8)
 #     return binary_mask
 
 # Visualization function for internal segmentation
-def visualize_internal_segmentation(all_triplets, color_mapping):
-    for original, prediction in all_triplets:
-        unique_values = np.unique(prediction)
-        print(f"Unique prediction values: {unique_values}")  # Debug print
-        if len(unique_values) == 1 and unique_values[0] == 0:
-            print("Warning: Predictions are all zero.")
+def visualize_internal_segmentation(original, prediction, title="Segmentation"):
+    plt.figure(figsize=(12, 6))
+    
+    # Original Image
+    plt.subplot(1, 3, 1)
+    plt.imshow(original, cmap='gray')
+    plt.title('Original Image')
+    
+    # Prediction Overlay
+    plt.subplot(1, 3, 2)
+    plt.imshow(original, cmap='gray')
+    plt.imshow(prediction, alpha=0.5)
+    plt.title('Prediction Overlay')
 
-        # Convert the prediction to a label map
-        label_map = np.argmax(prediction, axis=-1)
-
-        # Convert the label map to a color image
-        color_image = np.zeros((original.shape[0], original.shape[1], 3), dtype=np.uint8)
-        for class_idx, color in color_mapping.items():
-            color_image[label_map == class_idx] = color
-
-        plt.figure(figsize=(8, 4))
-        plt.subplot(1, 2, 1)
-        plt.imshow(original.squeeze(), cmap='gray')
-        plt.title('Original')
-
-        plt.subplot(1, 2, 2)
-        plt.imshow(color_image)
-        plt.title('Segmentation')
-        plt.show()
+    # Prediction Map
+    plt.subplot(1, 3, 3)
+    plt.imshow(prediction)
+    plt.title('Prediction Map')
+    
+    plt.suptitle(title)
+    plt.show()
 
 
 
-
-def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='my_model.keras', 
-                multiclass_model_path='internal_segmentation.keras', 
-                segmentation_type='internal', 
-                color_mapping=None, atlas_dir=None,):
+def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='my_model.keras',
+                internal_folder_paths=None, segmentation_type='internal', training_data=None):
 
     normalizedDict = normalizeTF(segmentDict)
-    all_triplets = []  # Define all_triplets here to be used for both binary and internal segmentation
+    all_triplets = []
 
+    
     if segmentation_type == 'skull':
-        # Binary Segmentation
         if os.path.exists(binary_model_path):
             print(f"Loading pre-trained binary model from {binary_model_path}...")
             model_binary = load_model(binary_model_path, custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
         else:
             print("Creating and training a new binary segmentation model...")
-            
-        # Binary Segmentation Visualization
+
         for key, sub_array in zip(file_names, normalizedDict.values()):
             print(f"Processing file: {key}")
             sub_arrays_split = split_into_subarrays(sub_array, depth)
             for idx, sub_arr in enumerate(sub_arrays_split):
-                surrounding_slices = get_surrounding_slices(sub_arr[depth//2], sub_arrays_split, depth)
+                surrounding_slices = get_surrounding_slices(sub_arr[depth // 2], sub_arrays_split, depth)
                 sub_arr_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
                 pred = model_binary.predict(sub_arr_exp)
-                print(f"Prediction stats - Min: {pred.min()}, Max: {pred.max()}, Mean: {pred.mean()}")
                 middle_index = depth // 2
-                # Visualize the raw prediction
-                visualize_segmentation(surrounding_slices[middle_index], pred[0][middle_index], title="Binary Segmentation")
-
+                all_triplets.append((surrounding_slices[middle_index], pred[0][middle_index]))
 
     elif segmentation_type == 'internal':
-        # Load or train the internal segmentation model
-        if os.path.exists(multiclass_model_path):
-            print(f"Loading pre-trained internal model from {multiclass_model_path}...")
-            model_internal = load_model(multiclass_model_path)
-        else:
-            print("Creating and training a new internal segmentation model...")
-            if atlas_dir is not None and color_mapping is not None:
-                atlas_images, labels_one_hot = preprocess_color_atlas(atlas_dir, color_mapping)
-                model_internal = unet_internal(input_size=(128, 128, 3), num_classes=len(color_mapping) + 1)  # Ensure num_classes is correct
-                history_internal = model_internal.fit(atlas_images, labels_one_hot, validation_split=0.1, epochs=25, batch_size=16)
-                model_internal.save(multiclass_model_path)
+        models_internal = {}
+        region_options = {
+            1: "Frontal Lobe",
+            2: "Temporal Lobe",
+            3: "Occipital Lobe",
+            4: "White Matter"
+        }
+
+        # Load or train models for each region
+        for region, folder_path in internal_folder_paths.items():
+            images = load_images_from_folder(folder_path)  # Always load images
+            X_train, Y_train = prepare_data_for_training(images, depth=depth, num_classes=5)  # Prepare data
+            
+            model_path = os.path.join(folder_path, f"{region.lower().replace(' ', '_')}_model.keras")
+            if os.path.exists(model_path):
+                print(f"Loading model for {region} from {model_path}...")
+                model = load_model(model_path)
             else:
-                print("Training data or color mapping for internal segmentation is not provided.")
-                return  # Exit the function if training data or color mapping is not available
+                print(f"Training new model for {region}...")
+                model = unet_internal(input_size=(128, 128, 1), num_classes=5)
+                model.fit(X_train, Y_train, epochs=10, batch_size=16)
+                ensure_directory_exists(folder_path)
+                model.save(model_path)
+            models_internal[region] = model
 
-        # Perform segmentation for each region
-        segmented_regions = {region: [] for region in color_mapping.keys()}
-
-        for file_name, sub_array in zip(file_names, normalizedDict.values()):
-            print(f"Processing file: {file_name}")
-            for slice_idx in range(sub_array.shape[0]):
-                single_slice = sub_array[slice_idx, :, :]
-
-                # Repeat the slice along the channel axis to create 3 channels and expand dimensions for batch size
-                single_slice_3_channels = np.repeat(single_slice[:, :, np.newaxis], 3, axis=2)
-                single_slice_expanded = np.expand_dims(single_slice_3_channels, axis=0)
-
-                pred = model_internal.predict(single_slice_expanded)
-                pred = np.squeeze(pred)  # Remove the batch dimension
-
-                # Store each region's segmentation separately
-                for region, color in color_mapping.items():
-                    region_index = list(color_mapping.values()).index(color)
-                    region_mask = (np.argmax(pred, axis=-1) == region_index)
-                    segmented_regions[region].append(region_mask)
-
-
-        region_mapping = {1: "Frontal Lobe", 2: "Temporal Lobe", 3: "Occipital Lobe", 4: "White Matter"}
-
-        # Allow user to select a region to visualize
+        # Visualization part
         while True:
             try:
-                selected_option = int(input("Select a region to view segmentation (1: Frontal, 2: Temporal, 3: Occipital, 4: White Matter): "))
-                selected_region = region_mapping.get(selected_option)
-                if selected_region:
-                    for slice_idx, segmentation in enumerate(segmented_regions[selected_region]):
-                        visualize_segmentation(normalizedDict[file_names[0]][slice_idx, :, :], segmentation, title=f"{selected_region} Segmentation")
-                    break
-                else:
-                    print("Invalid selection. Please enter a number between 1 and 4.")
+                region_selection = int(input("Select the region to visualize (1-Frontal, 2-Temporal, 3-Occipital, 4-White Matter): ").strip())
+                region_to_view = region_options.get(region_selection, None)
             except ValueError:
-                print("Invalid input. Please enter a number.")
-    
-        # Ask user if they want to see the trained images after training/loading the model
-    # show_images_input = input("Do you want to see the trained images? (yes/no): ").strip().lower()
-    # show_images = show_images_input == 'yes'
+                print("Invalid input. Please enter a number between 1 and 4.")
+                continue
 
-    # Visualization for all triplets after processing both types
-    for i in range(0, len(all_triplets), 3):
-        batch_triplets = all_triplets[i:i+3]
-        show_slices(batch_triplets)
+            if region_to_view in models_internal:
+                model = models_internal[region_to_view]
+                for key, img_3d in segmentDict.items():
+                    print(f"Processing file: {key} for {region_to_view}")
+                    for slice_idx in range(img_3d.shape[2]):
+                        slice_2d = img_3d[:, :, slice_idx]
+                        # Resize each slice to (128, 128) if not already
+                        if slice_2d.shape != (128, 128):
+                            slice_2d = resize(slice_2d, (128, 128), preserve_range=True)
+                        slice_2d_normalized = np.expand_dims(np.expand_dims(slice_2d, axis=0), axis=-1) / 255.0
+                        pred = model.predict(slice_2d_normalized)
+                        visualize_segmentation(slice_2d, pred[0], title=f"Segmentation - {region_to_view}")
+            else:
+                print("Region not recognized. Please enter a number between 1 and 4.")
+
+            continue_viewing = input("Would you like to visualize another region? (y/n): ").strip().lower()
+            if continue_viewing != 'y':
+                break
+
 
     # Optionally, prompt the user to display the images, if desired
     if all_triplets and input("Show processed images? (y/n): ").strip().lower() == 'y':
-        triplet_index = 0
-        while triplet_index < len(all_triplets):
-            batch_triplets = all_triplets[triplet_index:triplet_index + 3]
-            show_slices(batch_triplets)
-            triplet_index += len(batch_triplets)
-            if triplet_index < len(all_triplets) and input("Show next set of images? (y/n): ").strip().lower() != 'y':
-                break
+        for original, prediction in all_triplets:
+            visualize_segmentation(original, prediction, title="Segmentation Results")
+
 
 
 
 if __name__ == "__main__":
-    # Define the atlas directory and color mapping for internal segmentation
-    atlas_dir = 'C:\\Users\\Justin Rivera\\OneDrive\\Documents\\ED1\\BrainAI-Segmentation\\atl_segmentation_PNGs\\Brain'
-    color_mapping = {
-        "White Matter": (236, 28, 36),  # Red
-        "Temporal Lobe": (0, 168, 243),  # Blue
-        "Occipital Lobe": (185, 122, 86),  # Brown
-        "Frontal Lobe": (184, 61, 186),  # Pink
-        # Add other regions and colors as required
+    # Paths to the folders containing images for each brain region
+    internal_folder_paths = {
+        "Frontal Lobe": "C:\\Users\\Justin Rivera\\OneDrive\\Documents\\ED1\\BrainAI-Segmentation\\Internal Segment Images Unet\\Frontal",
+        "Temporal Lobe": "C:\\Users\\Justin Rivera\\OneDrive\\Documents\\ED1\\BrainAI-Segmentation\\Internal Segment Images Unet\\Occipital",
+        "Occipital Lobe": "C:\\Users\\Justin Rivera\\OneDrive\\Documents\\ED1\\BrainAI-Segmentation\\Internal Segment Images Unet\\Temporal",
+        "White Matter": "C:\\Users\\Justin Rivera\\OneDrive\\Documents\\ED1\\BrainAI-Segmentation\\Internal Segment Images Unet\\White Matter"
     }
 
-
-    # Example dictionary holding your image data
+    # Example dictionary holding your image data for skull segmentation
     sitk_images_dict = {
         "image1": data.get_3d_image("scan1"),
         "image2": data.get_3d_image("scan2"),
     }
     file_names = list(sitk_images_dict.keys())
 
-    # User chooses the segmentation type
     segmentation_type = input("Choose segmentation type ('internal' or 'skull'): ").strip().lower()
     
     if segmentation_type == 'internal':
-        # Call dlAlgorithm for internal segmentation
         dlAlgorithm(
-            segmentDict=sitk_images_dict,
+            segmentDict=sitk_images_dict,  # Or however you plan to load images for internal segmentation
             file_names=file_names,
-            binary_model_path='my_model.keras',
-            multiclass_model_path='internal_segmentation.keras',
-            segmentation_type=segmentation_type,
-            atlas_dir=atlas_dir,
-            color_mapping=color_mapping,
+            internal_folder_paths=internal_folder_paths,  # Added for internal segmentation
+            segmentation_type=segmentation_type
         )
     elif segmentation_type == 'skull':
-        # Call dlAlgorithm for binary segmentation
         dlAlgorithm(
             segmentDict=sitk_images_dict,
             file_names=file_names,
-            binary_model_path='my_model.keras',
-            multiclass_model_path='internal_segmentation.keras',
-            segmentation_type=segmentation_type,
+            binary_model_path='my_model.keras',  # Assuming this is your skull segmentation model
+            segmentation_type=segmentation_type
         )
     else:
-        print("Invalid segmentation type. Please choose 'internal' or 'skull'.")
+        print("Invalid segmentation type. Please choose 'internal' or 'skull' segmentation")
+
 
