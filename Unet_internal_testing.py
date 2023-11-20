@@ -214,25 +214,57 @@ def find_boundary(segment):
 
 def show_slices(triplets):
     n = len(triplets)
-    # Set up the matplotlib figure and axes, based on the number of triplets
-    fig, axes = plt.subplots(1, n, figsize=(n * 5, 5))
-    for i in range(n):
-        orig, pred = triplets[i]
-        # If pred is more than 2D, reduce to a 2D array. This assumes that the segmentation
-        # map is in the last layer.
+    # Set up subplots with 2 columns for each triplet: one for the original, one for the segmented
+    fig, axes = plt.subplots(2, n, figsize=(2*n, 4))
+
+    for i, (orig, pred) in enumerate(triplets):
+        # Ensure orig is 2D
+        orig = np.squeeze(orig)
+        if orig.ndim != 2:
+            raise ValueError(f"Original image has more than 2 dimensions after squeeze: {orig.shape}")
+
+        # If pred is not 2D, reduce it to 2D, assuming it's a probability map
         if pred.ndim > 2:
-            pred = np.squeeze(pred)  # This should reduce it to 2D if there's an extra dimension
-        if pred.ndim > 2:  # If still more than 2D, take the max over the channels
-            pred = np.max(pred, axis=-1)
+            # Take the maximum along the last axis to collapse the channel dimension
+            pred = np.amax(pred, axis=-1)
+        
+        # Ensure pred is now 2D
+        if pred.ndim != 2:
+            raise ValueError(f"Prediction has more than 2 dimensions after processing: {pred.shape}")
 
-        # Display the original image in grayscale
-        axes[i].imshow(orig.T, cmap="gray", origin="lower")
-        # Overlay the prediction on top of the original image in grayscale
-        # You can adjust the alpha value to make the overlay more or less transparent
-        axes[i].imshow(pred.T, cmap="gray", alpha=0.5, origin="lower")
+        # Normalize the prediction
+        pred_norm = (pred - np.min(pred)) / (np.max(pred) - np.min(pred))
+        # Create a binary mask with thresholding
+        binary_mask = pred_norm > 0.3
 
-    plt.suptitle("Original and Segmented")
+        # Apply the binary mask to the original image to get the segmented output
+        segmented = np.where(binary_mask, orig, 0)
+
+        # Display the original image in the first row
+        axes[0, i].imshow(orig, cmap="gray", origin="lower")
+        axes[0, i].set_title("Original")
+        axes[0, i].axis('off')  # Turn off axis
+
+        # Display the segmented image in the second row
+        axes[1, i].imshow(segmented, cmap="gray", origin="lower")
+        axes[1, i].set_title("Segmented")
+        axes[1, i].axis('off')  # Turn off axis
+
+    plt.tight_layout()
+    plt.suptitle("Original and Segmented Images")
     plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
