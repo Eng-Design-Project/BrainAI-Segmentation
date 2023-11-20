@@ -290,7 +290,7 @@ def create_seg_images_from_dict(images_dict, coords_dict):
 # takes a directory of DCMs, outputs a dictionary with region names as keys and sitk images as the values
 # def DCMs_to_sitk_img_dict(directory):
 #     image = data.get_3d_image(directory)
-
+"""
 #     #this part of the function could be expanded to have more regions
 #     def generate_regions(): 
 #         region1 = [[x, y, z] for x in range(0, 51) for y in range(0, 51) for z in range(0, 51)]
@@ -307,7 +307,7 @@ def create_seg_images_from_dict(images_dict, coords_dict):
 #     region_images = create_seg_images_from_image(image, region_dict)
 #     #display_regions_from_dict(region_images)
 #     data.display_seg_np_images(region_images)
-    
+    """
 #DCMs_to_sitk_img_dict("scan1")
 
 #extra pixel layer algo

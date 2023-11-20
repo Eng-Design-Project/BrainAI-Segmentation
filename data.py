@@ -225,7 +225,10 @@ def save_3d_img_to_dcm(array, template_dir, new_dir):
     # Iterate through the slices and save each one
     for z in range(array.shape[0]):
         slice_arr = array[z, :, :]
-
+        # Resize the slice
+        pil_img = Image.fromarray(slice_arr)
+        resized_img = pil_img.resize((224, 224), Image.Resampling.LANCZOS)
+        resized_slice_arr = np.array(resized_img)
         # Read the template DICOM file
         template = pydicom.dcmread(template_path)
 
@@ -235,10 +238,10 @@ def save_3d_img_to_dcm(array, template_dir, new_dir):
         ds.update(template)  # Update the dataset with the template
 
         # Update the pixel data
-        ds.PixelData = slice_arr.tobytes()
+        ds.PixelData = resized_slice_arr.tobytes()
 
         # Update the rows and columns based on the array shape
-        ds.Rows, ds.Columns = slice_arr.shape
+        ds.Rows, ds.Columns = resized_slice_arr.shape
 
         # Update the slice location and instance number
         ds.SliceLocation = str(z)
@@ -269,15 +272,19 @@ def save_3d_img_to_png(image_array, new_dir):
     # Iterate through the slices and save each one as PNG
     for z in range(num_slices):
         slice_image_np = image_array[z, :, :]
+        # Resize the slice
+        pil_img = Image.fromarray(slice_image_np)
+        resized_img = pil_img.resize((224, 224), Image.Resampling.LANCZOS)
+        resized_slice_image_np = np.array(resized_img)
         # Normalize the slice for better contrast in the PNG
-        slice_image_np = np.interp(slice_image_np, (slice_image_np.min(), slice_image_np.max()), (0, 255))
-        slice_image_np = np.uint8(slice_image_np)
+        resized_slice_image_np = np.interp(resized_slice_image_np, (resized_slice_image_np.min(), resized_slice_image_np.max()), (0, 255))
+        resized_slice_image_np = np.uint8(resized_slice_image_np)
 
         # Create a filename for the slice
         filename = os.path.join(new_dir, f"slice_{z:03d}.png")
 
         # Save the slice as PNG
-        plt.imsave(filename, slice_image_np, cmap='gray')
+        plt.imsave(filename, resized_slice_image_np, cmap='gray')
 
         print(f"Saved slice {z} to {filename}")
 
@@ -450,6 +457,47 @@ def set_seg_results_with_dir(directory = "atl_segmentation_DCMs"):
     
 # set_seg_results()
 
+#this function takes a 3d numpy image, returns a single number as the average of (46) averages
+def average_overall_brightness_3d(image):
+    # Ensure the input is a numpy array
+    if not isinstance(image, np.ndarray):
+        raise ValueError("Input must be a numpy array")
+    
+    # Ensure the input is a 3D array with shape (46, 128, 128)
+    # if images.shape != (46, 128, 128):
+    #     raise ValueError("Input must have shape (46, 128, 128) for 46 grayscale images with dimensions 128x128")
+
+    # Calculate the average pixel brightness for each image
+    image_averages = np.mean(image, axis=(1, 2))
+    # Calculate the overall average by averaging the image averages
+    overall_average_brightness = np.mean(image_averages)
+    return overall_average_brightness
+
+# if the argument is a 3d image with 46 slices, this function will return a numpy array with 46 averages
+# each average can be accessed by typical indexing, e.g. average_brightness[0] returns first average, ...[45] returns last, etc.
+def array_of_average_pixel_brightness_3d(images):
+    # Ensure the input is a numpy array
+    if not isinstance(images, np.ndarray):
+        raise ValueError("Input must be a numpy array")
+    # Ensure the input is a 3D array
+    if len(images.shape) != 3:
+        raise ValueError("Input must be a 3D array of grayscale images")
+    # Calculate the average pixel brightness for all images
+    average_brightness = np.mean(images, axis=(1, 2))
+    return average_brightness
+
+# this function returns the brightness of a single 2d grayscale numpy image
+def avg_brightness_2d(image):
+    # Ensure the input image is a numpy array
+    if not isinstance(image, np.ndarray):
+        raise ValueError("Input image must be a numpy array")
+    # Ensure the image is 2D (grayscale)
+    if len(image.shape) != 2:
+        raise ValueError("Input image must be grayscale (2D array)")
+    # Calculate the average pixel brightness
+    average_brightness = np.mean(image)
+    return average_brightness
+
 def is_segment_results_dir(directory):
     """
     Validates if a given directory matches the specified structure and format.
@@ -500,6 +548,40 @@ def contains_only_dcms(directory):
                 return False
 
     return True
+
+def save_3d_array_as_jpegs(array, output_dir):
+    """
+    Saves each slice of a 3D numpy array as a separate JPEG file.
+    Each slice is resized to 224x224 pixels.
+    """
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    for i in range(array.shape[0]):
+        # Extract the slice
+        slice = array[i, :, :]
+        # Resize the slice
+        resized_slice = resize(slice, (224, 224), anti_aliasing=True)
+        # Convert to uint8
+        resized_slice = (255 * resized_slice).astype(np.uint8)
+        # Save the slice as JPEG
+        Image.fromarray(resized_slice).save(os.path.join(output_dir, f'slice_{i:03d}.jpeg'), 'JPEG')
+
+def convert_pngs_to_jpegs(input_dir, output_dir):
+    """
+    Converts PNG images in a directory to 224x224 JPEG images.
+    Saves the converted JPEGs in the specified output directory.
+    """
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    for filename in os.listdir(input_dir):
+        if filename.endswith(".png"):
+            # Read the image
+            img_path = os.path.join(input_dir, filename)
+            img = Image.open(img_path)
+            # Resize and save as JPEG
+            img.resize((224, 224)).convert('RGB').save(os.path.join(output_dir, filename.replace('.png', '.jpeg')), 'JPEG')    
 
 
 if __name__ == "__main__":
