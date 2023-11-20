@@ -3,10 +3,10 @@ import tensorflow as tf
 import numpy as np
 from scipy.ndimage import convolve
 import data
-from tensorflow.keras.models import load_model
 import matplotlib.pyplot as plt
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
-
+#from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+import os
+from keras.models import load_model
 
 # Function to split 3D images into smaller sub-arrays
 def split_into_subarrays(img_array, depth=5):
@@ -127,60 +127,75 @@ def show_slices(triplets):
     plt.suptitle("Original and Segmented")
     plt.show()
 
-def dlAlgorithm(segmentDict, depth=5):
-    numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()}
-    normalizedDict = normalizeTF(numpyImagesDict)
-    
-    # Define the U-Net model
-    model = unet(input_size=(depth, 128, 128, 1))
+# Change file path to your own file path to my_model.keras
+def dlAlgorithm(segmentDict, depth=5, model_path='C:\\Users\\Justin Rivera\\OneDrive\\Documents\\ED1\\BrainAI-Segmentation\\my_model.keras'):
+    normalizedDict = normalizeTF(segmentDict)
+    model_exists = os.path.exists(model_path)
+    if model_exists:
+        print("Loading pre-trained model...")
+        model = load_model(model_path, custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
+    else:
+        print("Creating and training a new model...")
+        model = unet(input_size=(depth, 128, 128, 1))
+        loss_list = []
 
-    loss_list = []
-    all_triplets = []  # <-- Store all the segmented triplets here
+        for key, sub_array in normalizedDict.items():
+            sub_arrays_split = split_into_subarrays(sub_array, depth)
+            for idx, sub_arr in enumerate(sub_arrays_split):
+                surrounding_slices = get_surrounding_slices(sub_arr[depth//2], sub_arrays_split, depth)
+                sub_boundary_array = find_boundary(surrounding_slices)
+                sub_arr_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
+                sub_boundary_array_exp = np.expand_dims(np.expand_dims(sub_boundary_array, axis=0), axis=-1)
+                
+                history = model.train_on_batch(sub_arr_exp, sub_boundary_array_exp)
+                loss_list.append(history)
 
-    # First loop for segmentation
+        # Save the model only after training
+        model.save(model_path)
+
+        # Plot the loss after training
+        plt.plot([l[0] for l in loss_list])  # Assuming 'l' has the loss in index 0
+        plt.title('Model Loss')
+        plt.ylabel('Loss')
+        plt.xlabel('Batch')
+        plt.show()
+
+    # Prediction and visualization block, executed regardless of whether the model was trained or loaded
+    all_triplets = []
     for key, sub_array in normalizedDict.items():
         sub_arrays_split = split_into_subarrays(sub_array, depth)
-        
         for idx, sub_arr in enumerate(sub_arrays_split):
             surrounding_slices = get_surrounding_slices(sub_arr[depth//2], sub_arrays_split, depth)
-            model = load_model("current_model.keras", custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
-            
-            sub_boundary_array = find_boundary(surrounding_slices)
             sub_arr_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
-            sub_boundary_array_exp = np.expand_dims(np.expand_dims(sub_boundary_array, axis=0), axis=-1)
-
-            history = model.train_on_batch(sub_arr_exp, sub_boundary_array_exp)
-            loss_list.append(history[0])
-
+            
             pred = model.predict(sub_arr_exp)
             middle_index = depth // 2
             slices_triplet = (surrounding_slices[middle_index], pred[0][middle_index])
             all_triplets.append(slices_triplet)
-
-    # Second loop for displaying the segmented images in batches of 3
-    for i in range(0, len(all_triplets), 3):
-        batch_triplets = all_triplets[i:i+3]
-
+    
+    # Display the segmented images
+    triplet_index = 0
+    while True:
+        batch_triplets = all_triplets[triplet_index:triplet_index + 3]
         for idx, triplet in enumerate(batch_triplets):
-            print(f"Triplet {idx + 1} Original Min: {triplet[0].min()}, Max: {triplet[0].max()}")
-            print(f"Triplet {idx + 1} Prediction Min: {triplet[1].min()}, Max: {triplet[1].max()}")
-
+            print(f"Triplet {idx + 1 + triplet_index} Original Min: {triplet[0].min()}, Max: {triplet[0].max()}")
+            print(f"Triplet {idx + 1 + triplet_index} Segmented Min: {triplet[1].min()}, Max: {triplet[1].max()}")
         show_slices(batch_triplets)
 
-        proceed = input("Would you like to see more slices? (y/n): ")
-        if proceed.lower() != 'y':
-            break  # Exit the function entirely
+        triplet_index += 3
 
-   # model = load_model("best_model.keras", custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
-    
-    #plt.plot(loss_list)
-    #plt.title('Model Loss')
-    #plt.ylabel('Loss')
-    #plt.xlabel('Batch')
-    #plt.show()
-
-
-
+        if triplet_index >= len(all_triplets):
+            print("End of list.")
+            restart = input("Would you like to start from the beginning? (y/n): ")
+            if restart.lower() == 'y':
+                triplet_index = 0  # Reset index to start from the beginning
+                continue  # Continue the loop from the beginning
+            else:
+                break  # Exit the loop if the user does not want to continue
+        else:
+            proceed = input("Would you like to see more slices? (y/n): ")
+            if proceed.lower() != 'y':
+                break  # Exit the loop if the user does not want to continue
 
 
 if __name__ == "__main__":

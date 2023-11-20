@@ -198,7 +198,7 @@ class Core:
         source_var.set(None)  # Set an initial value that does not correspond to any option
         file_option = tk.Radiobutton(popup_window, text="From File", variable=source_var, value="file")
         file_option.pack()
-        memory_option = tk.Radiobutton(popup_window, text="From Memory (most recent Segmentation Results)", variable=source_var, value="memory")
+        memory_option = tk.Radiobutton(popup_window, text="From Memory (recent Seg Results or selected file)", variable=source_var, value="memory")
         memory_option.pack()
 
         # Create a button to confirm the selection and execute clustering
@@ -459,7 +459,7 @@ class Core:
         source_var.set(None)  # Set an initial value that does not correspond to any option
         file_option = tk.Radiobutton(popup_window, text="From File", variable=source_var, value="file")
         file_option.pack()
-        memory_option = tk.Radiobutton(popup_window, text="From Memory (most recent Segmentation Results)", variable=source_var, value="memory")
+        memory_option = tk.Radiobutton(popup_window, text="From Memory (recent Seg Results or selected file)", variable=source_var, value="memory")
         memory_option.pack()
 
         # Create a button to confirm the selection and execute clustering
@@ -666,9 +666,7 @@ class Core:
         print("Internal Atlas Segmentation")
         internal_color_atlas = data.get_2d_png_array_list("Color Atlas internal")
         internal_seg_results = segmentation.execute_internal_atlas_seg(data.segmentation_results, internal_color_atlas)
-        #save results
-        data.segmentation_results = internal_seg_results
-        
+        #save results, to file and data.seg results        
         self.save_seg_results(internal_seg_results)
         
         #display results
@@ -1133,45 +1131,7 @@ class Core:
 
         print("pre atlas seg clicked")
 
-"""class ClusteringPage:
-    def __init__(self, master, core_instance):
-        self.master = master
-        self.core_instance = core_instance
 
-        self.back_button = tk.Button(self.master, text="Back", command=self.go_back)
-        self.back_button.pack(pady=20)
-
-        self.hide_buttons()
-
-    def hide_buttons(self):
-        self.back_button.pack_forget()
-
-    def show_buttons(self):
-        self.back_button.pack(pady=20)
-
-    def go_back(self):
-        self.hide_buttons()
-        self.core_instance.advanced_segmentation_page.show_buttons()
-
-class DeepLearningPage:
-    def __init__(self, master, core_instance):
-        self.master = master
-        self.core_instance = core_instance
-
-        self.back_button = tk.Button(self.master, text="Back", command=self.go_back)
-        self.back_button.pack(pady=20)
-
-        self.hide_buttons()
-
-    def hide_buttons(self):
-        self.back_button.pack_forget()
-
-    def show_buttons(self):
-        self.back_button.pack(pady=20)
-
-    def go_back(self):
-        self.hide_buttons()
-        self.core_instance.advanced_segmentation_page.show_buttons()"""
 
 # Usage
 if __name__ == "__main__":
