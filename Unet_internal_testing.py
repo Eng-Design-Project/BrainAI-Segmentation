@@ -212,61 +212,49 @@ def find_boundary(segment):
     plt.show()
 '''
 
-def show_slices(triplets):
+import numpy as np
+import matplotlib.pyplot as plt
+
+def show_slices(triplets, threshold=0.5):  # Adjust threshold value as needed
     n = len(triplets)
-    # Set up subplots with 2 columns for each triplet: one for the original, one for the segmented
     fig, axes = plt.subplots(2, n, figsize=(2*n, 4))
 
     for i, (orig, pred) in enumerate(triplets):
-        # Ensure orig is 2D
         orig = np.squeeze(orig)
         if orig.ndim != 2:
-            raise ValueError(f"Original image has more than 2 dimensions after squeeze: {orig.shape}")
+            raise ValueError(f"Original image has unexpected dimensions: {orig.shape}")
 
-        # If pred is not 2D, reduce it to 2D, assuming it's a probability map
-        if pred.ndim > 2:
-            # Take the maximum along the last axis to collapse the channel dimension
-            pred = np.amax(pred, axis=-1)
-        
-        # Ensure pred is now 2D
-        if pred.ndim != 2:
-            raise ValueError(f"Prediction has more than 2 dimensions after processing: {pred.shape}")
+        # Ensure prediction is 2D by taking the channel with the maximum response
+        if pred.ndim == 3 and pred.shape[-1] > 1:  # More than one channel
+            pred = np.argmax(pred, axis=-1)  # Use argmax to choose the most likely class at each pixel
+        elif pred.ndim == 3 and pred.shape[-1] == 1:  # Single channel prediction
+            pred = np.squeeze(pred)  # Remove the channel dimension
+        elif pred.ndim != 2:
+            raise ValueError(f"Prediction has unexpected dimensions: {pred.shape}")
 
-        # Normalize the prediction
-        pred_norm = (pred - np.min(pred)) / (np.max(pred) - np.min(pred))
-        # Create a binary mask with thresholding
-        binary_mask = pred_norm > 0.3
+        # Debugging print statements
+        print(f"Original image shape: {orig.shape}")
+        print(f"Prediction shape: {pred.shape}")
+
+        # Normalize the prediction to be between 0 and 1 if it's not a binary mask
+        if pred.max() > 1:
+            pred = (pred - pred.min()) / (pred.max() - pred.min())
+
+        binary_mask = pred > threshold
 
         # Apply the binary mask to the original image to get the segmented output
-        segmented = np.where(binary_mask, orig, 0)
+        segmented = orig * binary_mask  # This line changed to multiply instead of using np.where
 
-        # Display the original image in the first row
-        axes[0, i].imshow(orig, cmap="gray", origin="lower")
+        axes[0, i].imshow(orig, cmap="gray")
         axes[0, i].set_title("Original")
-        axes[0, i].axis('off')  # Turn off axis
+        axes[0, i].axis('off')
 
-        # Display the segmented image in the second row
-        axes[1, i].imshow(segmented, cmap="gray", origin="lower")
+        axes[1, i].imshow(segmented, cmap="gray")
         axes[1, i].set_title("Segmented")
-        axes[1, i].axis('off')  # Turn off axis
+        axes[1, i].axis('off')
 
-    plt.tight_layout()
-    plt.suptitle("Original and Segmented Images")
+    plt.suptitle("Original and Segmented")
     plt.show()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # def show_slices(triplets):
@@ -333,12 +321,6 @@ def visualize_segmentation(slice, prediction, title="Segmentation"):
     plt.imshow(prediction.T, cmap='gray', origin='lower')
     plt.title(title)
     plt.show()
-
-
-
-# def convert_to_binary_mask(prediction, threshold=0.5):
-#     binary_mask = (prediction > threshold).astype(np.uint8)
-#     return binary_mask
 
 # Visualization function for internal segmentation
 def visualize_internal_segmentation(original, prediction, title="Segmentation"):
@@ -416,7 +398,7 @@ def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='my_model.ke
             
             images = load_dcm_images_from_folder(folder_path)
             for slice_idx in range(images.shape[0]):  # Iterate through each slice in the loaded images
-                slice_2d = images[slice_idx, :, :, 0]  # Adjust this line to correctly access the 2D slice
+                slice_2d = images[slice_idx, :, :, 0]  
                 slice_2d_normalized = normalize_image(slice_2d)
                 slice_2d_normalized = np.expand_dims(slice_2d_normalized, axis=-1)
                 slice_2d_normalized = np.expand_dims(slice_2d_normalized, axis=0)
@@ -429,7 +411,7 @@ def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='my_model.ke
         triplet_index = 0
         while triplet_index < len(all_triplets):
             batch_triplets = all_triplets[triplet_index:triplet_index + 3]
-            show_slices(batch_triplets)
+            show_slices(batch_triplets)  
             triplet_index += 3
             if triplet_index < len(all_triplets):
                 proceed = input("Would you like to see more slices? (y/n): ").strip().lower()
@@ -443,10 +425,10 @@ def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='my_model.ke
 if __name__ == "__main__":
     # Paths to the folders containing images for each brain region
     internal_folder_paths = {
-        "Frontal Lobe": "Internal Segment DCM unet\Frontal",
-        "Temporal Lobe": "Internal Segment DCM unet\Temporal",
-        "Occipital Lobe": "Internal Segment DCM unet\Occipital",
-        "White Matter": "Internal Segment DCM unet\White Matter",
+        "Frontal Lobe": "Internal Segment DCM unet\\Frontal",
+        "Temporal Lobe": "Internal Segment DCM unet\\Temporal",
+        "Occipital Lobe": "Internal Segment DCM unet\\Occipital",
+        "White Matter": "Internal Segment DCM unet\\White Matter",
     }
 
     # Example dictionary holding your image data for skull segmentation
@@ -456,23 +438,25 @@ if __name__ == "__main__":
     }
     file_names = list(sitk_images_dict.keys())
 
-    segmentation_type = input("Choose segmentation type ('internal' or 'skull'): ").strip().lower()
-    
-    if segmentation_type == 'internal':
-        dlAlgorithm(
-            segmentDict=sitk_images_dict,  # Or however you plan to load images for internal segmentation
-            file_names=file_names,
-            internal_folder_paths=internal_folder_paths,  # Added for internal segmentation
-            segmentation_type=segmentation_type
-        )
-    elif segmentation_type == 'skull':
+    # Mapping of user input to segmentation types
+    segmentation_options = {
+        "1": "internal",
+        "2": "skull"
+    }
+
+    user_input = input("Choose segmentation type (1 for 'internal' or 2 for 'skull'): ").strip()
+    segmentation_type = segmentation_options.get(user_input, None)
+
+    if segmentation_type:
         dlAlgorithm(
             segmentDict=sitk_images_dict,
             file_names=file_names,
-            binary_model_path='my_model.keras',  # Assuming this is your skull segmentation model
+            internal_folder_paths=internal_folder_paths if segmentation_type == "internal" else None,
+            binary_model_path='my_model.keras' if segmentation_type == "skull" else None,
             segmentation_type=segmentation_type
         )
     else:
-        print("Invalid segmentation type. Please choose 'internal' or 'skull' segmentation")
+        print("Invalid input. Please enter 1 for internal segmentation or 2 for skull segmentation.")
+
 
 
