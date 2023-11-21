@@ -4,7 +4,7 @@ import numpy as np
 from scipy.ndimage import convolve
 import data
 import matplotlib.pyplot as plt
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+#from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 import os
 from keras.models import load_model
 
@@ -129,9 +129,7 @@ def show_slices(triplets):
 
 # Change file path to your own file path to my_model.keras
 def dlAlgorithm(segmentDict, depth=5, model_path='C:\\Users\\Justin Rivera\\OneDrive\\Documents\\ED1\\BrainAI-Segmentation\\my_model.keras'):
-    numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in segmentDict.items()}
-    normalizedDict = normalizeTF(numpyImagesDict)
-    
+    normalizedDict = normalizeTF(segmentDict)
     model_exists = os.path.exists(model_path)
     if model_exists:
         print("Loading pre-trained model...")
