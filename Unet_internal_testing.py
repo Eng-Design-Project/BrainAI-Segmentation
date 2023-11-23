@@ -291,8 +291,8 @@ def prepare_data_for_training(img_array, depth=5, num_classes=5):
 
     return X_train, Y_train
 
-'''
-def visualize_segmentation(slice, prediction, title="Segmentation"):
+
+'''def visualize_segmentation(slice, prediction, title="Segmentation"):
     # Squeeze the prediction to remove the batch dimension
     prediction = np.squeeze(prediction)
     
@@ -313,9 +313,8 @@ def visualize_segmentation(slice, prediction, title="Segmentation"):
     plt.title(title)
     plt.show()
     '''
-'''
-# Visualization function for internal segmentation
-def visualize_internal_segmentation(original, prediction, title="Segmentation"):
+
+'''def visualize_internal_segmentation(original, prediction, title="Segmentation"):
     plt.figure(figsize=(12, 6))
     
     # Original Image
