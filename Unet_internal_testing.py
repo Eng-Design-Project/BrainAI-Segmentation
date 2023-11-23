@@ -291,7 +291,7 @@ def prepare_data_for_training(img_array, depth=5, num_classes=5):
 
     return X_train, Y_train
 
-
+'''
 def visualize_segmentation(slice, prediction, title="Segmentation"):
     # Squeeze the prediction to remove the batch dimension
     prediction = np.squeeze(prediction)
@@ -312,7 +312,8 @@ def visualize_segmentation(slice, prediction, title="Segmentation"):
     plt.imshow(prediction.T, cmap='gray', origin='lower')
     plt.title(title)
     plt.show()
-
+    '''
+'''
 # Visualization function for internal segmentation
 def visualize_internal_segmentation(original, prediction, title="Segmentation"):
     plt.figure(figsize=(12, 6))
@@ -335,7 +336,7 @@ def visualize_internal_segmentation(original, prediction, title="Segmentation"):
     
     plt.suptitle(title)
     plt.show()
-
+'''
 
 
 def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='my_model.keras',
