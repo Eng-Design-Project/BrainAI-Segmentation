@@ -195,7 +195,7 @@ def find_boundary(segment):
     segment_copy[~boundary] = 0  # Label the rest as 0
     return segment_copy
 
-'''def show_slices(triplets):
+'''def show_slices(triplets): This returns the images in color. This was an accident but they looked cool so I just commented it out insteaad of deleting it
     n = len(triplets)
     fig, axes = plt.subplots(1, n, figsize=(n * 6, 6))
     for i in range(n):
@@ -212,50 +212,41 @@ def find_boundary(segment):
     plt.show()
 '''
 
-import numpy as np
-import matplotlib.pyplot as plt
 
-def show_slices(triplets, threshold=0.5):  # Adjust threshold value as needed
+def show_slices(triplets, threshold=0.5, brightening_factor=1.3):  # Adjust threshold and brightening factor as needed
     n = len(triplets)
     fig, axes = plt.subplots(2, n, figsize=(2*n, 4))
 
     for i, (orig, pred) in enumerate(triplets):
-        orig = np.squeeze(orig)
+        orig = np.squeeze(orig).astype(np.float32)  # Ensure original is float32 to prevent clipping
         if orig.ndim != 2:
             raise ValueError(f"Original image has unexpected dimensions: {orig.shape}")
 
-        # Ensure prediction is 2D by taking the channel with the maximum response
-        if pred.ndim == 3 and pred.shape[-1] > 1:  # More than one channel
-            pred = np.argmax(pred, axis=-1)  # Use argmax to choose the most likely class at each pixel
-        elif pred.ndim == 3 and pred.shape[-1] == 1:  # Single channel prediction
-            pred = np.squeeze(pred)  # Remove the channel dimension
+        # Prediction processing
+        if pred.ndim == 3 and pred.shape[-1] > 1:
+            pred = np.argmax(pred, axis=-1)
+        elif pred.ndim == 3 and pred.shape[-1] == 1:
+            pred = np.squeeze(pred)
         elif pred.ndim != 2:
             raise ValueError(f"Prediction has unexpected dimensions: {pred.shape}")
 
-        # Debugging print statements
-        print(f"Original image shape: {orig.shape}")
-        print(f"Prediction shape: {pred.shape}")
-
-        # Normalize the prediction to be between 0 and 1 if it's not a binary mask
-        if pred.max() > 1:
-            pred = (pred - pred.min()) / (pred.max() - pred.min())
-
         binary_mask = pred > threshold
 
-        # Apply the binary mask to the original image to get the segmented output
-        segmented = orig * binary_mask  # This line changed to multiply instead of using np.where
+        # Apply brightening
+        brightened_image = np.copy(orig)
+        brightened_image[binary_mask] *= brightening_factor
+        brightened_image = np.clip(brightened_image, 0, np.max(orig))  # Clip to the max of original to prevent overexposure
 
         axes[0, i].imshow(orig, cmap="gray")
         axes[0, i].set_title("Original")
         axes[0, i].axis('off')
 
-        axes[1, i].imshow(segmented, cmap="gray")
+        axes[1, i].imshow(brightened_image, cmap="gray")  # Show the brightened image
         axes[1, i].set_title("Segmented")
         axes[1, i].axis('off')
 
-    plt.suptitle("Original and Segmented")
+    plt.suptitle("Original and Brightened Segmented")
     plt.show()
-
 
 # def show_slices(triplets):
 #     n = len(triplets)
