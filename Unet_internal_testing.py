@@ -212,7 +212,6 @@ def find_boundary(segment):
     plt.show()
 '''
 
-
 def show_slices(triplets, threshold=0.5, brightening_factor=1.3):  # Adjust threshold and brightening factor as needed
     n = len(triplets)
     fig, axes = plt.subplots(2, n, figsize=(2*n, 4))
@@ -248,18 +247,6 @@ def show_slices(triplets, threshold=0.5, brightening_factor=1.3):  # Adjust thre
     plt.suptitle("Original and Brightened Segmented")
     plt.show()
 
-# def show_slices(triplets):
-#     n = len(triplets)
-#     fig, axes = plt.subplots(1, n * 2, figsize=(12, 6))
-#     for i in range(n):
-#         orig, pred = triplets[i]
-#         axes[i * 2].imshow(orig.T, cmap="gray", origin="lower")
-#         pred_2d = np.squeeze(pred.T)
-#         axes[i * 2 + 1].imshow(pred_2d, cmap="gray", origin="lower")
-#     plt.suptitle("Original and Segmented")
-#     plt.show()
-
-
 
 def normalize_image(image):
     min_val = np.min(image)
@@ -291,55 +278,8 @@ def prepare_data_for_training(img_array, depth=5, num_classes=5):
 
     return X_train, Y_train
 
-
-'''def visualize_segmentation(slice, prediction, title="Segmentation"):
-    # Squeeze the prediction to remove the batch dimension
-    prediction = np.squeeze(prediction)
-    
-    # If the prediction has more than two dimensions, take the maximum projection across channels
-    if prediction.ndim > 2:
-        prediction = np.max(prediction, axis=-1)
-
-    # Normalize prediction to the range [0, 255] for visualization
-    prediction = (prediction * 255).astype(np.uint8)
-
-    plt.figure(figsize=(8, 4))
-    plt.subplot(1, 2, 1)
-    plt.imshow(slice.T, cmap='gray', origin='lower')
-    plt.title('Original')
-
-    plt.subplot(1, 2, 2)
-    plt.imshow(prediction.T, cmap='gray', origin='lower')
-    plt.title(title)
-    plt.show()
-    '''
-
-'''def visualize_internal_segmentation(original, prediction, title="Segmentation"):
-    plt.figure(figsize=(12, 6))
-    
-    # Original Image
-    plt.subplot(1, 3, 1)
-    plt.imshow(original, cmap='gray')
-    plt.title('Original Image')
-    
-    # Prediction Overlay
-    plt.subplot(1, 3, 2)
-    plt.imshow(original, cmap='gray')
-    plt.imshow(prediction, alpha=0.5)
-    plt.title('Prediction Overlay')
-
-    # Prediction Map
-    plt.subplot(1, 3, 3)
-    plt.imshow(prediction)
-    plt.title('Prediction Map')
-    
-    plt.suptitle(title)
-    plt.show()
-'''
-
-
 def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='my_model.keras',
-                internal_folder_paths=None, segmentation_type='internal', training_data=None):
+                internal_folder_paths=None, segmentation_type='internal'):
 
     normalizedDict = normalizeTF(segmentDict) if segmentDict is not None else None
     all_triplets = []
