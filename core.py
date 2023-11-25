@@ -288,6 +288,9 @@ class Core:
                 data.segmentation_results = None
                 while not data.segmentation_results: #note, this may result in infinite loop, need some flag if window closed
                     folder = filedialog.askdirectory(title="Select folder with segmentation results")
+                    if folder == '':
+                        popup_window.destroy()
+                        return
                     #check if save folder matches expected structure
                     if data.is_segment_results_dir(folder):
                         #the function below sets data.segmentation_results to an 3d np array image dict
@@ -298,9 +301,15 @@ class Core:
                         # if contains_only_dcms(selection) == true
             if seg_var == "Whole Scan":
                 folder = filedialog.askdirectory(title="Select folder with dcms")
+                if folder == '':
+                        popup_window.destroy()
+                        return
                 while not data.contains_only_dcms(folder):#note, this may result in infinite loop, need some flag if window closed
                     tk.messagebox.showwarning(title="Invalid Selection", message="Select a folder containing only DCM files.")
                     folder = filedialog.askdirectory(title="Select folder with dcms")
+                    if folder == '':
+                        popup_window.destroy()
+                        return
                 volume = data.get_3d_image(folder)
         
             
@@ -496,6 +505,9 @@ class Core:
                 data.segmentation_results = None
                 while not data.segmentation_results: #note, this may result in infinite loop, need some flag if window closed
                     folder = filedialog.askdirectory(title="Select folder with segmentation results")
+                    if folder == '':
+                        popup_window.destroy()
+                        return
                     #check if save folder matches expected structure
                     if data.is_segment_results_dir(folder):
                         #the function below sets data.segmentation_results to an 3d np array image dict
@@ -506,9 +518,15 @@ class Core:
                         # if contains_only_dcms(selection) == true
             if seg_var == "Whole Scan":
                 folder = filedialog.askdirectory(title="Select folder with dcms")
+                if folder == '':
+                    popup_window.destroy()
+                    return
                 while not data.contains_only_dcms(folder):#note, this may result in infinite loop, need some flag if window closed
                     tk.messagebox.showwarning(title="Invalid Selection", message="Select a folder containing only DCM files.")
                     folder = filedialog.askdirectory(title="Select folder with dcms")
+                    if folder == '':
+                        popup_window.destroy()
+                        return
                 volume = data.get_3d_image(folder)
         
             
@@ -855,11 +873,15 @@ class Core:
 
         if image_dict is None:
             folder = filedialog.askdirectory(title="Select folder with subfolders containing DCM files")
+            if folder == '':
+                        return
             while not data.is_segment_results_dir(folder):
                 tk.messagebox.showwarning(
                     title="Invalid Selection",
                     message="The folder you selected does not match the expected structure. Select a folder with sub-folders containing DCM files.")
                 folder = filedialog.askdirectory(title="Select folder with subfolders containing DCM files")
+                if folder == '':
+                        return
             image_dict = data.subfolders_to_dictionary(folder)
         print("Showing seg results")
         pngs_dict = data.array_dict_to_png_dict(image_dict)
@@ -1003,6 +1025,8 @@ class Core:
         # This function will eventually display DCMs from file
         # note, currently only works for un-segmented DCMs
         folder = filedialog.askdirectory(title="Select a folder containing only DCM files")
+        if folder == '':
+            return
         if (data.contains_only_dcms(folder)):
             # convert each file to a PNG and save it to list
             png_list = []
