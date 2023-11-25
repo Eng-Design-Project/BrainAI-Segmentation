@@ -133,26 +133,37 @@ def save_2d_images_list(image_list, directory):
 
 
 def get_3d_image(directory):
-    image_files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]  # gather files
-    slices = [pydicom.dcmread(os.path.join(directory, f)) for f in image_files]  # read each file
+    print("Reading DICOM files from directory:", directory)
 
-    # Create a set to track unique ImagePositionPatient[2] values
+    image_files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+    print(f"Found {len(image_files)} files in the directory.")
+
+    slices = [pydicom.dcmread(os.path.join(directory, f)) for f in image_files]
+    print(f"Read {len(slices)} DICOM slices.")
+
     unique_positions = set()
     unique_slices = []
 
-    # Loop through each slice and add it to unique_slices if its position is unique
+    # Loop through each slice
     for s in slices:
         position = float(s.ImagePositionPatient[2])
         if position not in unique_positions:
             unique_slices.append(s)
             unique_positions.add(position)
 
+    print(f"Number of unique slices based on position: {len(unique_slices)}")
+
     # Sort the unique slices
     unique_slices.sort(key=lambda x: float(x.ImagePositionPatient[2]))
+    print("Unique slices sorted based on ImagePositionPatient[2].")
+
+    # Stack and reverse the array
     output_arr = np.stack([s.pixel_array for s in unique_slices])
     output_arr = output_arr[::-1, :, :]
 
+    print("Final output array shape:", output_arr.shape)
     return output_arr
+
 
         
 # def get_3d_image(directory):
@@ -261,29 +272,30 @@ def save_3d_img_to_dcm(array, template_dir, new_dir):
     # Generate template_path from template_dir
     template_path = get_first_dcm_path(template_dir)
 
+    # Read the template DICOM file to get the slice thickness
+    template = pydicom.dcmread(template_path)
+    slice_thickness = float(template.SliceThickness)
+
     # Iterate through the slices and save each one
     for z in range(array.shape[0]):
         slice_arr = array[z, :, :]
-        # Resize the slice
-        pil_img = Image.fromarray(slice_arr)
-        resized_img = pil_img.resize((224, 224), Image.Resampling.LANCZOS)
-        resized_slice_arr = np.array(resized_img)
-        # Read the template DICOM file
-        template = pydicom.dcmread(template_path)
-
+        
         # Create a new DICOM dataset based on the template
         ds = Dataset()
         ds.file_meta = template.file_meta
         ds.update(template)  # Update the dataset with the template
 
         # Update the pixel data
-        ds.PixelData = resized_slice_arr.tobytes()
+        ds.PixelData = slice_arr.tobytes()
 
         # Update the rows and columns based on the array shape
-        ds.Rows, ds.Columns = resized_slice_arr.shape
+        ds.Rows, ds.Columns = slice_arr.shape
 
-        # Update the slice location and instance number
-        ds.SliceLocation = str(z)
+        # Calculate the slice position (ImagePositionPatient[2])
+        initial_position = float(template.ImagePositionPatient[2])
+        ds.ImagePositionPatient[2] = str(initial_position + z * slice_thickness)
+
+        # Update the instance number
         ds.InstanceNumber = str(z)
 
         # Set the endianess and VR encoding
@@ -299,6 +311,7 @@ def save_3d_img_to_dcm(array, template_dir, new_dir):
         print(f"Saved slice {z} to {filename}")
 
     print(f"Saved 3D image to {new_dir}")
+
 
 def save_3d_img_to_png(image_array, new_dir):
     # Check if the directory exists, if not, create it
@@ -487,8 +500,11 @@ def subfolders_to_dictionary(directory):
         region_dict = {}
         for i in os.listdir(directory):
             # print(i)
+            print(os.path.join(directory, i))
             region_dict[i] = get_3d_image(os.path.join(directory, i))
-
+            print("shape of " + i)
+            print(region_dict[i].shape)
+        
         return region_dict
     else:
         return None
@@ -656,9 +672,11 @@ def convert_pngs_to_jpegs(input_dir, output_dir):
 
 
 if __name__ == "__main__":
-    test_dir = "scan1"
-    test_pydicom_arr = get_3d_image(test_dir)
-    display_3d_array_slices(test_pydicom_arr, 20)
+    print("data module test")
+    test_subfolders_to_dictionary("scan 1 atlas seg results")
+    # test_dir = "scan1"
+    # test_pydicom_arr = get_3d_image(test_dir)
+    # display_3d_array_slices(test_pydicom_arr, 20)
     
     # print(is_segment_results_dir("atl_segmentation_DCMs"))
     # print(is_segment_results_dir("atl_segmentation_PNGs"))

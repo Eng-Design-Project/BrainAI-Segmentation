@@ -150,29 +150,26 @@ class CustomClassifierSingleModel:
         return self.classification_dict
 
 class CustomClassifierMultiModel:
-    def __init__(self, regions=None):
-        self.model_dict = {region: buildPixelModel() for region in regions} if regions else {}
-        self.classification_dict = {}
-        self.normalized_data = None
-        self.labeled_data = None
+    def __init__(self, dict_of_np_arrays, labeled_data=None):
+        self.normalized_data = normalize_np_dict(dict_of_np_arrays)
+        self.model_dict = {region: buildPixelModel() for region in self.normalized_data.keys()}
+        self.optimizer_dict = {region: tf.keras.optimizers.Adam() for region in self.normalized_data.keys()}
+        self.labeled_data = labeled_data
         self.windows_dict = {}
-        self.optimizer_dict = {region: tf.keras.optimizers.Adam() for region in regions} if regions else {}
 
-    def executeDL(self, user_score=0, dict_of_np_arrays=None, labeled_data=None):
-        # Initialize data and models
-        if self.normalized_data is None:
-            self.normalized_data = normalize_np_dict(dict_of_np_arrays)
-            for region in self.normalized_data.keys():
-                if region not in self.model_dict:
-                    self.model_dict[region] = buildPixelModel()
-                    self.optimizer_dict[region] = tf.keras.optimizers.Adam()
-
-        # Update labeled data if provided
+    def trainDL(self, user_score=0, labeled_data=None):
+        #update labeled data if provided
         if labeled_data:
             self.labeled_data = labeled_data
+        
+        #holds results of predictions
+        classification_dict = {}
 
         for region, seg_volume in self.normalized_data.items():
-            # Extract windows
+            #extract windows: small convolutional blocks instead of taking the entire image is input
+                #windows are at the edges of the image, we only need to smooth edges not predict entire regions
+                #the center voxel is the subject of prediction
+                
             if region not in self.windows_dict:
                 windows, indices = extract_windows(seg_volume)
                 self.windows_dict[region] = windows[..., np.newaxis]
@@ -183,33 +180,73 @@ class CustomClassifierMultiModel:
             optimizer = self.optimizer_dict[region]
             region_labels = self.labeled_data.get(region) if self.labeled_data else None
 
-            # Training
+            #training: checks if theres labeled data and uses standard .fit(),
+                #otherwise does user feedback training
             if region_labels:
                 model.compile(optimizer=optimizer, loss="sparse_categorical_crossentropy", metrics=["accuracy"])
                 model.fit(windows, region_labels, epochs=10)
             else:
+                print("windows shape")
+                print(windows.shape)
                 train_model_with_user_feedback(model, windows, user_score, optimizer)
 
-            # Prediction
+            #predictions from the model
+            if windows.size == 0:
+                print(f"No windows to process for region: {region}")
+                continue
             predictions = model.predict(windows)
             predicted_labels = np.argmax(predictions, axis=1)
             classified_indices = indices[predicted_labels == 0].tolist()
-            self.classification_dict[region] = classified_indices
+            
+            classification_dict[region] = classified_indices
 
-        return self.classification_dict
-
-
+        return classification_dict
+    
+    def save_models(self, save_dir):
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        
+        for region, model in self.model_dict.items():
+            model_path = os.path.join(save_dir, f'model_{region}.h5')
+            model.save(model_path)
+        print(f"All models saved in {save_dir}")
+    
+    def load_models(self, save_dir):
+        for region in self.normalized_data.keys():
+            model_path = os.path.join(save_dir, f'model_{region}.h5')
+            if os.path.exists(model_path):
+                self.model_dict[region] = tf.keras.models.load_model(model_path)
+            else:
+                print(f"No saved model found for region {region} in {save_dir}")
+    
+    def predict(self, dict_of_np_arrays):
+        predictions_dict = {}
+        for region, seg_volume in dict_of_np_arrays.items():
+            if region in self.model_dict:
+                windows, _ = extract_windows(seg_volume)
+                windows = windows[..., np.newaxis]
+                model = self.model_dict[region]
+                predictions = model.predict(windows)
+                predicted_labels = np.argmax(predictions, axis=1)
+                predictions_dict[region] = predicted_labels
+            else:
+                print(f"No model found for region {region}")
+        return predictions_dict
 
 if __name__ == '__main__':
     print("running dl module")
     # classifier = CustomClassifierSingleModel()
-    regions = ["Brain"]
-    classifier = CustomClassifierMultiModel(regions)
+    
     #need dict of np arrays
     test_data_input = data.subfolders_to_dictionary("scan 1 atlas seg results.DCMs")
+    for key in test_data_input.keys():
+        print(key + " shape:")
+        print(test_data_input[key].shape)
+
     if (test_data_input != None):
         del test_data_input["Skull"]
-        classif_dict = classifier.executeDL(0, test_data_input)
+        classifier = CustomClassifierMultiModel(test_data_input)
+        classif_dict = classifier.trainDL()
         for keys, values in classif_dict.items():
             print(keys, ": ", values)
         results = segmentation.filter_noise_from_images(test_data_input, classif_dict)
@@ -291,4 +328,57 @@ def build_boundary_window_model(window_size=3):
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     return model
 '''
+
+'''
+
+class CustomClassifierMultiModelold:
+    def __init__(self, regions=None):
+        self.model_dict = {region: buildPixelModel() for region in regions} if regions else {}
+        self.classification_dict = {}
+        self.normalized_data = None
+        self.labeled_data = None
+        self.windows_dict = {}
+        self.optimizer_dict = {region: tf.keras.optimizers.Adam() for region in regions} if regions else {}
+
+    def trainDL(self, user_score=0, dict_of_np_arrays=None, labeled_data=None):
+        # Initialize data and models
+        if self.normalized_data is None:
+            self.normalized_data = normalize_np_dict(dict_of_np_arrays)
+            for region in self.normalized_data.keys():
+                if region not in self.model_dict:
+                    self.model_dict[region] = buildPixelModel()
+                    self.optimizer_dict[region] = tf.keras.optimizers.Adam()
+
+        # Update labeled data if provided
+        if labeled_data:
+            self.labeled_data = labeled_data
+
+        for region, seg_volume in self.normalized_data.items():
+            # Extract windows
+            if region not in self.windows_dict:
+                windows, indices = extract_windows(seg_volume)
+                self.windows_dict[region] = windows[..., np.newaxis]
+            else:
+                windows = self.windows_dict[region]
+
+            model = self.model_dict[region]
+            optimizer = self.optimizer_dict[region]
+            region_labels = self.labeled_data.get(region) if self.labeled_data else None
+
+            # Training
+            if region_labels:
+                model.compile(optimizer=optimizer, loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+                model.fit(windows, region_labels, epochs=10)
+            else:
+                train_model_with_user_feedback(model, windows, user_score, optimizer)
+
+            # Prediction
+            predictions = model.predict(windows)
+            predicted_labels = np.argmax(predictions, axis=1)
+            classified_indices = indices[predicted_labels == 0].tolist()
+            self.classification_dict[region] = classified_indices
+
+        return self.classification_dict
+    
+    '''
 
