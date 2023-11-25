@@ -1,3 +1,5 @@
+
+
 import numpy as np
 import matplotlib.pyplot as plt
 import SimpleITK as sitk
@@ -36,7 +38,7 @@ def create_image_from_regions(image, region_dict):
     return output_images
 
 
-image = data.get_3d_image("scan1")
+#image = data.get_3d_image("scan1")
 
 def generate_regions():
     region1 = [[x, y, z] for x in range(0, 51) for y in range(0, 51) for z in range(0, 51)]
@@ -50,24 +52,26 @@ def generate_regions():
     return region_dict
 
 
-# Define your regions and their coordinates here
-region_dict = generate_regions()
+# # Define your regions and their coordinates here
+# region_dict = generate_regions()
 
-region_images = create_image_from_regions(image, region_dict)
+# region_images = create_image_from_regions(image, region_dict)
 
-# Display each region
-for region_name, region_image in region_images.items():
-    print(region_name)
-    print(region_image.GetSize())
+# # Display each region
+# for region_name, region_image in region_images.items():
+#     print(region_name)
+#     print(region_image.GetSize())
 
-    plt.figure(figsize=(6, 6))
-    array_from_image = sitk.GetArrayFromImage(region_image)
-        # Displaying the first slice of the 3D image
-    plt.imshow(array_from_image[0, :, :], cmap='gray')
-    plt.axis('off')
-    plt.title(f"Region: {region_name}")
-    plt.show()
-
-
-
-
+#     plt.figure(figsize=(6, 6))
+#     array_from_image = sitk.GetArrayFromImage(region_image)
+#         # Displaying the first slice of the 3D image
+#     plt.imshow(array_from_image[0, :, :], cmap='gray')
+#     plt.axis('off')
+#     plt.title(f"Region: {region_name}")
+#     plt.show()
+if __name__ == "__main__":
+    # large_atlas = data.get_3d_image("large atlas")
+    # print(large_atlas.shape)
+    # large_atlas = large_atlas[::-1, :, :]
+    # data.save_3d_img_to_dcm(large_atlas, "large atlas", "large atlas resorted")
+    data.save_dcm_dir_to_png_dir("large atlas resorted", "large atlas resorted pngs")

@@ -621,10 +621,15 @@ class Core:
         # use functions in data to read the atlas and 
         #   the image in question into memory here as 3d np array images
         image = data.get_3d_image(self.selected_folder)
-        atlas_path = data.get_atlas_path()
-        atlas = data.get_3d_image(atlas_path)
+
+        image_depth = image.shape[0]   
+        atlas_paths = data.get_atlas_path(image_depth)
+        #if atlas_paths = 0  popup "Image too large" break out of function
+        atlas = data.get_3d_image(atlas_paths[0])
         # get atlas colors as 3d np array
-        color_atlas = data.get_2d_png_array_list("color atlas")
+        color_atlas = data.get_2d_png_array_list(atlas_paths[1])
+
+             
         # call execute atlas seg, passing image, atlas and atlas colors as args
         seg_results = segmentation.execute_atlas_seg(atlas, color_atlas, image)
         data.segmentation_results = seg_results

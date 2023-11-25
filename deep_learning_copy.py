@@ -130,6 +130,7 @@ def show_slices(triplets):
 # Change file path to your own file path to my_model.keras
 def dlAlgorithm(segmentDict, depth=5, model_path='C:\\Users\\Justin Rivera\\OneDrive\\Documents\\ED1\\BrainAI-Segmentation\\my_model.keras'):
     normalizedDict = normalizeTF(segmentDict)
+    
     model_exists = os.path.exists(model_path)
     if model_exists:
         print("Loading pre-trained model...")
@@ -153,12 +154,6 @@ def dlAlgorithm(segmentDict, depth=5, model_path='C:\\Users\\Justin Rivera\\OneD
         # Save the model only after training
         model.save(model_path)
 
-        # Plot the loss after training
-        plt.plot([l[0] for l in loss_list])  # Assuming 'l' has the loss in index 0
-        plt.title('Model Loss')
-        plt.ylabel('Loss')
-        plt.xlabel('Batch')
-        plt.show()
 
     # Prediction and visualization block, executed regardless of whether the model was trained or loaded
     all_triplets = []
