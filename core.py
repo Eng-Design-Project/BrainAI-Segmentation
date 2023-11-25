@@ -346,42 +346,6 @@ class Core:
         # Close the popup window
         popup_window.destroy()
 
-        #***************************************************************************************
-        # if source == "file":
-        #     # Add code to get the selected file or folder here and store it
-        #     selected_folder = self.get_selected_folder()
-        #     data.set_seg_results(selected_folder)
-        #     self.segmentation_results = data.segmentation_results
-        #     print("Selected file or folder:", selected_folder)
-        #     #call execute clustering here
-
-        #     # Logic to perform clustering from a file and set the clustering_results variable
-        #     clustering_results = {}  # Implement file-based clustering logic here
-        # elif source == "memory":
-        #     # Logic to perform clustering from memory and set the clustering_results variable
-        #     data.set_seg_results()
-        #     self.segmentation_results = data.segmentation_results
-        #     clustering_results = {}  # Implement memory-based clustering logic here
-
-        # # Display clustering results within the GUI
-        # self.display_clustering_results(algorithm, clustering_results)
-
-        # # You can use labels or other widgets to display the clustering results.
-
-        # # Set image paths and current image index (replace with your own data)
-        # folder_path = "scan1_pngs"
-        # self.image_paths = [os.path.join(folder_path, filename) for filename in os.listdir(folder_path) if filename.endswith(".png")]
-        # self.current_image_index = 0
-
-        # # Show or hide "Previous" and "Next" buttons based on whether images are available
-        # if self.image_paths:
-        #     self.show_current_image()
-        #     self.previous_button.pack(pady=10, anchor="center")
-        #     self.next_button.pack(pady=10, anchor="center")
-        # else:
-        #     self.previous_button.pack_forget()
-        #     self.next_button.pack_forget()
-
     #this isn't currently in use, any type of seg results should be displayed by one function
     def display_clustering_results_deprecated(self, algorithm, clustering_results):
         # Create a label or canvas to display the clustering results
@@ -543,6 +507,7 @@ class Core:
                 
             else:
                 print("segment custom")
+                self.train_custom_dl_model(data.segmentation_results)
             
                     
         if seg_var == "Whole Scan":
@@ -550,12 +515,31 @@ class Core:
                 print("whole scan u-net")
             else:
                 print("whole scan custom")
+                self.train_custom_dl_model(volume)
+
             
             #self.show_seg_results(dl_dict)
     
         # Close the popup window
         popup_window.destroy()
 
+    def train_custom_dl_model(self, input):
+        print("training custom dl model")
+        dict_of_3d_arrays = {}
+        if isinstance(input, dict):
+            print("input is a dictionary.")
+            dict_of_3d_arrays = input
+        else:
+            print("input is an array.")
+            dict_of_3d_arrays["FullScan"] = input
+        classifier = deep_learning.CustomClassifierMultiModel(dict_of_3d_arrays)
+        classif_dict = classifier.trainDL()
+        results = segmentation.filter_noise_from_images(dict_of_3d_arrays, classif_dict)
+        data.display_seg_np_images(results)
+            
+
+
+        
     def get_selected_segmentation_method(self):
         #later, this will be removed. when a button calls a function,
         #  we should know which algo is being called by passing an argument
@@ -644,6 +628,7 @@ class Core:
              
         # call execute atlas seg, passing image, atlas and atlas colors as args
         seg_results = segmentation.execute_atlas_seg(atlas, color_atlas, image)
+        del seg_results["Skull"]
         data.segmentation_results = seg_results
         # returns dict of simple itk images
         # save them as dcms to the nested folder

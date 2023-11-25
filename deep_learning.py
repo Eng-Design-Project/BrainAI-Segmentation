@@ -238,7 +238,7 @@ if __name__ == '__main__':
     # classifier = CustomClassifierSingleModel()
     
     #need dict of np arrays
-    test_data_input = data.subfolders_to_dictionary("scan 1 atlas seg results.DCMs")
+    test_data_input = data.subfolders_to_dictionary("scan1 atl seg.DCMs")
     for key in test_data_input.keys():
         print(key + " shape:")
         print(test_data_input[key].shape)
@@ -247,8 +247,8 @@ if __name__ == '__main__':
         del test_data_input["Skull"]
         classifier = CustomClassifierMultiModel(test_data_input)
         classif_dict = classifier.trainDL()
-        for keys, values in classif_dict.items():
-            print(keys, ": ", values)
+        # for keys, values in classif_dict.items():
+        #     print(keys, ": ", values)
         results = segmentation.filter_noise_from_images(test_data_input, classif_dict)
         data.display_seg_np_images(results)
     

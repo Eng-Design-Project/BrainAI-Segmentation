@@ -440,11 +440,12 @@ def store_seg_img_on_file(dict, template_dir, new_dir):
     
     for key in dict:
         # making a sub folder based on the brain region name
-        sub_dir = os.path.join(new_dir, key)
-        os.makedirs(sub_dir)
+        if key != "Skull":
+            sub_dir = os.path.join(new_dir, key)
+            os.makedirs(sub_dir)
 
-        save_3d_img_to_dcm(dict[key], template_dir, sub_dir)
-        #print("key:", key)
+            save_3d_img_to_dcm(dict[key], template_dir, sub_dir)
+            #print("key:", key)
 
 def test_store_seg_img_on_file(new_dir):
     ## the following code tests the "store_sec_img_on_file()"" functions
@@ -462,12 +463,13 @@ def store_seg_png_on_file(dict, new_dir):
         os.makedirs(new_dir)
     
     for key in dict:
-        # making a sub folder based on the brain region name
-        sub_dir = os.path.join(new_dir, key)
-        os.makedirs(sub_dir)
+        if key != "Skull":
+            # making a sub folder based on the brain region name
+            sub_dir = os.path.join(new_dir, key)
+            os.makedirs(sub_dir)
 
-        save_3d_img_to_png(dict[key], sub_dir)
-        #print("key:", key)
+            save_3d_img_to_png(dict[key], sub_dir)
+            #print("key:", key)
 
 # the function below takes a dictionary of 3d np array images and returns an equivalent dict of png images
 # img_dict parameter is a dictionary whose keys are strings, and values are 3d np array 3d images
