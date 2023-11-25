@@ -301,7 +301,7 @@ def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='my_model.ke
             return
 
     elif segmentation_type == 'internal':
-        models_internal = {}
+        
         region_options = {
             1: "Frontal Lobe",
             2: "Temporal Lobe",
