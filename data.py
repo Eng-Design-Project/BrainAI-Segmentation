@@ -426,13 +426,16 @@ def array_dict_to_png_dict(img_dict):
 # the output is a dictionary with brain region names as keys and 3d np array images as values
 def subfolders_to_dictionary(directory):
     #print(os.listdir(directory))
-    region_dict = {}
-    for i in os.listdir(directory):
-        # print(i)
-        region_dict[i] = get_3d_image(os.path.join(directory, i))
+    is_valid = is_segment_results_dir(directory)
+    if (is_valid):
+        region_dict = {}
+        for i in os.listdir(directory):
+            # print(i)
+            region_dict[i] = get_3d_image(os.path.join(directory, i))
 
-    return region_dict
-
+        return region_dict
+    else:
+        return None
     
 
 # the following code tests the "subfolders_to_dictionary()" function

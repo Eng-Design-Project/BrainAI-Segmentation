@@ -207,12 +207,14 @@ if __name__ == '__main__':
     classifier = CustomClassifierMultiModel(regions)
     #need dict of np arrays
     test_data_input = data.subfolders_to_dictionary("scan 1 atlas seg results.DCMs")
-    del test_data_input["Skull"]
-    classif_dict = classifier.executeDL(0, test_data_input)
-    for keys, values in classif_dict.items():
-       print(keys, ": ", values)
-    results = segmentation.filter_noise_from_images(test_data_input, classif_dict)
-    data.display_seg_np_images(results)
+    if (test_data_input != None):
+        del test_data_input["Skull"]
+        classif_dict = classifier.executeDL(0, test_data_input)
+        for keys, values in classif_dict.items():
+            print(keys, ": ", values)
+        results = segmentation.filter_noise_from_images(test_data_input, classif_dict)
+        data.display_seg_np_images(results)
+    
 
     #need to put execution in for loop, get user_score each time
     #need to generate some labeled data: handmake a brain with neat boundary, extract windows, label all windows 1
