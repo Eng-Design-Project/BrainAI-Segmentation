@@ -19,6 +19,23 @@ def generate_dummy_labeled_data(windows_dict):
         labeled_data[region] = labels
     return labeled_data
 
+
+#hoping to give the model a starting point to work with,
+#  so it can make predictions at the start that are at least passable
+def generate_heuristic_labeled_data(windows_dict, threshold=0.3):
+    labeled_data = {}
+    for region, windows in windows_dict.items():
+        labels = []
+        for window in windows:
+            #calculate the proportion of voxels in the window that are above the threshold
+            prop_above_threshold = np.mean(window > threshold)
+            #if the majority of voxels are above the threshold, label as 0, else 1
+            label = 0 if prop_above_threshold > 0.5 else 1
+            labels.append(label)
+        labeled_data[region] = np.array(labels)
+    return labeled_data
+
+
 #normalizes pixel value of 3d array dict
 def normalize_np_dict(volume3dDict):
     normalizedDict = {}
@@ -91,113 +108,47 @@ def train_model_with_user_feedback(model, windows, user_score, optimizer):
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
     return loss
 
-
-#class version of executeDL: no need to output and reinput things other than user_score
-#notes: this class assumes one model can be used for all regions to be classified.
-#  Probably not the case, so another class will be made that has a seperate model for each region
-class CustomClassifierSingleModel:
-    def __init__(self, initial_model=None):
-        self.model = initial_model if initial_model else buildPixelModel()
-        #self.models = {"brain": buildPixelModel()}
-        self.classification_dict = {}
-        self.normalized_data = None
-        self.labeled_data = None
-        self.windows_dict = {}
-        self.optimizer = tf.keras.optimizers.Adam()  # Initialize once at the class level
-
-    def executeDL(self, user_score=0, dict_of_np_arrays=None, labeled_data=None):
-
-        # initialize data on first run of executeDL
-        if self.normalized_data is None:
-            self.normalized_data = normalize_np_dict(dict_of_np_arrays)
-
-        # update labeled_data if it's given
-        if labeled_data:
-            self.labeled_data = labeled_data
-
-        for region, seg_volume in self.normalized_data.items():
-            if region not in self.windows_dict:
-                windows, indices = extract_windows(seg_volume)
-                for i, window in enumerate(windows[:15]):  # Print first 5 windows
-                    print(f"Window {i}: shape = {window.shape}")
-                    print("First slice of the window:")
-                    print(window[0, :, :])  # This will print only the first slice of the 3D window
-                self.windows_dict[region] = windows[..., np.newaxis]  # Adding a channel dimension
-                print("region not in windows dict")
-            else:
-                windows = self.windows_dict[region]
-                print("region in windows dict")
-
-            # Using the labeled_data for the specific region if available
-            region_labels = self.labeled_data.get(region) if self.labeled_data else None
-
-            # No need to compile multiple times, so we check if it's compiled.
-            if not hasattr(self.model, 'optimizer'):
-                self.model.compile(optimizer=self.optimizer, loss="sparse_categorical_crossentropy", metrics=["accuracy"])
-
-            if region_labels:
-                self.model.fit(windows, region_labels, epochs=10)  # or any other number of epochs
-                #self.models[region].fit(....)
-            train_model_with_user_feedback(self.model, windows, user_score, self.optimizer)
-
-            predictions = self.model.predict(windows)
-            predicted_labels = np.argmax(predictions, axis=1)
-
-            # Filter out the indices where the prediction is positive
-            classified_indices = indices[predicted_labels == 0].tolist()
-            self.classification_dict[region] = classified_indices
-
-        return self.classification_dict
-
+    
 class CustomClassifierMultiModel:
-    def __init__(self, dict_of_np_arrays, labeled_data=None):
+    def __init__(self, dict_of_np_arrays):
         self.normalized_data = normalize_np_dict(dict_of_np_arrays)
         self.model_dict = {region: buildPixelModel() for region in self.normalized_data.keys()}
         self.optimizer_dict = {region: tf.keras.optimizers.Adam() for region in self.normalized_data.keys()}
-        self.labeled_data = labeled_data
         self.windows_dict = {}
-
-    def trainDL(self, user_score=0, labeled_data=None):
-        #update labeled data if provided
-        if labeled_data:
-            self.labeled_data = labeled_data
+        self.indices_dict = {}
         
-        #holds results of predictions
-        classification_dict = {}
+        #extract windows from input data
+        for region, seg_volume in self.normalized_data.items():
+            windows, indices = extract_windows(seg_volume)
+            self.windows_dict[region] = windows[..., np.newaxis]
+            self.indices_dict[region] = indices
+        
+        self.labeled_data = generate_heuristic_labeled_data(self.windows_dict)
 
         for region, seg_volume in self.normalized_data.items():
-            #extract windows: small convolutional blocks instead of taking the entire image is input
-                #windows are at the edges of the image, we only need to smooth edges not predict entire regions
-                #the center voxel is the subject of prediction
-                
-            if region not in self.windows_dict:
-                windows, indices = extract_windows(seg_volume)
-                self.windows_dict[region] = windows[..., np.newaxis]
-            else:
-                windows = self.windows_dict[region]
-
             model = self.model_dict[region]
             optimizer = self.optimizer_dict[region]
-            region_labels = self.labeled_data.get(region) if self.labeled_data else None
+            region_labels = self.labeled_data[region]
+            model.compile(optimizer=optimizer, loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+            model.fit(self.windows_dict[region], region_labels, epochs=10)
 
-            #training: checks if theres labeled data and uses standard .fit(),
-                #otherwise does user feedback training
-            if region_labels:
-                model.compile(optimizer=optimizer, loss="sparse_categorical_crossentropy", metrics=["accuracy"])
-                model.fit(windows, region_labels, epochs=10)
-            else:
-                print("windows shape")
-                print(windows.shape)
-                train_model_with_user_feedback(model, windows, user_score, optimizer)
+    def trainDL(self, user_score=0):
+        classification_dict = {}
+        for region, windows in self.windows_dict.items():
+            model = self.model_dict[region]
+            optimizer = self.optimizer_dict[region]
 
-            #predictions from the model
+            # User feedback training
             if windows.size == 0:
                 print(f"No windows to process for region: {region}")
                 continue
+
+            train_model_with_user_feedback(model, windows, user_score, optimizer)
+
+            # Predictions
             predictions = model.predict(windows)
             predicted_labels = np.argmax(predictions, axis=1)
-            classified_indices = indices[predicted_labels == 0].tolist()
-            
+            classified_indices = self.indices_dict[predicted_labels == 1].tolist()
             classification_dict[region] = classified_indices
 
         return classification_dict
@@ -245,6 +196,7 @@ if __name__ == '__main__':
 
     if (test_data_input != None):
         del test_data_input["Skull"]
+
         classifier = CustomClassifierMultiModel(test_data_input)
         classif_dict = classifier.trainDL()
         # for keys, values in classif_dict.items():
@@ -330,6 +282,62 @@ def build_boundary_window_model(window_size=3):
 '''
 
 '''
+#class version of executeDL: no need to output and reinput things other than user_score
+#notes: this class assumes one model can be used for all regions to be classified.
+#  Probably not the case, so another class will be made that has a seperate model for each region
+class CustomClassifierSingleModel:
+    def __init__(self, initial_model=None):
+        self.model = initial_model if initial_model else buildPixelModel()
+        #self.models = {"brain": buildPixelModel()}
+        self.classification_dict = {}
+        self.normalized_data = None
+        self.labeled_data = None
+        self.windows_dict = {}
+        self.optimizer = tf.keras.optimizers.Adam()  # Initialize once at the class level
+
+    def executeDL(self, user_score=0, dict_of_np_arrays=None, labeled_data=None):
+
+        # initialize data on first run of executeDL
+        if self.normalized_data is None:
+            self.normalized_data = normalize_np_dict(dict_of_np_arrays)
+
+        # update labeled_data if it's given
+        if labeled_data:
+            self.labeled_data = labeled_data
+
+        for region, seg_volume in self.normalized_data.items():
+            if region not in self.windows_dict:
+                windows, indices = extract_windows(seg_volume)
+                for i, window in enumerate(windows[:15]):  # Print first 5 windows
+                    print(f"Window {i}: shape = {window.shape}")
+                    print("First slice of the window:")
+                    print(window[0, :, :])  # This will print only the first slice of the 3D window
+                self.windows_dict[region] = windows[..., np.newaxis]  # Adding a channel dimension
+                print("region not in windows dict")
+            else:
+                windows = self.windows_dict[region]
+                print("region in windows dict")
+
+            # Using the labeled_data for the specific region if available
+            region_labels = self.labeled_data.get(region) if self.labeled_data else None
+
+            # No need to compile multiple times, so we check if it's compiled.
+            if not hasattr(self.model, 'optimizer'):
+                self.model.compile(optimizer=self.optimizer, loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+
+            if region_labels:
+                self.model.fit(windows, region_labels, epochs=10)  # or any other number of epochs
+                #self.models[region].fit(....)
+            train_model_with_user_feedback(self.model, windows, user_score, self.optimizer)
+
+            predictions = self.model.predict(windows)
+            predicted_labels = np.argmax(predictions, axis=1)
+
+            # Filter out the indices where the prediction is positive
+            classified_indices = indices[predicted_labels == 0].tolist()
+            self.classification_dict[region] = classified_indices
+
+        return self.classification_dict
 
 class CustomClassifierMultiModelold:
     def __init__(self, regions=None):
