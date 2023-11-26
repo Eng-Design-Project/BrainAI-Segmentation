@@ -4,13 +4,10 @@ from scipy.ndimage import convolve
 from skimage.transform import resize
 import data
 import matplotlib.pyplot as plt
-#from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 import os
 from keras.models import load_model
 from tensorflow.keras.utils import to_categorical
-#from PIL import Image
 import glob
-#from skimage.io import imread
 import pydicom
 
 def load_dcm_images_from_folder(folder, target_size=(128, 128)):
