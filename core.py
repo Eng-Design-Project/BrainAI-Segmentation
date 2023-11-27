@@ -323,8 +323,8 @@ class Core:
             #the first argument should be a pre-atlas segmented scan, the 2nd argument should be a string of the chosen algo
             dict_of_coords_dicts = clustering.execute_seg_clustering(data.segmentation_results, algorithm, 5)
             for region in data.segmentation_results.keys():
-                cluster_dict = segmentation.create_seg_images_from_image(data.segmentation_results[region], dict_of_coords_dicts[region])
-                self.show_seg_results(cluster_dict)
+                clustered_dict = segmentation.create_seg_images_from_image(data.segmentation_results[region], dict_of_coords_dicts[region])
+                self.show_seg_results(clustered_dict)
                 # for cluster in clustered_dict.keys():
                 #     self.show_image_results(clustered_dict[cluster])
                     
@@ -535,7 +535,7 @@ class Core:
         classifier = deep_learning.CustomClassifierMultiModel(dict_of_3d_arrays)
         classif_dict = classifier.trainDL()
         results = segmentation.filter_noise_from_images(dict_of_3d_arrays, classif_dict)
-        data.display_seg_np_images(results)
+        self.show_seg_results(results)
             
 
 
