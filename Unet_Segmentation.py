@@ -352,6 +352,7 @@ def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='my_model.ke
 
 if __name__ == "__main__":
     # Paths to the folders containing images for each brain region
+
     internal_folder_paths = {
         "Frontal Lobe": "Internal Segment DCM unet\\Frontal",
         "Temporal Lobe": "Internal Segment DCM unet\\Temporal",

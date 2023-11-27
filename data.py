@@ -670,7 +670,43 @@ def convert_pngs_to_jpegs(input_dir, output_dir):
             img_path = os.path.join(input_dir, filename)
             img = Image.open(img_path)
             # Resize and save as JPEG
-            img.resize((224, 224)).convert('RGB').save(os.path.join(output_dir, filename.replace('.png', '.jpeg')), 'JPEG')    
+            img.resize((224, 224)).convert('RGB').save(os.path.join(output_dir, filename.replace('.png', '.jpeg')), 'JPEG')
+            
+def crop_image_to_boundary(image, border=5):
+    """
+    Crop an image so that any edge is within 5 pixels of the image boundary.
+
+    Args:
+    image (PIL.Image): The image to be cropped.
+    border (int): The distance from the edge to stop cropping.
+
+    Returns:
+    PIL.Image: The cropped image.
+    """
+    # Convert image to numpy array
+    np_image = np.array(image)
+
+    # Find the coordinates of the first non-black pixels from each edge
+    rows = np.any(np_image > 0, axis=1)
+    cols = np.any(np_image > 0, axis=0)
+
+    # Check if the image contains non-black pixels
+    if not np.any(rows) or not np.any(cols):
+        # If the image is entirely black, return the original image
+        return image
+
+    ymin, ymax = np.where(rows)[0][[0, -1]]
+    xmin, xmax = np.where(cols)[0][[0, -1]]
+
+    # Adjust for the border
+    ymin = max(ymin - border, 0)
+    ymax = min(ymax + border, image.height)
+    xmin = max(xmin - border, 0)
+    xmax = min(xmax + border, image.width)
+
+    # Crop and return the image
+    cropped_image = image.crop((xmin, ymin, xmax, ymax))
+    return cropped_image                            
 
 
 if __name__ == "__main__":

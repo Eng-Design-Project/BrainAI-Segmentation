@@ -4,9 +4,11 @@ from tkinter import ttk
 from tkinter import Canvas, Scrollbar, Frame
 from tkinter import messagebox
 import numpy as np
+import numpy as np
+from skimage.transform import resize
 
 
-from PIL import Image, ImageTk, ImageOps  # Import PIL for image manipulation
+from PIL import Image, ImageTk, ImageOps, ImageChops  # Import PIL for image manipulation
 from tkinter import Toplevel, Radiobutton, Button, StringVar
 
 
@@ -16,7 +18,7 @@ import clustering
 import segmentation
 import data
 import os
-import deep_learning_copy
+import Unet_Segmentation
 import deep_learning
 
 
@@ -504,6 +506,7 @@ class Core:
             #the first argument should be a pre-atlas segmented scan, the 2nd argument should be a string of the chosen algo
             if algorithm == "U-net":
                 print("segment u-net")
+                self.train_unet_model(data.segmentation_results, 'internal')  # or 'skull'
                 
             else:
                 print("segment custom")
@@ -513,6 +516,7 @@ class Core:
         if seg_var == "Whole Scan":
             if algorithm == "U-net":
                 print("whole scan u-net")
+                self.train_unet_model(volume, 'skull')  # or 'skull'
             else:
                 print("whole scan custom")
                 self.train_custom_dl_model(volume)
@@ -536,6 +540,35 @@ class Core:
         classif_dict = classifier.trainDL()
         results = segmentation.filter_noise_from_images(dict_of_3d_arrays, classif_dict)
         data.display_seg_np_images(results)
+
+    def train_unet_model(self, input, algorithm_type):
+        print("training U-net model")
+        dict_of_3d_arrays = {}
+        if isinstance(input, dict):
+            print("input is a dictionary.")
+            dict_of_3d_arrays = input
+        else:
+            print("input is an array.")
+            dict_of_3d_arrays["FullScan"] = input
+
+        file_names = list(dict_of_3d_arrays.keys())
+
+        # Initialize internal_folder_paths with actual paths or logic
+        internal_folder_paths = {
+            "Frontal Lobe": "Internal Segment DCM unet\Frontal",
+            "Temporal Lobe": "Internal Segment DCM unet\Temporal",
+            "Occipital Lobe": "Internal Segment DCM unet\Occipital",
+            "White Matter": "Internal Segment DCM unet\White Matter",
+        }
+
+        # Assuming 'algorithm_type' is either 'internal' or 'skull'
+        Unet_Segmentation.dlAlgorithm(
+            segmentDict=dict_of_3d_arrays,
+            file_names=file_names,
+            internal_folder_paths=internal_folder_paths,
+            binary_model_path='my_model.keras',  # Adjust as needed
+            segmentation_type=algorithm_type
+        )
             
 
 
@@ -587,7 +620,7 @@ class Core:
         }
 
         # Call the dlAlgorithm function from deep_learning_copy module
-        deep_learning_copy.dlAlgorithm(images_dict)
+        Unet_Segmentation.dlAlgorithm(images_dict)
 
     def custom_askdirectory(title):
         #might replace other usses of askdirectory, to display a message
@@ -878,18 +911,34 @@ class Core:
         segmentation_indexes = {region: 0 for region in pngs_dict.keys()}
         current_segmentation = next(iter(pngs_dict))  # Initialize with the first key
 
+        def is_image_all_white(img):
+            """Check if the image is completely white."""
+            # Create a completely white image of the same size
+            white_img = Image.new('L', img.size, 255)
+            # Use ImageChops to subtract the white image from the input image
+            diff_img = ImageChops.difference(img, white_img)
+            # If the difference is all black, the input image is all white
+            return not diff_img.getbbox()
+
         def update_image():
             index = segmentation_indexes[current_segmentation]
             image_list = pngs_dict[current_segmentation]
             image = image_list[index]
 
-            # Convert the image to grayscale
-            image = ImageOps.grayscale(image)
+           
 
-            # Set all white pixels to black (assuming white pixels have value 255)
-            image = image.point(lambda p: p if p != 255 else 0)
+            # Crop the image
+            image = data.crop_image_to_boundary(image, border=5)
 
-            # Resize the image to 224x224 using LANCZOS (formerly ANTIALIAS)
+            # Check if the whole image is white
+            if is_image_all_white(image):
+                # If so, set all pixels to black
+                image = Image.new('L', image.size, 0)
+            else:
+                # Else, do nothing (retain the original image)
+                pass
+
+            # Resize the image to 224x224 using LANCZOS
             image = image.resize((224, 224), Image.Resampling.LANCZOS)
 
             photo = ImageTk.PhotoImage(image)
