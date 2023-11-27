@@ -16,7 +16,7 @@ import clustering
 import segmentation
 import data
 import os
-import deep_learning_copy
+import Unet_Segmentation
 import deep_learning
 
 
@@ -586,8 +586,8 @@ class Core:
             "image2": data.get_3d_image("scan2"),
         }
 
-        # Call the dlAlgorithm function from deep_learning_copy module
-        deep_learning_copy.dlAlgorithm(images_dict)
+        # Call the dlAlgorithm function from Unet_segmentation module
+        Unet_Segmentation.dlAlgorithm(images_dict)
 
     def custom_askdirectory(title):
         #might replace other usses of askdirectory, to display a message
