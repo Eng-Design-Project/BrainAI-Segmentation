@@ -4,14 +4,14 @@ from scipy.ndimage import convolve
 from skimage.transform import resize
 import data
 import matplotlib.pyplot as plt
-#from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 import os
 from keras.models import load_model
 from tensorflow.keras.utils import to_categorical
-#from PIL import Image
 import glob
-#from skimage.io import imread
 import pydicom
+import tkinter as tk
+from tkinter import simpledialog
+
 
 def load_dcm_images_from_folder(folder, target_size=(128, 128)):
     images = []
@@ -48,7 +48,7 @@ def weighted_binary_crossentropy(y_true, y_pred):
 
 
 # Function to create a U-Net model for 3D image segmentation
-def unet(input_size=(5, 128, 128, 1)):  # Notice the change in the last dimension
+def unet_generate_model(input_size=(5, 128, 128, 1)):  # Notice the change in the last dimension
     inputs = tf.keras.layers.Input(input_size)
     
 # Encoder layers (convolutions and pooling)
@@ -244,8 +244,24 @@ def show_slices(triplets, threshold=0.5, brightening_factor=1.3):  # Adjust thre
         axes[1, i].set_title("Segmented")
         axes[1, i].axis('off')
 
-    plt.suptitle("Original and Brightened Segmented")
     plt.show()
+
+
+
+def get_unet_result_coordinates(original, new):
+
+    coordinates_dict = {}
+    #We want all coordinates NOT 
+    for key in original.keys():
+        coordinate_list = []
+        for x in range(original[key].size[0]):
+            for y in range(original[key].size[1]):
+                for z in range(original[key].size[2]):
+                    if not new[key][x,y,z] > original[key][x,y,z]:
+                        coordinate_list.append([x,y,z])
+        coordinates_dict[key] = coordinate_list
+
+    return coordinates_dict
 
 
 def normalize_image(image):
@@ -278,6 +294,17 @@ def prepare_data_for_training(img_array, depth=5, num_classes=5):
 
     return X_train, Y_train
 
+
+def get_user_selection(region_options):
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+
+    region_selection = simpledialog.askinteger("Select Region",
+                                               "Select the region to visualize:\n" +
+                                               "\n".join([f"{k}: {v}" for k, v in region_options.items()]),
+                                               parent=root)
+    return region_selection
+
 def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='my_model.keras',
                 internal_folder_paths=None, segmentation_type='internal'):
 
@@ -302,21 +329,12 @@ def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='my_model.ke
 
     elif segmentation_type == 'internal':
         
-        region_options = {
-            1: "Frontal Lobe",
-            2: "Temporal Lobe",
-            3: "Occipital Lobe",
-            4: "White Matter"
-        }
+        for region_name, folder_path in internal_folder_paths.items():
+            print(f"Processing region: {region_name}")
 
-        region_selection = int(input("Select the region to visualize (1-Frontal, 2-Temporal, 3-Occipital, 4-White Matter): ").strip())
-        region_to_view = region_options.get(region_selection, None)
-        
-        if region_to_view:
-            folder_path = internal_folder_paths[region_to_view]
-            model_path = os.path.join(folder_path, f"{region_to_view.lower().replace(' ', '_')}_model.keras")
+            model_path = os.path.join(folder_path, f"{region_name.lower().replace(' ', '_')}_model.keras")
             if not os.path.exists(model_path):
-                print(f"Training new model for {region_to_view}...")
+                print(f"Training new model for {region_name}...")
                 images = load_dcm_images_from_folder(folder_path)
                 X_train, Y_train = prepare_data_for_training(images, depth=depth, num_classes=5)
                 model = unet_internal(input_size=(128, 128, 1), num_classes=5)
@@ -324,7 +342,7 @@ def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='my_model.ke
                 ensure_directory_exists(folder_path)
                 model.save(model_path)
             else:
-                print(f"Loading model for {region_to_view} from {model_path}...")
+                print(f"Loading model for {region_name} from {model_path}...")
                 model = load_model(model_path)
             
             images = load_dcm_images_from_folder(folder_path)
@@ -336,19 +354,104 @@ def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='my_model.ke
                 pred = model.predict(slice_2d_normalized)
                 all_triplets.append((slice_2d, pred[0])) 
 
-    # Visualization loop
-    if all_triplets:
-        print("Processing complete, now displaying images.")
-        triplet_index = 0
-        while triplet_index < len(all_triplets):
-            batch_triplets = all_triplets[triplet_index:triplet_index + 3]
-            show_slices(batch_triplets)  
-            triplet_index += 3
-            if triplet_index < len(all_triplets):
-                proceed = input("Would you like to see more slices? (y/n): ").strip().lower()
-                if proceed != 'y':
-                    break
+            # Display images for the current region
+            #display_images_for_region(all_triplets, region_name)
+            all_triplets.clear()  # Clear the list for the next region
+
     print("All images have been processed.")
+
+
+
+def execute_unet(inputDict, depth=5):
+
+    dict_of_3d_arrays = {}
+
+    if isinstance(inputDict, dict):
+            print("input is a dictionary.")
+            dict_of_3d_arrays = inputDict
+    else:
+        print("input is an array.")
+        dict_of_3d_arrays["FullScan"] = inputDict
+
+    normalizedDict = normalizeTF(dict_of_3d_arrays)
+    all_triplets = []
+    model_paths = {key: f"{key}_model.keras" for key in normalizedDict.keys()}
+
+    for key, array3d in normalizedDict.items():
+        if os.path.exists(model_paths[key]):
+            # If the path exists
+            print(f"The path for '{key}' exists.")
+            subarrays_split = split_into_subarrays(array3d)
+            model_binary = load_model(model_paths[key], custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
+            for idx, sub_arr in enumerate(sub_arrays_split):
+                surrounding_slices = get_surrounding_slices(sub_arr[2], sub_arrays_split, depth)
+                sub_arr_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
+                pred = model_binary.predict(sub_arr_exp)
+                middle_index = depth // 2
+                slices_triplet = (surrounding_slices[middle_index], pred[0][middle_index])
+                all_triplets.append(slices_triplet)
+        else:
+            # If the path does not exist
+            print(f"The path for '{key}' does not exist.")
+            model = unet_generate_model()
+            subarrays = split_into_subarrays(array3d)
+            print(f"Training new model for {key}...")
+            images = load_dcm_images_from_folder(folder_path)
+            X_train, Y_train = prepare_data_for_training(images, depth=depth, num_classes=5)
+            model = unet_internal(input_size=(128, 128, 1), num_classes=5)
+            model.fit(X_train, Y_train, epochs=25, batch_size=16)
+            ensure_directory_exists(folder_path)
+            model.save(model_path)
+            
+
+
+
+    if segmentation_type == 'internal':
+        
+        for region_name, folder_path in internal_folder_paths.items():
+            print(f"Processing region: {region_name}")
+
+            model_path = os.path.join(folder_path, f"{region_name.lower().replace(' ', '_')}_model.keras")
+            if not os.path.exists(model_path):
+                print(f"Training new model for {region_name}...")
+                images = load_dcm_images_from_folder(folder_path)
+                X_train, Y_train = prepare_data_for_training(images, depth=depth, num_classes=5)
+                model = unet_internal(input_size=(128, 128, 1), num_classes=5)
+                model.fit(X_train, Y_train, epochs=25, batch_size=16)
+                ensure_directory_exists(folder_path)
+                model.save(model_path)
+            else:
+                print(f"Loading model for {region_name} from {model_path}...")
+                model = load_model(model_path)
+            
+            images = load_dcm_images_from_folder(folder_path)
+            for slice_idx in range(images.shape[0]):  # Iterate through each slice in the loaded images
+                slice_2d = images[slice_idx, :, :, 0]  
+                slice_2d_normalized = normalize_image(slice_2d)
+                slice_2d_normalized = np.expand_dims(slice_2d_normalized, axis=-1)
+                slice_2d_normalized = np.expand_dims(slice_2d_normalized, axis=0)
+                pred = model.predict(slice_2d_normalized)
+                all_triplets.append((slice_2d, pred[0])) 
+
+            # Display images for the current region
+            #display_images_for_region(all_triplets, region_name)
+            all_triplets.clear()  # Clear the list for the next region
+
+    print("All images have been processed.")
+
+
+
+
+def display_images_for_region(all_triplets, region_name):
+    print(f"Displaying images for {region_name}...")
+    triplet_index = 0
+    while triplet_index < len(all_triplets):
+        batch_triplets = all_triplets[triplet_index:triplet_index + 3]
+        show_slices(batch_triplets)  
+        triplet_index += 3
+
+        if triplet_index < len(all_triplets):
+            print(f"Continuing with more slices from {region_name}...")
 
 
 
@@ -379,7 +482,7 @@ if __name__ == "__main__":
     segmentation_type = segmentation_options.get(user_input, None)
 
     if segmentation_type:
-        dlAlgorithm(
+        execute_unet(
             segmentDict=sitk_images_dict,
             file_names=file_names,
             internal_folder_paths=internal_folder_paths if segmentation_type == "internal" else None,
