@@ -75,6 +75,8 @@ class Core:
         self.atlas_segmentation_completed = False  # Initialize the attribute as False
         # Add a variable to track the state of clustering description visibility
         self.show_clustering_description = False
+        # Add a variable to track the positive coordinates of each region
+        self.coords_dict = {} #this class var should be updated whenever atlas seg or internal seg is run
 
 
         self.master.title("QuickSeg")

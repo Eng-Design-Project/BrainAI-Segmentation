@@ -1,6 +1,8 @@
 import segmentation
 import data
 import numpy as np
+import matplotlib.pyplot as plt
+
 
 image = data.get_3d_image("scan1")
 
@@ -58,9 +60,37 @@ def array_of_average_pixel_brightness_3d(images):
 
     return average_brightness
 
-avg_bright_array = array_of_average_pixel_brightness_3d(seg_results['Brain'])
-print(avg_bright_array)
-print('......')
+avg_bright_array = array_of_average_pixel_brightness_3d(image)
 images = seg_results['Brain']
-print( np.min(images), np.max(images), np.min(images)*255)
-print(avg_bright_arr(seg_results['Brain']))
+
+
+
+print("single slice:")
+slice1 = image[0]
+print(slice1.shape)
+print(np.min(slice1))
+print(np.max(slice1))
+
+mean = np.mean(slice1)
+avg = data.avg_brightness_2d(slice1)
+
+print("average (not normalized) brightness of first slice of scan1:")
+print(mean)
+print("average (normalized) brightness of first slice of scan1:")
+print(avg)
+
+print("average (not normalized) divided by max")
+print(mean/np.max(slice1))
+print("average (normalized) divided by 255")
+print(avg/255)
+print("if the 2 ratios are the same, then the normalization is correct")
+
+plt.imshow(seg_results['Brain'][5], 'gray', origin='upper')
+plt.show()
+
+print("first avg of the normalized averages array:")
+print(avg_bright_array[0])
+
+print(data.array_of_average_pixel_brightness_3d(seg_results['Brain']))
+
+
