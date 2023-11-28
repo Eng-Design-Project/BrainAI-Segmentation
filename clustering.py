@@ -8,9 +8,7 @@ from sklearn.cluster import DBSCAN, KMeans, AgglomerativeClustering
 from skimage.exposure import equalize_adapthist
 from skimage import exposure, img_as_ubyte
 from sklearn.preprocessing import StandardScaler
-# from sklearn.metrics.pairwise import euclidean_distances
 from scipy.ndimage import gaussian_filter
-# from scipy.cluster.hierarchy import dendrogram, linkage
 from skimage import morphology, measure, feature, exposure
 from skimage.filters import gaussian, threshold_local, sobel
 from skimage.feature import graycomatrix, graycoprops
@@ -754,3 +752,4 @@ if __name__ == "__main__":
 
     # print("3D Skull Cluster Coordinates:")
     # print(skull_cluster_coordinates) 
+

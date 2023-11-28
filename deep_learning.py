@@ -1,36 +1,40 @@
-# import SimpleITK as sitk
 import os
 import tensorflow as tf
 import numpy as np
 from scipy.ndimage import convolve
 import data
-
-#dummy input data
-sitk_images_dict = {
-    "image1": data.get_3d_image("scan1"), # gets 3d sitk image from a folder of DCM images
-    "image2": data.get_3d_image("scan2"),   
-    # Add other images...
-}
-
-# SITK TO PYDICOM - MD
-# original:
-'''
-#for the dummyDL functiom
-numpyImagesDict = {key: sitk.GetArrayFromImage(img) for key, img in sitk_images_dict.items()}
-'''
-#for the dummyDL functiom
-numpyImagesDict = {key: img.pixel_array for key, img in sitk_images_dict.items()}
+import segmentation
 
 
-#for the dummyDL function
-#labeled data is tricky, because it should probably be in the same format as the input data + a 1 or 0 label
-#dictionary makes sense, but the input data is a 3x3x3 (unless we pass a window size other than default) np array,
-# or rather, a stack of 3x3x3 arrays inside another array, because that's more optimized
-dummyLabels = {
-    "image1": 1,
-    "image2": 0
-    # Add more labels...
-}
+#since our classifier model is looking at windows, labeled data must be in the form of windows
+#i.e. a dictionary, key is brain region, value is a 4d np array. 3 dimensions are a single window 
+# (a 3x3x3 chunk of the original image around the boundary)
+#4th dimension is the index of that window
+def generate_dummy_labeled_data(windows_dict):
+    labeled_data = {}
+    for region, windows in windows_dict.items():
+        num_windows = windows.shape[0]
+        # Randomly generate labels (0 or 1) for each window
+        labels = np.random.randint(0, 2, num_windows)
+        labeled_data[region] = labels
+    return labeled_data
+
+
+#hoping to give the model a starting point to work with,
+#  so it can make predictions at the start that are at least passable
+def generate_heuristic_labeled_data(windows_dict, threshold=0.3):
+    labeled_data = {}
+    for region, windows in windows_dict.items():
+        labels = []
+        for window in windows:
+            #calculate the proportion of voxels in the window that are above the threshold
+            prop_above_threshold = np.mean(window > threshold)
+            #if the majority of voxels are above the threshold, label as 0, else 1
+            label = 0 if prop_above_threshold > 0.5 else 1
+            labels.append(label)
+        labeled_data[region] = np.array(labels)
+    return labeled_data
+
 
 #normalizes pixel value of 3d array dict
 def normalize_np_dict(volume3dDict):
@@ -50,7 +54,7 @@ def normalize_np_dict(volume3dDict):
 
 
 #pix by pix classifier, not built with user score in mind
-def buildPixelModel(window_size=3):
+def buildPixelModel(window_size=8):
     # Assumes input is a 3D patch of size [window_size, window_size, window_size]
     model = tf.keras.Sequential([
         tf.keras.layers.InputLayer(input_shape=(window_size, window_size, window_size, 1)),
@@ -77,7 +81,7 @@ def find_boundary(segment):
     return boundary
 
 #takes boundary (edges), and gets 3d windows around each boundary voxel. These are inputs to the model
-def extract_windows(volume, window_size=3):
+def extract_windows(volume, window_size=8):
     boundary = find_boundary(volume)
     padding = window_size // 2
     padded_volume = np.pad(volume, ((padding, padding), (padding, padding), (padding, padding)), mode='constant')
@@ -95,11 +99,145 @@ def extract_windows(volume, window_size=3):
     #does it make sense to convert to arrays?
     return np.array(windows), np.array(indices)
 
+#this should run without labeled data
+def train_model_with_user_feedback(model, windows, user_score, optimizer):
+    with tf.GradientTape() as tape:
+        predictions = model(windows)[:, 1]
+        loss = tf.keras.losses.MSE(tf.constant([user_score], dtype=tf.float32), tf.reduce_mean(predictions))
+    grads = tape.gradient(loss, model.trainable_variables)
+    optimizer.apply_gradients(zip(grads, model.trainable_variables))
+    return loss
 
+    
+class CustomClassifierMultiModel:
+    def __init__(self, dict_of_np_arrays):
+        self.normalized_data = normalize_np_dict(dict_of_np_arrays)
+        self.model_dict = {region: buildPixelModel() for region in self.normalized_data.keys()}
+        self.optimizer_dict = {region: tf.keras.optimizers.Adam() for region in self.normalized_data.keys()}
+        self.windows_dict = {}
+        self.indices_dict = {}
+        
+        #extract windows from input data
+        for region, seg_volume in self.normalized_data.items():
+            windows, indices = extract_windows(seg_volume)
+            self.windows_dict[region] = windows[..., np.newaxis]
+            self.indices_dict[region] = indices
+        
+        self.labeled_data = generate_heuristic_labeled_data(self.windows_dict)
+
+        for region, seg_volume in self.normalized_data.items():
+            model = self.model_dict[region]
+            optimizer = self.optimizer_dict[region]
+            region_labels = self.labeled_data[region]
+            model.compile(optimizer=optimizer, loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+            model.fit(self.windows_dict[region], region_labels, epochs=3)
+
+    def trainDL(self, user_score=0):
+        classification_dict = {}
+        for region, windows in self.windows_dict.items():
+            model = self.model_dict[region]
+            optimizer = self.optimizer_dict[region]
+
+            # User feedback training
+            if windows.size == 0:
+                print(f"No windows to process for region: {region}")
+                continue
+
+            train_model_with_user_feedback(model, windows, user_score, optimizer)
+
+            # Predictions
+            predictions = model.predict(windows)
+            predicted_labels = np.argmax(predictions, axis=1)
+            
+            #get the indices array for the current region
+            region_indices = self.indices_dict[region]
+
+            #use the boolean array (predicted_labels == 1) to filter the indices
+            classified_indices = region_indices[predicted_labels == 1].tolist()
+
+            classification_dict[region] = classified_indices
+
+        return classification_dict
+    
+    def save_models(self, save_dir):
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        
+        for region, model in self.model_dict.items():
+            model_path = os.path.join(save_dir, f'model_{region}.h5')
+            model.save(model_path)
+        print(f"All models saved in {save_dir}")
+    
+    def load_models(self, save_dir):
+        for region in self.normalized_data.keys():
+            model_path = os.path.join(save_dir, f'model_{region}.h5')
+            if os.path.exists(model_path):
+                self.model_dict[region] = tf.keras.models.load_model(model_path)
+            else:
+                print(f"No saved model found for region {region} in {save_dir}")
+    
+    def predict(self, dict_of_np_arrays):
+        predictions_dict = {}
+        for region, seg_volume in dict_of_np_arrays.items():
+            if region in self.model_dict:
+                windows, _ = extract_windows(seg_volume)
+                windows = windows[..., np.newaxis]
+                model = self.model_dict[region]
+                predictions = model.predict(windows)
+                predicted_labels = np.argmax(predictions, axis=1)
+                predictions_dict[region] = predicted_labels
+            else:
+                print(f"No model found for region {region}")
+        return predictions_dict
+
+if __name__ == '__main__':
+    print("running dl module")
+    # classifier = CustomClassifierSingleModel()
+    
+    #need dict of np arrays
+    test_data_input = data.subfolders_to_dictionary("scan1 atl seg.DCMs")
+    for key in test_data_input.keys():
+        print(key + " shape:")
+        print(test_data_input[key].shape)
+
+    if (test_data_input != None):
+        del test_data_input["Skull"]
+
+        classifier = CustomClassifierMultiModel(test_data_input)
+        classif_dict = classifier.trainDL()
+        # for keys, values in classif_dict.items():
+        #     print(keys, ": ", values)
+        results = segmentation.filter_noise_from_images(test_data_input, classif_dict)
+        data.display_seg_np_images(results)
+    
+
+    #need to put execution in for loop, get user_score each time
+    #need to save model between runs somehow
+    #if score > x, restart process with new results (so new boundary windows can shift over time)
+    #if score > x+, finish
+   
+
+'''
+
+#for the dummyDL function
+#labeled data is tricky, because it should probably be in the same format as the input data + a 1 or 0 label
+#dictionary makes sense, but the input data is a 3x3x3 (unless we pass a window size other than default) np array,
+# or rather, a stack of 3x3x3 arrays inside another array, because that's more optimized
+dummyLabels = {
+    "image1": 1,
+    "image2": 0
+    # Add more labels...
+}
+
+
+#this will break without labeled data
+#this is deprecated, the logic is all in the class definition now
 def train_model(model, windows, user_score, labels=None):
     model.fit(windows, labels, epochs= 20 - int(user_score * 10)) 
 
-# not tested yet -Kevin
+    
+# the function below will not be used: the class method will be used instead
+#only keeping this for now as a note
 def executeDL(dict_of_np_arrays, user_score=0, model=buildPixelModel()):
     
     #should only have to normalize data once, and we only need to pass dict_of_np_arrays once
@@ -131,118 +269,7 @@ def executeDL(dict_of_np_arrays, user_score=0, model=buildPixelModel()):
     #segmentation attemps displayed by core, user score collected
     #this function called again, passing the model back, and passing in user score
     #dummyDL is run on a loop, probably in core?
-
-#class version of executeDL: no need to output and reinput things other than user_score
-#Notes: labeled data could be a bunch of 'windows', labeled 0 or 1
-#   should windows also be a class attribute? why extract windows many times
-#   if windows are a class attribute, than we wouldn't need to keep the entire image in memory
-class CustomClassifier:
-    def __init__(self, initial_model=None, labeled_data=None):
-        self.model = initial_model if initial_model else buildPixelModel()
-        self.classification_dict = {}
-        self.normalized_data = None
-        self.labeled_data = labeled_data
-        self.windows = None
-
-    def executeDL(self, dict_of_np_arrays=None, user_score=0):
-        if self.normalized_data == None:
-            self.normalized_data = normalize_np_dict(dict_of_np_arrays)
-
-        # No need to compile multiple times, so we check if it's compiled.
-        if not hasattr(self.model, 'optimizer'):
-            self.model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
-
-        for region, seg_volume in self.normalized_data.items():
-            if self.windows == None:
-                windows, indices = extract_windows(seg_volume)
-                self.windows = windows[..., np.newaxis]  # Adding a channel dimension
-
-            # Using the labeled_data for the specific region if available
-            region_labels = self.labeled_data.get(region) if self.labeled_data else None
-            #labeled data needs to be redone, to fit with the input data expected
-
-            train_model(self.model, windows, user_score, region_labels)
-            
-            #make predictions
-            predictions = self.model.predict(windows)
-
-            #average predicted probability for positive class
-            avg_prediction = np.mean(predictions[:, 1])
-
-            #what datastruct is predictions? does this round or just make things 1? Find the highest preds?
-            predicted_labels = np.argmax(predictions, axis=1)
-
-            #Define a loss based on the user's score
-            # We can use mean squared error here, but other choices might be appropriate depending on the problem
-            loss = (avg_prediction - user_score) ** 2
-
-            # Update the model
-            # This part is tricky without labeled data; we need a way to compute gradients
-            # One option is to use a library like TensorFlow's 'tape' mechanism
-            with tf.GradientTape() as tape:
-                tape.watch(self.model.trainable_variables)
-                # Repredict to get the model's outputs as TensorFlow tensors
-                predictions_tf = self.model(windows, training=True)
-                avg_prediction_tf = tf.reduce_mean(predictions_tf[:, 1])
-                loss_tf = (avg_prediction_tf - user_score) ** 2
-                grads = tape.gradient(loss_tf, self.model.trainable_variables)
-                optimizer = tf.keras.optimizers.Adam()
-                optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
-
-            classified_indices = indices[predicted_labels == 1]
-            self.classification_dict[region] = classified_indices
-
-        return self.classification_dict
-    
-
-
-if __name__ == '__main__':
-   print("running dl module")
-   classifier = CustomClassifier()
-   
-
 '''
-#class not needed
-class DeepLearningModule:
-    def __init__(self):
-        self.atlas_segmentation_data = {}
-        self.user_score1 = -1
-        self.user_score2 = -2
-
-    def load_regions(self, region_data):
-        for region_name, sitk_name in region_data.items():
-            try:
-                region_image = sitk.ReadImage(sitk_name)
-                print(f"Loaded {region_name} from {sitk_name}")
-            except Exception as e:
-                print(f"Error loading {region_name} from {sitk_name}: {e}")
-
-    def load_atlas_data(self, atlas_data1, atlas_data2):
-        for folder_path in [atlas_data1, atlas_data2]:
-            for filename in os.listdir(folder_path):
-                file_path = os.path.join(folder_path, filename)
-                try:
-                    atlas_image = sitk.ReadImage(file_path)
-                    self.atlas_segmentation_data[filename] = atlas_image
-                    print(f"Loaded atlas data from {file_path}")
-                except Exception as e:
-                    print(f"Error loading atlas data from {file_path}: {e}")
-
-
-# Existing user score global variables and function
-#will prob be removed, user score will be supplied to dl algo as argument from core
-user_score1 = -1
-user_score2 = -2
-
-#will be removed, user score updated in core
-def get_user_score(x1, x2):
-    global user_score1, user_score2
-    user_score1 = x1
-    user_score2 = x2
-    print("score 1 is: ", user_score1)
-    print("score 2 is: ", user_score2)
-'''
-
 
 '''
 #had two models that essentially did the same thing, 
@@ -259,4 +286,113 @@ def build_boundary_window_model(window_size=3):
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     return model
 '''
+
+'''
+#class version of executeDL: no need to output and reinput things other than user_score
+#notes: this class assumes one model can be used for all regions to be classified.
+#  Probably not the case, so another class will be made that has a seperate model for each region
+class CustomClassifierSingleModel:
+    def __init__(self, initial_model=None):
+        self.model = initial_model if initial_model else buildPixelModel()
+        #self.models = {"brain": buildPixelModel()}
+        self.classification_dict = {}
+        self.normalized_data = None
+        self.labeled_data = None
+        self.windows_dict = {}
+        self.optimizer = tf.keras.optimizers.Adam()  # Initialize once at the class level
+
+    def executeDL(self, user_score=0, dict_of_np_arrays=None, labeled_data=None):
+
+        # initialize data on first run of executeDL
+        if self.normalized_data is None:
+            self.normalized_data = normalize_np_dict(dict_of_np_arrays)
+
+        # update labeled_data if it's given
+        if labeled_data:
+            self.labeled_data = labeled_data
+
+        for region, seg_volume in self.normalized_data.items():
+            if region not in self.windows_dict:
+                windows, indices = extract_windows(seg_volume)
+                for i, window in enumerate(windows[:15]):  # Print first 5 windows
+                    print(f"Window {i}: shape = {window.shape}")
+                    print("First slice of the window:")
+                    print(window[0, :, :])  # This will print only the first slice of the 3D window
+                self.windows_dict[region] = windows[..., np.newaxis]  # Adding a channel dimension
+                print("region not in windows dict")
+            else:
+                windows = self.windows_dict[region]
+                print("region in windows dict")
+
+            # Using the labeled_data for the specific region if available
+            region_labels = self.labeled_data.get(region) if self.labeled_data else None
+
+            # No need to compile multiple times, so we check if it's compiled.
+            if not hasattr(self.model, 'optimizer'):
+                self.model.compile(optimizer=self.optimizer, loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+
+            if region_labels:
+                self.model.fit(windows, region_labels, epochs=10)  # or any other number of epochs
+                #self.models[region].fit(....)
+            train_model_with_user_feedback(self.model, windows, user_score, self.optimizer)
+
+            predictions = self.model.predict(windows)
+            predicted_labels = np.argmax(predictions, axis=1)
+
+            # Filter out the indices where the prediction is positive
+            classified_indices = indices[predicted_labels == 0].tolist()
+            self.classification_dict[region] = classified_indices
+
+        return self.classification_dict
+
+class CustomClassifierMultiModelold:
+    def __init__(self, regions=None):
+        self.model_dict = {region: buildPixelModel() for region in regions} if regions else {}
+        self.classification_dict = {}
+        self.normalized_data = None
+        self.labeled_data = None
+        self.windows_dict = {}
+        self.optimizer_dict = {region: tf.keras.optimizers.Adam() for region in regions} if regions else {}
+
+    def trainDL(self, user_score=0, dict_of_np_arrays=None, labeled_data=None):
+        # Initialize data and models
+        if self.normalized_data is None:
+            self.normalized_data = normalize_np_dict(dict_of_np_arrays)
+            for region in self.normalized_data.keys():
+                if region not in self.model_dict:
+                    self.model_dict[region] = buildPixelModel()
+                    self.optimizer_dict[region] = tf.keras.optimizers.Adam()
+
+        # Update labeled data if provided
+        if labeled_data:
+            self.labeled_data = labeled_data
+
+        for region, seg_volume in self.normalized_data.items():
+            # Extract windows
+            if region not in self.windows_dict:
+                windows, indices = extract_windows(seg_volume)
+                self.windows_dict[region] = windows[..., np.newaxis]
+            else:
+                windows = self.windows_dict[region]
+
+            model = self.model_dict[region]
+            optimizer = self.optimizer_dict[region]
+            region_labels = self.labeled_data.get(region) if self.labeled_data else None
+
+            # Training
+            if region_labels:
+                model.compile(optimizer=optimizer, loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+                model.fit(windows, region_labels, epochs=10)
+            else:
+                train_model_with_user_feedback(model, windows, user_score, optimizer)
+
+            # Prediction
+            predictions = model.predict(windows)
+            predicted_labels = np.argmax(predictions, axis=1)
+            classified_indices = indices[predicted_labels == 0].tolist()
+            self.classification_dict[region] = classified_indices
+
+        return self.classification_dict
+    
+    '''
 
