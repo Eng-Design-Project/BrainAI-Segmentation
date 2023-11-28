@@ -534,6 +534,7 @@ def set_seg_results_with_dir(directory = "atl_segmentation_DCMs"):
     
 # set_seg_results()
 
+#this function needs fixing, there should be a for loop like in the function below it.
 #this function has been changed, it now returns a single NORMALIZED average.
 #this function takes a 3d numpy image, returns a single number as the average of (46) averages
 def average_overall_brightness_3d(image):
@@ -551,6 +552,7 @@ def average_overall_brightness_3d(image):
     overall_average_brightness = np.mean(normalized_image_averages)
     return overall_average_brightness
 
+# added another fix to this function.
 # this fuction has been changed, it now returns NORMALIZED (between [0, 255]) averages
 # if the argument is a 3d image with 46 slices, this function will return a numpy array with 46 averages
 # each average can be accessed by typical indexing, e.g. average_brightness[0] returns first average, ...[45] returns last, etc.
@@ -558,16 +560,26 @@ def array_of_average_pixel_brightness_3d(images):
     # Ensure the input is a numpy array
     if not isinstance(images, np.ndarray):
         raise ValueError("Input must be a numpy array")
-    
     # Ensure the input is a 3D array
     if len(images.shape) != 3:
         raise ValueError("Input must be a 3D array of grayscale images")
 
-    # Normalize each image to the range [0, 255]
-    normalized_images = (images - np.min(images)) / (np.max(images) - np.min(images)) * 255
+    num_slices, height, width = images.shape
 
-    # Calculate the average pixel brightness for all normalized images
-    average_brightness = np.mean(normalized_images, axis=(1, 2))
+    # Initialize an array to store the normalized average brightness for each image
+    average_brightness = np.zeros(num_slices)
+
+    for i in range(num_slices):
+        # Check if the range is zero to avoid division by zero
+        if np.max(images[i]) - np.min(images[i]) == 0:
+            normalized_image = images[i]  # Avoid normalization if the range is zero
+        else:
+            # Normalize each image to the range [0, 255]
+            normalized_image = (images[i] - np.min(images[i])) / (np.max(images[i]) - np.min(images[i])) * 255
+
+        # Calculate the average pixel brightness for the normalized image
+        average_brightness[i] = np.mean(normalized_image)
+
     return average_brightness
 
 # this function returns the normalized [0,255] avg brightness of a single 2d grayscale numpy image
