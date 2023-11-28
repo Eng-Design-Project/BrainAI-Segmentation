@@ -16,7 +16,7 @@ import clustering
 import segmentation
 import data
 import os
-import deep_learning_copy
+import unet_segmentation
 
 
 """class AdvancedSegmentationPage:
@@ -603,7 +603,7 @@ class Core:
         }
 
         # Call the dlAlgorithm function from deep_learning_copy module
-        deep_learning_copy.dlAlgorithm(images_dict)
+        unet_segmentation.dlAlgorithm(images_dict)
 
     def custom_askdirectory(title):
         #might replace other usses of askdirectory, to display a message

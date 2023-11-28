@@ -274,12 +274,11 @@ def normalize_image(image):
     return normalized_image
 
 
-def prepare_data_for_training(img_array, depth=5, num_classes=5):
+def prepare_data_for_training(subarrays, depth=5, num_classes=5):
     X_train = []
     Y_train = []
 
-    sub_arrays = [img_array[i:i + depth] for i in range(0, img_array.shape[0], depth) if i + depth <= img_array.shape[0]]
-    for sub_arr in sub_arrays:
+    for sub_arr in subarrays:
         middle_slice = sub_arr[depth // 2]
 
         # Generate the boundary and one-hot encode it
@@ -383,8 +382,8 @@ def execute_unet(inputDict, depth=5):
             print(f"The path for '{key}' exists.")
             subarrays_split = split_into_subarrays(array3d)
             model_binary = load_model(model_paths[key], custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
-            for idx, sub_arr in enumerate(sub_arrays_split):
-                surrounding_slices = get_surrounding_slices(sub_arr[2], sub_arrays_split, depth)
+            for idx, sub_arr in enumerate(subarrays_split):
+                surrounding_slices = get_surrounding_slices(sub_arr[2], subarrays_split, depth)
                 sub_arr_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
                 pred = model_binary.predict(sub_arr_exp)
                 middle_index = depth // 2
@@ -396,52 +395,12 @@ def execute_unet(inputDict, depth=5):
             model = unet_generate_model()
             subarrays = split_into_subarrays(array3d)
             print(f"Training new model for {key}...")
-            images = load_dcm_images_from_folder(folder_path)
-            X_train, Y_train = prepare_data_for_training(images, depth=depth, num_classes=5)
-            model = unet_internal(input_size=(128, 128, 1), num_classes=5)
+            X_train, Y_train = prepare_data_for_training(subarrays)
             model.fit(X_train, Y_train, epochs=25, batch_size=16)
-            ensure_directory_exists(folder_path)
-            model.save(model_path)
-            
+            model.save(model_paths[key])
 
 
-
-    if segmentation_type == 'internal':
-        
-        for region_name, folder_path in internal_folder_paths.items():
-            print(f"Processing region: {region_name}")
-
-            model_path = os.path.join(folder_path, f"{region_name.lower().replace(' ', '_')}_model.keras")
-            if not os.path.exists(model_path):
-                print(f"Training new model for {region_name}...")
-                images = load_dcm_images_from_folder(folder_path)
-                X_train, Y_train = prepare_data_for_training(images, depth=depth, num_classes=5)
-                model = unet_internal(input_size=(128, 128, 1), num_classes=5)
-                model.fit(X_train, Y_train, epochs=25, batch_size=16)
-                ensure_directory_exists(folder_path)
-                model.save(model_path)
-            else:
-                print(f"Loading model for {region_name} from {model_path}...")
-                model = load_model(model_path)
-            
-            images = load_dcm_images_from_folder(folder_path)
-            for slice_idx in range(images.shape[0]):  # Iterate through each slice in the loaded images
-                slice_2d = images[slice_idx, :, :, 0]  
-                slice_2d_normalized = normalize_image(slice_2d)
-                slice_2d_normalized = np.expand_dims(slice_2d_normalized, axis=-1)
-                slice_2d_normalized = np.expand_dims(slice_2d_normalized, axis=0)
-                pred = model.predict(slice_2d_normalized)
-                all_triplets.append((slice_2d, pred[0])) 
-
-            # Display images for the current region
-            #display_images_for_region(all_triplets, region_name)
-            all_triplets.clear()  # Clear the list for the next region
-
-    print("All images have been processed.")
-
-
-
-
+    
 def display_images_for_region(all_triplets, region_name):
     print(f"Displaying images for {region_name}...")
     triplet_index = 0
@@ -457,40 +416,14 @@ def display_images_for_region(all_triplets, region_name):
 
 
 if __name__ == "__main__":
-    # Paths to the folders containing images for each brain region
-    internal_folder_paths = {
-        "Frontal Lobe": "Internal Segment DCM unet\\Frontal",
-        "Temporal Lobe": "Internal Segment DCM unet\\Temporal",
-        "Occipital Lobe": "Internal Segment DCM unet\\Occipital",
-        "White Matter": "Internal Segment DCM unet\\White Matter",
-    }
 
     # Example dictionary holding your image data for skull segmentation
     sitk_images_dict = {
         "image1": data.get_3d_image("scan1"),
         "image2": data.get_3d_image("scan2"),
     }
-    file_names = list(sitk_images_dict.keys())
+    execute_unet(sitk_images_dict)
 
-    # Mapping of user input to segmentation types
-    segmentation_options = {
-        "1": "internal",
-        "2": "skull"
-    }
-
-    user_input = input("Choose segmentation type (1 for 'internal' or 2 for 'skull'): ").strip()
-    segmentation_type = segmentation_options.get(user_input, None)
-
-    if segmentation_type:
-        execute_unet(
-            segmentDict=sitk_images_dict,
-            file_names=file_names,
-            internal_folder_paths=internal_folder_paths if segmentation_type == "internal" else None,
-            binary_model_path='my_model.keras' if segmentation_type == "skull" else None,
-            segmentation_type=segmentation_type
-        )
-    else:
-        print("Invalid input. Please enter 1 for internal segmentation or 2 for skull segmentation.")
 
 
 
