@@ -13,19 +13,6 @@ import tkinter as tk
 from tkinter import simpledialog
 
 
-def load_dcm_images_from_folder(folder, target_size=(128, 128)):
-    images = []
-    for dcm_path in glob.glob(folder + '/*.dcm'):  
-        dcm = pydicom.dcmread(dcm_path)
-        img = dcm.pixel_array
-        if img.dtype != np.float32:
-            img = img.astype(np.float32)
-        img = resize(img, target_size, preserve_range=True)
-        img = normalize_image(img)  # Normalize the image
-        images.append(img[..., np.newaxis])  # Add channel dimension
-    return np.array(images)
-
-
 def ensure_directory_exists(path):
     directory = os.path.dirname(path)
     if not os.path.exists(directory):
@@ -106,57 +93,75 @@ def unet_generate_model(input_size=(5, 128, 128, 1)):
     model.compile(optimizer='adam', loss=weighted_binary_crossentropy, metrics=['accuracy'])
     return model
 
-def unet_internal(input_size=(128, 128, 1), num_classes=5):
-    inputs = tf.keras.layers.Input(input_size)
+# def unet_internal(input_size=(128, 128, 1), num_classes=5):
+#     inputs = tf.keras.layers.Input(input_size)
 
-    # Encoder layers (convolutions and pooling)
-    conv1 = tf.keras.layers.Conv2D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(inputs)
-    conv1 = tf.keras.layers.Conv2D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv1)
-    pool1 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv1)
+#     # Encoder layers (convolutions and pooling)
+#     conv1 = tf.keras.layers.Conv2D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(inputs)
+#     conv1 = tf.keras.layers.Conv2D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv1)
+#     pool1 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv1)
     
-    conv2 = tf.keras.layers.Conv2D(32, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool1)
-    conv2 = tf.keras.layers.Conv2D(32, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv2)
-    pool2 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv2)
+#     conv2 = tf.keras.layers.Conv2D(32, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool1)
+#     conv2 = tf.keras.layers.Conv2D(32, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv2)
+#     pool2 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv2)
     
-    conv3 = tf.keras.layers.Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool2)
-    conv3 = tf.keras.layers.Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv3)
-    pool3 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv3)
+#     conv3 = tf.keras.layers.Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool2)
+#     conv3 = tf.keras.layers.Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv3)
+#     pool3 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv3)
     
-    conv4 = tf.keras.layers.Conv2D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool3)
-    conv4 = tf.keras.layers.Conv2D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv4)
-    drop4 = tf.keras.layers.Dropout(0.3)(conv4)
-    pool4 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(drop4)
+#     conv4 = tf.keras.layers.Conv2D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool3)
+#     conv4 = tf.keras.layers.Conv2D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv4)
+#     drop4 = tf.keras.layers.Dropout(0.3)(conv4)
+#     pool4 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(drop4)
     
-    conv5 = tf.keras.layers.Conv2D(256, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool4)
-    conv5 = tf.keras.layers.Conv2D(256, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv5)
-    drop5 = tf.keras.layers.Dropout(0.3)(conv5)
+#     conv5 = tf.keras.layers.Conv2D(256, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool4)
+#     conv5 = tf.keras.layers.Conv2D(256, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv5)
+#     drop5 = tf.keras.layers.Dropout(0.3)(conv5)
 
-    # Decoder layers (up-sampling and concatenation)
-    up6 = tf.keras.layers.UpSampling2D(size=(2, 2))(drop5)
-    merge6 = tf.keras.layers.concatenate([drop4, up6], axis=-1)
-    conv6 = tf.keras.layers.Conv2D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge6)
+#     # Decoder layers (up-sampling and concatenation)
+#     up6 = tf.keras.layers.UpSampling2D(size=(2, 2))(drop5)
+#     merge6 = tf.keras.layers.concatenate([drop4, up6], axis=-1)
+#     conv6 = tf.keras.layers.Conv2D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge6)
 
-    up7 = tf.keras.layers.UpSampling2D(size=(2, 2))(conv6)
-    merge7 = tf.keras.layers.concatenate([conv3, up7], axis=-1)
-    conv7 = tf.keras.layers.Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge7)
+#     up7 = tf.keras.layers.UpSampling2D(size=(2, 2))(conv6)
+#     merge7 = tf.keras.layers.concatenate([conv3, up7], axis=-1)
+#     conv7 = tf.keras.layers.Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge7)
 
-    up8 = tf.keras.layers.UpSampling2D(size=(2, 2))(conv7)
-    merge8 = tf.keras.layers.concatenate([conv2, up8], axis=-1)
-    conv8 = tf.keras.layers.Conv2D(32, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge8)
+#     up8 = tf.keras.layers.UpSampling2D(size=(2, 2))(conv7)
+#     merge8 = tf.keras.layers.concatenate([conv2, up8], axis=-1)
+#     conv8 = tf.keras.layers.Conv2D(32, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge8)
 
-    up9 = tf.keras.layers.UpSampling2D(size=(2, 2))(conv8)
-    merge9 = tf.keras.layers.concatenate([conv1, up9], axis=-1)
-    conv9 = tf.keras.layers.Conv2D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge9)
+#     up9 = tf.keras.layers.UpSampling2D(size=(2, 2))(conv8)
+#     merge9 = tf.keras.layers.concatenate([conv1, up9], axis=-1)
+#     conv9 = tf.keras.layers.Conv2D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge9)
 
-    # Output layer
-    outputs = tf.keras.layers.Conv2D(num_classes, (1, 1), activation='softmax')(conv9)
+#     # Output layer
+#     outputs = tf.keras.layers.Conv2D(num_classes, (1, 1), activation='softmax')(conv9)
 
-    # Compile the model
-    model = tf.keras.models.Model(inputs=[inputs], outputs=[outputs])
-    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+#     # Compile the model
+#     model = tf.keras.models.Model(inputs=[inputs], outputs=[outputs])
+#     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
-    return model
+#     return model
 
+def generate_predictions(subarrays, model):
+    predictions = []
+    for sub_arr in subarrays:
+        # Check if the subarray has the correct shape for the model
+        if sub_arr.shape == (5, 128, 128):
+            # Reshape the subarray to include the batch size and channel dimensions
+            sub_arr_reshaped = np.expand_dims(sub_arr, axis=0)  # Adds the batch size dimension
+            sub_arr_reshaped = np.expand_dims(sub_arr_reshaped, axis=-1)  # Adds the channel dimension
+
+            # Generate prediction and store it
+            pred = model.predict(sub_arr_reshaped)
+            predictions.append(pred[0])  # pred[0] to remove the batch size dimension
+        else:
+            print("Subarray with incorrect shape encountered:", sub_arr.shape)
+            continue
+
+    print("generate predictions complete")
+    return predictions
 
 def get_surrounding_slices(original_slice, sub_arrays, depth):
     surrounding_depth = depth // 2
@@ -324,6 +329,7 @@ def get_user_selection(region_options):
 def execute_unet(inputDict, depth=5):
 
     dict_of_3d_arrays = {}
+    new_dict = {}
 
     if isinstance(inputDict, dict):
             print("input is a dictionary.")
@@ -342,18 +348,7 @@ def execute_unet(inputDict, depth=5):
             print(f"The path for '{key}' exists.")
             subarrays_split = split_into_subarrays(array3d)
             model_binary = load_model(model_paths[key], custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
-            for idx, sub_arr in enumerate(subarrays_split):
-                surrounding_slices = get_surrounding_slices(sub_arr[2], subarrays_split, depth)
-                sub_arr_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
-
-                # Ensure the shape is correct
-                if sub_arr_exp.shape == (1, depth, 128, 128, 1):
-                    pred = model_binary.predict(sub_arr_exp)
-                    middle_index = depth // 2
-                    slices_triplet = (surrounding_slices[middle_index], pred[0][middle_index])
-                    all_triplets.append(slices_triplet)
-                else:
-                    print("Shape mismatch in prediction input:", sub_arr_exp.shape)
+            predictions = generate_predictions(subarrays_split, model_binary)
         else:
             # If the path does not exist
             print(f"The path for '{key}' does not exist.")
@@ -362,8 +357,9 @@ def execute_unet(inputDict, depth=5):
             print(subarrays[0].shape)
             print(f"Training new model for {key}...")
             X_train, Y_train = prepare_data_for_training(subarrays)
-            model.fit(X_train, Y_train, epochs=25, batch_size=16)
+            model.fit(X_train, Y_train, epochs=10, batch_size=16)
             model.save(model_paths[key])
+            
 
 
     
