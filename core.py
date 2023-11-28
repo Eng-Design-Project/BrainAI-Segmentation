@@ -659,7 +659,12 @@ class Core:
 
              
         # call execute atlas seg, passing image, atlas and atlas colors as args
-        seg_results = segmentation.execute_atlas_seg(atlas, color_atlas, image)
+        seg_results = segmentation.execute_atlas_seg(atlas, color_atlas, image)[0]
+        # the function above will have modified the self.coords_dict varible
+        # to check if it was successfully modified, we should do a print statement
+        self.coords_dict = segmentation.execute_atlas_seg(atlas, color_atlas, image)[1]
+        # print(self.coords_dict)
+
         del seg_results["Skull"]
         data.segmentation_results = seg_results
         # returns dict of simple itk images
@@ -686,7 +691,10 @@ class Core:
         print("Internal Atlas Segmentation")
         if (data.segmentation_results != None):
             internal_color_atlas = data.get_2d_png_array_list("Color Atlas internal")
-            internal_seg_results = segmentation.execute_internal_atlas_seg(data.segmentation_results, internal_color_atlas)
+            internal_seg_results = segmentation.execute_internal_atlas_seg(data.segmentation_results, internal_color_atlas)[0]
+            self.coords_dict = segmentation.execute_internal_atlas_seg(data.segmentation_results, internal_color_atlas)[1]
+            print(self.coords_dict)
+
             #save results, to file and data.seg results        
             save_success = self.save_seg_results(internal_seg_results)
             if (save_success):

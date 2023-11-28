@@ -464,7 +464,9 @@ def execute_atlas_seg(atlas, atlas_colors, image):
     for region, segment in final_dict.items():
         final_dict[region] = expand_roi(reg_image, segment)
 
-    return final_dict
+    #return final_dict
+    #return region_to_coord_dict and final dict (it'll return a tuple)
+    return final_dict, region_to_coord_dict
 
 #can only be done after normal atlas seg
 def execute_internal_atlas_seg(image_dict: dict, internal_color_atlas: list) -> dict:
@@ -486,7 +488,9 @@ def execute_internal_atlas_seg(image_dict: dict, internal_color_atlas: list) -> 
             for internal_region, segment in internal_dict.items():
                 internal_dict[internal_region] = expand_roi(image_dict[region], segment)
 
-    return internal_dict
+    #return internal_dict
+    return internal_dict, internal_color_atlas_coords
+
 
 
 
