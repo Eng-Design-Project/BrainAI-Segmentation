@@ -37,21 +37,30 @@ def split_into_subarrays(img_array, depth=5):
     sub_arrays = [img_array[i:i+depth, :, :] for i in range(0, total_slices, depth) if i+depth <= total_slices]
     return sub_arrays
 
+# def weighted_binary_crossentropy(y_true, y_pred):
+#     # custom weights for binary cross entropy
+#     weight_0 = 1.0  # for regions
+#     weight_1 = 2.0  # for boundaries
+#     b_ce = tf.keras.backend.binary_crossentropy(y_true, y_pred)
+#     weight_vector = y_true * weight_1 + (1. - y_true) * weight_0
+#     weighted_b_ce = weight_vector * b_ce
+#     return tf.keras.backend.mean(weighted_b_ce)
+
 def weighted_binary_crossentropy(y_true, y_pred):
-    # custom weights for binary cross entropy
-    weight_0 = 1.0  # for regions
-    weight_1 = 2.0  # for boundaries
+    # Compute the binary crossentropy
     b_ce = tf.keras.backend.binary_crossentropy(y_true, y_pred)
-    weight_vector = y_true * weight_1 + (1. - y_true) * weight_0
-    weighted_b_ce = weight_vector * b_ce
-    return tf.keras.backend.mean(weighted_b_ce)
+
+    # If you have weights to apply, modify the cross-entropy here
+    # Example: weighted_b_ce = apply_weights_to_b_ce(b_ce, weights)
+
+    return b_ce
 
 
 # Function to create a U-Net model for 3D image segmentation
-def unet_generate_model(input_size=(5, 128, 128, 1)):  # Notice the change in the last dimension
+def unet_generate_model(input_size=(5, 128, 128, 1)): 
     inputs = tf.keras.layers.Input(input_size)
     
-# Encoder layers (convolutions and pooling)
+    # Encoder layers (convolutions and pooling)
     conv1 = tf.keras.layers.Conv3D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(inputs)
     conv1 = tf.keras.layers.Conv3D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv1)
     pool1 = tf.keras.layers.MaxPooling3D(pool_size=(1, 2, 2))(conv1)
@@ -273,25 +282,32 @@ def normalize_image(image):
         normalized_image = image - min_val
     return normalized_image
 
-
-def prepare_data_for_training(subarrays, depth=5, num_classes=5):
+def prepare_data_for_training(subarrays, depth=5):
     X_train = []
     Y_train = []
 
     for sub_arr in subarrays:
-        middle_slice = sub_arr[depth // 2]
+        if sub_arr.shape[0] == depth:
+            # Generate the boundary for the middle slice
+            #middle_slice = sub_arr[depth // 2]
+            boundary = find_boundary(sub_arr)
 
-        # Generate the boundary and one-hot encode it
-        boundary = find_boundary(middle_slice)
-        boundary_one_hot = to_categorical(boundary, num_classes=num_classes)
+            # Add channel dimension to each slice in the sub-array and to the boundary
+            sub_arr_processed = sub_arr[..., np.newaxis]
+            boundary_processed = boundary[..., np.newaxis]
 
-        X_train.append(middle_slice[..., np.newaxis])  # Add channel dimension
-        Y_train.append(boundary_one_hot)
+            X_train.append(sub_arr_processed)
+            Y_train.append(boundary_processed)
 
+    # Convert lists to numpy arrays
     X_train = np.array(X_train)
-    Y_train = np.array(Y_train).reshape(-1, 128, 128, num_classes)
+    Y_train = np.array(Y_train)
+
+    print(X_train.shape)
+    print(Y_train.shape)
 
     return X_train, Y_train
+
 
 
 def get_user_selection(region_options):
@@ -303,62 +319,6 @@ def get_user_selection(region_options):
                                                "\n".join([f"{k}: {v}" for k, v in region_options.items()]),
                                                parent=root)
     return region_selection
-
-def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='my_model.keras',
-                internal_folder_paths=None, segmentation_type='internal'):
-
-    normalizedDict = normalizeTF(segmentDict) if segmentDict is not None else None
-    all_triplets = []
-
-    if segmentation_type == 'skull':
-        if os.path.exists(binary_model_path):
-            model_binary = load_model(binary_model_path, custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
-            for key, sub_array in zip(file_names, normalizedDict.values()):
-                sub_arrays_split = split_into_subarrays(sub_array, depth)
-                for idx, sub_arr in enumerate(sub_arrays_split):
-                    surrounding_slices = get_surrounding_slices(sub_arr[2], sub_arrays_split, depth)
-                    sub_arr_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
-                    pred = model_binary.predict(sub_arr_exp)
-                    middle_index = depth // 2
-                    slices_triplet = (surrounding_slices[middle_index], pred[0][middle_index])
-                    all_triplets.append(slices_triplet)
-        else:
-            print("Binary segmentation model path does not exist. Please check the path and try again.")
-            return
-
-    elif segmentation_type == 'internal':
-        
-        for region_name, folder_path in internal_folder_paths.items():
-            print(f"Processing region: {region_name}")
-
-            model_path = os.path.join(folder_path, f"{region_name.lower().replace(' ', '_')}_model.keras")
-            if not os.path.exists(model_path):
-                print(f"Training new model for {region_name}...")
-                images = load_dcm_images_from_folder(folder_path)
-                X_train, Y_train = prepare_data_for_training(images, depth=depth, num_classes=5)
-                model = unet_internal(input_size=(128, 128, 1), num_classes=5)
-                model.fit(X_train, Y_train, epochs=25, batch_size=16)
-                ensure_directory_exists(folder_path)
-                model.save(model_path)
-            else:
-                print(f"Loading model for {region_name} from {model_path}...")
-                model = load_model(model_path)
-            
-            images = load_dcm_images_from_folder(folder_path)
-            for slice_idx in range(images.shape[0]):  # Iterate through each slice in the loaded images
-                slice_2d = images[slice_idx, :, :, 0]  
-                slice_2d_normalized = normalize_image(slice_2d)
-                slice_2d_normalized = np.expand_dims(slice_2d_normalized, axis=-1)
-                slice_2d_normalized = np.expand_dims(slice_2d_normalized, axis=0)
-                pred = model.predict(slice_2d_normalized)
-                all_triplets.append((slice_2d, pred[0])) 
-
-            # Display images for the current region
-            #display_images_for_region(all_triplets, region_name)
-            all_triplets.clear()  # Clear the list for the next region
-
-    print("All images have been processed.")
-
 
 
 def execute_unet(inputDict, depth=5):
@@ -385,15 +345,21 @@ def execute_unet(inputDict, depth=5):
             for idx, sub_arr in enumerate(subarrays_split):
                 surrounding_slices = get_surrounding_slices(sub_arr[2], subarrays_split, depth)
                 sub_arr_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
-                pred = model_binary.predict(sub_arr_exp)
-                middle_index = depth // 2
-                slices_triplet = (surrounding_slices[middle_index], pred[0][middle_index])
-                all_triplets.append(slices_triplet)
+
+                # Ensure the shape is correct
+                if sub_arr_exp.shape == (1, depth, 128, 128, 1):
+                    pred = model_binary.predict(sub_arr_exp)
+                    middle_index = depth // 2
+                    slices_triplet = (surrounding_slices[middle_index], pred[0][middle_index])
+                    all_triplets.append(slices_triplet)
+                else:
+                    print("Shape mismatch in prediction input:", sub_arr_exp.shape)
         else:
             # If the path does not exist
             print(f"The path for '{key}' does not exist.")
             model = unet_generate_model()
             subarrays = split_into_subarrays(array3d)
+            print(subarrays[0].shape)
             print(f"Training new model for {key}...")
             X_train, Y_train = prepare_data_for_training(subarrays)
             model.fit(X_train, Y_train, epochs=25, batch_size=16)
