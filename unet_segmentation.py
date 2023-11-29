@@ -93,6 +93,7 @@ def unet_generate_model(input_size=(5, 128, 128, 1)):
     model.compile(optimizer='adam', loss=weighted_binary_crossentropy, metrics=['accuracy'])
     return model
 
+
 # def unet_internal(input_size=(128, 128, 1), num_classes=5):
 #     inputs = tf.keras.layers.Input(input_size)
 
@@ -153,15 +154,23 @@ def generate_predictions(subarrays, model):
             sub_arr_reshaped = np.expand_dims(sub_arr, axis=0)  # Adds the batch size dimension
             sub_arr_reshaped = np.expand_dims(sub_arr_reshaped, axis=-1)  # Adds the channel dimension
 
-            # Generate prediction and store it
+            # Generate prediction
             pred = model.predict(sub_arr_reshaped)
-            predictions.append(pred[0])  # pred[0] to remove the batch size dimension
+
+            # Keep the prediction in 4D (including the channel dimension) and store it
+            pred_4d = pred[0, :, :, :, :]  # Shape: [depth, height, width, channels]
+            predictions.append(pred_4d)
         else:
             print("Subarray with incorrect shape encountered:", sub_arr.shape)
             continue
 
+    # Concatenate all predictions along the depth axis
+    combined_prediction = np.concatenate(predictions, axis=0)
+
     print("generate predictions complete")
-    return predictions
+    print(combined_prediction.shape)
+    return combined_prediction
+
 
 def get_surrounding_slices(original_slice, sub_arrays, depth):
     surrounding_depth = depth // 2
@@ -182,6 +191,8 @@ def get_surrounding_slices(original_slice, sub_arrays, depth):
     return surrounding_slices
 
 
+
+    
 def normalizeTF(volume3dDict):
     normalizedDict = {}
     for key, value in volume3dDict.items():
@@ -348,7 +359,8 @@ def execute_unet(inputDict, depth=5):
             print(f"The path for '{key}' exists.")
             subarrays_split = split_into_subarrays(array3d)
             model_binary = load_model(model_paths[key], custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
-            predictions = generate_predictions(subarrays_split, model_binary)
+            predict_3d = generate_predictions(subarrays_split, model_binary)
+            data.display_3d_array_slices(predict_3d, 5)
         else:
             # If the path does not exist
             print(f"The path for '{key}' does not exist.")
@@ -362,7 +374,6 @@ def execute_unet(inputDict, depth=5):
             
 
 
-    
 def display_images_for_region(all_triplets, region_name):
     print(f"Displaying images for {region_name}...")
     triplet_index = 0
@@ -382,7 +393,7 @@ if __name__ == "__main__":
     # Example dictionary holding your image data for skull segmentation
     sitk_images_dict = {
         "image1": data.get_3d_image("scan1"),
-        "image2": data.get_3d_image("scan2"),
+        #"image2": data.get_3d_image("scan2"),
     }
     execute_unet(sitk_images_dict)
 
