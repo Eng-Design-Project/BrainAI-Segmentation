@@ -502,6 +502,7 @@ if __name__ == "__main__":
     #data.display_3d_array_slices(image, 10)
     
     color_atlas = data.get_2d_png_array_list("color atlas")
+    print(color_atlas.shape)
     seg_results = execute_atlas_seg(atlas, color_atlas, image)
     
     internal_color_atlas = data.get_2d_png_array_list("Color Atlas internal")
