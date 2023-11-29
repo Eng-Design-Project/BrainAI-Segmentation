@@ -599,6 +599,52 @@ def avg_brightness_2d(image):
     average_brightness = np.mean(normalized_image)
     return average_brightness
 
+# img_dict is a dictionary of 3d arrays, and coords dict is a dict of lists of coordinates
+# they both have matching regions, then it goes through the regions and finds the brighntess of a pixel
+# for every coordinate in the list of coordinates, normalizes it, calculates the average of all of them,
+# and appends to a dict key = region, value = average brightness
+# and returns average brightness dictionary
+def avg_brightness(img_dict, coords_dict):
+    # Ensure the input is a numpy array
+    brightness_dict = {}
+
+    for region in img_dict.keys():
+        if not isinstance(img_dict[region], np.ndarray):
+            raise ValueError("Input must be a numpy array")
+
+        avg_brightness = 0
+        max = np.max(img_dict[region])
+        min = np.min(img_dict[region])
+        print("MIN:")
+        print(min)
+        print("MAX:")
+        print(max)
+        if max - min == 0:
+            continue
+        else:
+            print("LENGTH:")
+            print(len(coords_dict[region]))
+            print('LAST ELEMENT')
+            print(coords_dict[region][len(coords_dict[region])-1])
+            print(img_dict[region].shape[0])
+            print(img_dict[region].shape[1])
+            print(img_dict[region].shape[2])
+            for i in range(len(coords_dict[region])):
+                x, y, z = coords_dict[region][i]
+                if (0 <= x < img_dict[region].shape[0]) and \
+                    (0 <= y < img_dict[region].shape[1]) and \
+                    (0 <= z < img_dict[region].shape[2]):
+                    pixel_value = img_dict[region][x, y, z]
+                    # Normalize each image to the range [0, 255]
+                    pixel_value = ((pixel_value - min) / (max - min)) * 255
+                    # Calculate the average pixel brightness for the normalized image
+                    avg_brightness += pixel_value
+
+            avg_brightness = avg_brightness / len(coords_dict[region])
+        brightness_dict[region] = avg_brightness
+
+    return brightness_dict
+
 def is_segment_results_dir(directory):
     """
     Validates if a given directory matches the specified structure and format.

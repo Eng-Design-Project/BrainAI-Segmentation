@@ -505,7 +505,7 @@ if __name__ == "__main__":
     seg_results = execute_atlas_seg(atlas, color_atlas, image)
     
     internal_color_atlas = data.get_2d_png_array_list("Color Atlas internal")
-    internal_seg_results = execute_internal_atlas_seg(seg_results, internal_color_atlas)
+    internal_seg_results = execute_internal_atlas_seg(seg_results, internal_color_atlas)[0]
 
     data.display_seg_np_images(internal_seg_results)
 

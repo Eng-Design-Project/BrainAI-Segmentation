@@ -659,11 +659,15 @@ class Core:
 
              
         # call execute atlas seg, passing image, atlas and atlas colors as args
-        seg_results = segmentation.execute_atlas_seg(atlas, color_atlas, image)[0]
-        # the function above will have modified the self.coords_dict varible
-        # to check if it was successfully modified, we should do a print statement
-        self.coords_dict = segmentation.execute_atlas_seg(atlas, color_atlas, image)[1]
-        # print(self.coords_dict)
+        seg_results, self.coords_dict = segmentation.execute_atlas_seg(atlas, color_atlas, image)
+        # execute_atlas_seg(...)[0] returns the seg results,
+        # execute_atlas_seg(...)[1] returns a dictionary containing the positive coordinates of the segments
+        # print(type(self.coords_dict)) #returns 'dict'
+        # print(self.coords_dict) # returns {'Skull': [[58, 2, 0], ...]}
+        avg_brightness_dict = data.avg_brightness(seg_results, self.coords_dict)
+        for key, value in avg_brightness_dict.items():
+            print(key)
+            print(value)
 
         del seg_results["Skull"]
         data.segmentation_results = seg_results
@@ -693,7 +697,7 @@ class Core:
             internal_color_atlas = data.get_2d_png_array_list("Color Atlas internal")
             internal_seg_results = segmentation.execute_internal_atlas_seg(data.segmentation_results, internal_color_atlas)[0]
             self.coords_dict = segmentation.execute_internal_atlas_seg(data.segmentation_results, internal_color_atlas)[1]
-            print(self.coords_dict)
+            #print(self.coords_dict)
 
             #save results, to file and data.seg results        
             save_success = self.save_seg_results(internal_seg_results)
