@@ -273,19 +273,14 @@ def show_slices(triplets, threshold=0.5, brightening_factor=1.3):  # Adjust thre
 
 
 
-def get_unet_result_coordinates(original, new):
-
+def get_unet_result_coordinates(predict_3d, threshold=0.5):
     coordinates_dict = {}
-    #We want all coordinates NOT 
-    for key in original.keys():
-        coordinate_list = []
-        for x in range(original[key].size[0]):
-            for y in range(original[key].size[1]):
-                for z in range(original[key].size[2]):
-                    if not new[key][x,y,z] > original[key][x,y,z]:
-                        coordinate_list.append([x,y,z])
-        coordinates_dict[key] = coordinate_list
-
+    # Get coordinates below the threshold
+    for x in range(predict_3d.shape[0]):
+        for y in range(predict_3d.shape[1]):
+            for z in range(predict_3d.shape[2]):
+                if predict_3d[x, y, z, 0] < threshold:  # Assuming the last dimension is the channel
+                    coordinates_dict.setdefault('coordinates', []).append([x, y, z])
     return coordinates_dict
 
 
@@ -337,32 +332,33 @@ def get_user_selection(region_options):
     return region_selection
 
 
-def execute_unet(inputDict, depth=5):
-
+def execute_unet(inputDict, depth=5, threshold=0.5):
     dict_of_3d_arrays = {}
     new_dict = {}
 
     if isinstance(inputDict, dict):
-            print("input is a dictionary.")
-            dict_of_3d_arrays = inputDict
+        print("input is a dictionary.")
+        dict_of_3d_arrays = inputDict
     else:
         print("input is an array.")
         dict_of_3d_arrays["FullScan"] = inputDict
 
     normalizedDict = normalizeTF(dict_of_3d_arrays)
-    all_triplets = []
     model_paths = {key: f"{key}_model.keras" for key in normalizedDict.keys()}
+
+    final_output = {}
 
     for key, array3d in normalizedDict.items():
         if os.path.exists(model_paths[key]):
-            # If the path exists
+            # Path exists
             print(f"The path for '{key}' exists.")
             subarrays_split = split_into_subarrays(array3d)
             model_binary = load_model(model_paths[key], custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
             predict_3d = generate_predictions(subarrays_split, model_binary)
-            data.display_3d_array_slices(predict_3d, 5)
+            coordinates_below_threshold = get_unet_result_coordinates(predict_3d, threshold)
+            final_output[key] = coordinates_below_threshold
         else:
-            # If the path does not exist
+            # Path does not exist
             print(f"The path for '{key}' does not exist.")
             model = unet_generate_model()
             subarrays = split_into_subarrays(array3d)
@@ -371,6 +367,12 @@ def execute_unet(inputDict, depth=5):
             X_train, Y_train = prepare_data_for_training(subarrays)
             model.fit(X_train, Y_train, epochs=10, batch_size=16)
             model.save(model_paths[key])
+            predict_3d = generate_predictions(subarrays, model)
+            coordinates_below_threshold = get_unet_result_coordinates(predict_3d, threshold)
+            final_output[key] = coordinates_below_threshold
+
+    print("Final output with coordinates below the threshold:", final_output)
+    return final_output
             
 
 
