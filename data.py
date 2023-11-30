@@ -133,26 +133,37 @@ def save_2d_images_list(image_list, directory):
 
 
 def get_3d_image(directory):
-    image_files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]  # gather files
-    slices = [pydicom.dcmread(os.path.join(directory, f)) for f in image_files]  # read each file
+    print("Reading DICOM files from directory:", directory)
 
-    # Create a set to track unique ImagePositionPatient[2] values
+    image_files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+    print(f"Found {len(image_files)} files in the directory.")
+
+    slices = [pydicom.dcmread(os.path.join(directory, f)) for f in image_files]
+    print(f"Read {len(slices)} DICOM slices.")
+
     unique_positions = set()
     unique_slices = []
 
-    # Loop through each slice and add it to unique_slices if its position is unique
+    # Loop through each slice
     for s in slices:
         position = float(s.ImagePositionPatient[2])
         if position not in unique_positions:
             unique_slices.append(s)
             unique_positions.add(position)
 
+    print(f"Number of unique slices based on position: {len(unique_slices)}")
+
     # Sort the unique slices
     unique_slices.sort(key=lambda x: float(x.ImagePositionPatient[2]))
+    print("Unique slices sorted based on ImagePositionPatient[2].")
+
+    # Stack and reverse the array
     output_arr = np.stack([s.pixel_array for s in unique_slices])
     output_arr = output_arr[::-1, :, :]
 
+    print("Final output array shape:", output_arr.shape)
     return output_arr
+
 
         
 # def get_3d_image(directory):
@@ -261,29 +272,30 @@ def save_3d_img_to_dcm(array, template_dir, new_dir):
     # Generate template_path from template_dir
     template_path = get_first_dcm_path(template_dir)
 
+    # Read the template DICOM file to get the slice thickness
+    template = pydicom.dcmread(template_path)
+    slice_thickness = float(template.SliceThickness)
+
     # Iterate through the slices and save each one
     for z in range(array.shape[0]):
         slice_arr = array[z, :, :]
-        # Resize the slice
-        pil_img = Image.fromarray(slice_arr)
-        resized_img = pil_img.resize((224, 224), Image.Resampling.LANCZOS)
-        resized_slice_arr = np.array(resized_img)
-        # Read the template DICOM file
-        template = pydicom.dcmread(template_path)
-
+        
         # Create a new DICOM dataset based on the template
         ds = Dataset()
         ds.file_meta = template.file_meta
         ds.update(template)  # Update the dataset with the template
 
         # Update the pixel data
-        ds.PixelData = resized_slice_arr.tobytes()
+        ds.PixelData = slice_arr.tobytes()
 
         # Update the rows and columns based on the array shape
-        ds.Rows, ds.Columns = resized_slice_arr.shape
+        ds.Rows, ds.Columns = slice_arr.shape
 
-        # Update the slice location and instance number
-        ds.SliceLocation = str(z)
+        # Calculate the slice position (ImagePositionPatient[2])
+        initial_position = float(template.ImagePositionPatient[2])
+        ds.ImagePositionPatient[2] = str(initial_position + z * slice_thickness)
+
+        # Update the instance number
         ds.InstanceNumber = str(z)
 
         # Set the endianess and VR encoding
@@ -299,6 +311,7 @@ def save_3d_img_to_dcm(array, template_dir, new_dir):
         print(f"Saved slice {z} to {filename}")
 
     print(f"Saved 3D image to {new_dir}")
+
 
 def save_3d_img_to_png(image_array, new_dir):
     # Check if the directory exists, if not, create it
@@ -427,11 +440,12 @@ def store_seg_img_on_file(dict, template_dir, new_dir):
     
     for key in dict:
         # making a sub folder based on the brain region name
-        sub_dir = os.path.join(new_dir, key)
-        os.makedirs(sub_dir)
+        if key != "Skull":
+            sub_dir = os.path.join(new_dir, key)
+            os.makedirs(sub_dir)
 
-        save_3d_img_to_dcm(dict[key], template_dir, sub_dir)
-        #print("key:", key)
+            save_3d_img_to_dcm(dict[key], template_dir, sub_dir)
+            #print("key:", key)
 
 def test_store_seg_img_on_file(new_dir):
     ## the following code tests the "store_sec_img_on_file()"" functions
@@ -449,12 +463,13 @@ def store_seg_png_on_file(dict, new_dir):
         os.makedirs(new_dir)
     
     for key in dict:
-        # making a sub folder based on the brain region name
-        sub_dir = os.path.join(new_dir, key)
-        os.makedirs(sub_dir)
+        if key != "Skull":
+            # making a sub folder based on the brain region name
+            sub_dir = os.path.join(new_dir, key)
+            os.makedirs(sub_dir)
 
-        save_3d_img_to_png(dict[key], sub_dir)
-        #print("key:", key)
+            save_3d_img_to_png(dict[key], sub_dir)
+            #print("key:", key)
 
 # the function below takes a dictionary of 3d np array images and returns an equivalent dict of png images
 # img_dict parameter is a dictionary whose keys are strings, and values are 3d np array 3d images
@@ -482,13 +497,19 @@ def array_dict_to_png_dict(img_dict):
 # the output is a dictionary with brain region names as keys and 3d np array images as values
 def subfolders_to_dictionary(directory):
     #print(os.listdir(directory))
-    region_dict = {}
-    for i in os.listdir(directory):
-        # print(i)
-        region_dict[i] = get_3d_image(os.path.join(directory, i))
-
-    return region_dict
-
+    is_valid = is_segment_results_dir(directory)
+    if (is_valid):
+        region_dict = {}
+        for i in os.listdir(directory):
+            # print(i)
+            print(os.path.join(directory, i))
+            region_dict[i] = get_3d_image(os.path.join(directory, i))
+            print("shape of " + i)
+            print(region_dict[i].shape)
+        
+        return region_dict
+    else:
+        return None
     
 
 # the following code tests the "subfolders_to_dictionary()" function
@@ -513,6 +534,7 @@ def set_seg_results_with_dir(directory = "atl_segmentation_DCMs"):
     
 # set_seg_results()
 
+#this function needs fixing, there should be a for loop like in the function below it.
 #this function has been changed, it now returns a single NORMALIZED average.
 #this function takes a 3d numpy image, returns a single number as the average of (46) averages
 def average_overall_brightness_3d(image):
@@ -530,6 +552,7 @@ def average_overall_brightness_3d(image):
     overall_average_brightness = np.mean(normalized_image_averages)
     return overall_average_brightness
 
+# added another fix to this function.
 # this fuction has been changed, it now returns NORMALIZED (between [0, 255]) averages
 # if the argument is a 3d image with 46 slices, this function will return a numpy array with 46 averages
 # each average can be accessed by typical indexing, e.g. average_brightness[0] returns first average, ...[45] returns last, etc.
@@ -537,16 +560,26 @@ def array_of_average_pixel_brightness_3d(images):
     # Ensure the input is a numpy array
     if not isinstance(images, np.ndarray):
         raise ValueError("Input must be a numpy array")
-    
     # Ensure the input is a 3D array
     if len(images.shape) != 3:
         raise ValueError("Input must be a 3D array of grayscale images")
 
-    # Normalize each image to the range [0, 255]
-    normalized_images = (images - np.min(images)) / (np.max(images) - np.min(images)) * 255
+    num_slices, height, width = images.shape
 
-    # Calculate the average pixel brightness for all normalized images
-    average_brightness = np.mean(normalized_images, axis=(1, 2))
+    # Initialize an array to store the normalized average brightness for each image
+    average_brightness = np.zeros(num_slices)
+
+    for i in range(num_slices):
+        # Check if the range is zero to avoid division by zero
+        if np.max(images[i]) - np.min(images[i]) == 0:
+            normalized_image = images[i]  # Avoid normalization if the range is zero
+        else:
+            # Normalize each image to the range [0, 255]
+            normalized_image = (images[i] - np.min(images[i])) / (np.max(images[i]) - np.min(images[i])) * 255
+
+        # Calculate the average pixel brightness for the normalized image
+        average_brightness[i] = np.mean(normalized_image)
+
     return average_brightness
 
 # this function returns the normalized [0,255] avg brightness of a single 2d grayscale numpy image
@@ -565,6 +598,73 @@ def avg_brightness_2d(image):
     # Calculate the average pixel brightness of the normalized image
     average_brightness = np.mean(normalized_image)
     return average_brightness
+
+# img_dict is a dictionary of 3d arrays, and coords dict is a dict of lists of coordinates
+# they both have matching regions, then it goes through the regions and finds the brighntess of a pixel
+# for every coordinate in the list of coordinates, normalizes it, calculates the average of all of them,
+# and appends to a dict key = region, value = average brightness
+# and returns average brightness dictionary
+def avg_brightness(img_dict, coords_dict):
+    # Ensure the input is a numpy array
+    brightness_dict = {}
+
+    for region in img_dict.keys():
+        if not isinstance(img_dict[region], np.ndarray):
+            raise ValueError("Input must be a numpy array")
+
+        avg_brightness = 0
+        max = np.max(img_dict[region])
+        min = np.min(img_dict[region])
+        print("MIN:")
+        print(min)
+        print("MAX:")
+        print(max)
+        if max - min == 0:
+            continue
+        else:
+            print("LENGTH:")
+            print(len(coords_dict[region]))
+            print('LAST ELEMENT')
+            print(coords_dict[region][len(coords_dict[region])-1])
+            print(img_dict[region].shape[0])
+            print(img_dict[region].shape[1])
+            print(img_dict[region].shape[2])
+            count = 0
+            normalized_image = min_max_normalize(img_dict[region])
+            for i in range(len(coords_dict[region])):
+                x, y, z = coords_dict[region][i]
+                if (0 <= x < img_dict[region].shape[0]) and \
+                    (0 <= y < img_dict[region].shape[1]) and \
+                    (0 <= z < img_dict[region].shape[2]):
+                    count+=1
+                    pixel_value = normalized_image[z, y, x]
+                    # Normalize each image to the range [0, 255]
+                    # pixel_value = ((pixel_value - min) / (max - min)) * 255
+                    # Calculate the average pixel brightness for the normalized image
+                    if z > 44:
+                        print(pixel_value)
+                    avg_brightness += pixel_value
+
+            print('AVERAGE BRIGHTNESS')
+            print(avg_brightness)
+            avg_brightness = avg_brightness / count
+        brightness_dict[region] = avg_brightness * 255
+
+    return brightness_dict
+
+def min_max_normalize(arr):
+    arr64 = arr.astype(np.float64)
+
+    min_val = np.min(arr64)
+    max_val = np.max(arr64)
+
+    # Check if max and min values are the same (to avoid division by zero)
+    if max_val - min_val == 0:
+        return arr64
+
+    normalized_arr64 = (arr64 - min_val) / (max_val - min_val)
+    return normalized_arr64
+
 
 def is_segment_results_dir(directory):
     """
@@ -653,9 +753,11 @@ def convert_pngs_to_jpegs(input_dir, output_dir):
 
 
 if __name__ == "__main__":
-    test_dir = "scan1"
-    test_pydicom_arr = get_3d_image(test_dir)
-    display_3d_array_slices(test_pydicom_arr, 20)
+    print("data module test")
+    test_subfolders_to_dictionary("scan 1 atlas seg results")
+    # test_dir = "scan1"
+    # test_pydicom_arr = get_3d_image(test_dir)
+    # display_3d_array_slices(test_pydicom_arr, 20)
     
     # print(is_segment_results_dir("atl_segmentation_DCMs"))
     # print(is_segment_results_dir("atl_segmentation_PNGs"))

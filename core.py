@@ -16,7 +16,8 @@ import clustering
 import segmentation
 import data
 import os
-import unet_segmentation
+import Unet_Segmentation
+import deep_learning
 
 
 """class AdvancedSegmentationPage:
@@ -74,6 +75,8 @@ class Core:
         self.atlas_segmentation_completed = False  # Initialize the attribute as False
         # Add a variable to track the state of clustering description visibility
         self.show_clustering_description = False
+        # Add a variable to track the positive coordinates of each region
+        self.coords_dict = {} #this class var should be updated whenever atlas seg or internal seg is run
 
 
         self.master.title("QuickSeg")
@@ -120,7 +123,7 @@ class Core:
         self.image_button.pack(pady=20)"""
 
         # Button for showing segmentation results for an image
-        self.show_image_results_button = tk.Button(self.master, text="Show Image Results", command=self.show_image_results)
+        self.show_image_results_button = tk.Button(self.master, text="Show Segmentation Results", command=self.show_seg_results)
         self.show_image_results_button.pack(pady=20)
 
         # Button for showing segmentation results for a folder
@@ -160,15 +163,15 @@ class Core:
         separator1 = ttk.Separator(popup_window, orient="horizontal")
         separator1.pack(fill="x", padx=20, pady=5)
 
-        segment_description = tk.Label(popup_window, text="Choose 'Whole Brain' for clustering the entire brain or 'Segment' to select specific segments.")
+        segment_description = tk.Label(popup_window, text="Choose 'Whole Scan' for clustering the entire scan or 'Segment' to select the results of segmentation.")
         segment_description.pack()
         segment_var = tk.StringVar()
         segment_var.set(None)
-        whole_brain = tk.Radiobutton(popup_window, text="Whole Brain", variable=segment_var, value="Whole Brain")
+        whole_brain = tk.Radiobutton(popup_window, text="Whole Scan", variable=segment_var, value="Whole Scan")
         whole_brain.pack()
         segment = tk.Radiobutton(popup_window, text="Segment", variable=segment_var, value="Segment")
         segment.pack()
-        #Note: We need to grey out or otherwise deselect options for any algos but DBSCAN if whole brain selected 
+        #Note: We need to grey out or otherwise deselect options for any algos but DBSCAN if whole scan selected 
         #temporarily, just have DBSCAN be the default value
 
         # Add a separator for the second category
@@ -198,7 +201,7 @@ class Core:
         source_var.set(None)  # Set an initial value that does not correspond to any option
         file_option = tk.Radiobutton(popup_window, text="From File", variable=source_var, value="file")
         file_option.pack()
-        memory_option = tk.Radiobutton(popup_window, text="From Memory (recent Seg Results or selected file)", variable=source_var, value="memory")
+        memory_option = tk.Radiobutton(popup_window, text="From Memory (recent Seg Results)", variable=source_var, value="memory")
         memory_option.pack()
 
         # Create a button to confirm the selection and execute clustering
@@ -270,7 +273,7 @@ class Core:
                     #note, data.segmentation results is set after atlas_segment() function is called
                     tk.messagebox.showwarning(title="Invalid Selection", message="No segmentation in memory, you need to select from file.")
                     source = "file"
-            if seg_var == "Whole Brain":
+            if seg_var == "Whole Scan":
                 if not self.selected_folder:
                     tk.messagebox.showwarning(title="Invalid Selection", message="No Scan in memory, you need to select from file.")
                     source = "file"                
@@ -287,6 +290,9 @@ class Core:
                 data.segmentation_results = None
                 while not data.segmentation_results: #note, this may result in infinite loop, need some flag if window closed
                     folder = filedialog.askdirectory(title="Select folder with segmentation results")
+                    if folder == '':
+                        popup_window.destroy()
+                        return
                     #check if save folder matches expected structure
                     if data.is_segment_results_dir(folder):
                         #the function below sets data.segmentation_results to an 3d np array image dict
@@ -295,11 +301,17 @@ class Core:
                         tk.messagebox.showwarning(title="Invalid Selection", message="The folder you selected does not match the expected structure. Select a folder with sub-folders containg DCM files.")
                         # in the future, add logic to query to user if they want to do atlas seg first,
                         # if contains_only_dcms(selection) == true
-            if seg_var == "Whole Brain":
+            if seg_var == "Whole Scan":
                 folder = filedialog.askdirectory(title="Select folder with dcms")
+                if folder == '':
+                        popup_window.destroy()
+                        return
                 while not data.contains_only_dcms(folder):#note, this may result in infinite loop, need some flag if window closed
                     tk.messagebox.showwarning(title="Invalid Selection", message="Select a folder containing only DCM files.")
                     folder = filedialog.askdirectory(title="Select folder with dcms")
+                    if folder == '':
+                        popup_window.destroy()
+                        return
                 volume = data.get_3d_image(folder)
         
             
@@ -310,75 +322,34 @@ class Core:
             #user shouldn't been able to select 'from memory'
         
         if seg_var == "Segment":
-            #the if statement below checks if data.segmentation_results is not empty. It should be unnecessary later when I've added more logic.
-            if data.segmentation_results:
-                #the first argument should be a pre-atlas segmented scan, the 2nd argument should be a string of the chosen algo
-                
-                dict_of_coords_dicts = clustering.execute_seg_clustering(data.segmentation_results, algorithm, 5)
-                for region in data.segmentation_results.keys():
-                    cluster_dict = segmentation.create_seg_images_from_image(data.segmentation_results[region], dict_of_coords_dicts[region])
-                    self.show_image_results(cluster_dict)
-                    # for cluster in clustered_dict.keys():
-                    #     self.show_image_results(clustered_dict[cluster])
+            #the first argument should be a pre-atlas segmented scan, the 2nd argument should be a string of the chosen algo
+            dict_of_coords_dicts = clustering.execute_seg_clustering(data.segmentation_results, algorithm, 5)
+            for region in data.segmentation_results.keys():
+                clustered_dict = segmentation.create_seg_images_from_image(data.segmentation_results[region], dict_of_coords_dicts[region])
+                self.show_seg_results(clustered_dict)
+                # for cluster in clustered_dict.keys():
+                #     self.show_image_results(clustered_dict[cluster])
                     
-        if seg_var == "Whole Brain":
-            # note, when it comes to whole brain, only the DBSCAN algorithm works at the moment
-            #the if statement below checks if the folder is not empty. It should be unnecessary later when I've added more logic.
-            if folder:
-                
-
-                #cluster coordinates returned, not noise, actual clusters for now
-                #could user select number of clusters?
-                coords_dict = clustering.execute_whole_clustering(volume, algorithm, 5)
-                
-                #seg brain with cluster coords
-                clustered_dict = segmentation.create_seg_images_from_image(volume, coords_dict)
-
-                #saving clusters breaks: cluster names are integers
-                #self.save_seg_results(clustered_dict)
-                
-                self.show_image_results(clustered_dict)
+        if seg_var == "Whole Scan":
+            # note, when it comes to whole scan, only the DBSCAN algorithm works at the moment
         
+            #cluster coordinates returned, not noise, actual clusters for now
+            #could user select number of clusters?
+            coords_dict = clustering.execute_whole_clustering(volume, algorithm, 5)
+            
+            #seg brain with cluster coords
+            clustered_dict = segmentation.create_seg_images_from_image(volume, coords_dict)
+
+            #saving clusters breaks: cluster names are integers
+            #self.save_seg_results(clustered_dict)
+            
+            self.show_seg_results(clustered_dict)
+    
         # Close the popup window
         popup_window.destroy()
 
-        #***************************************************************************************
-        # if source == "file":
-        #     # Add code to get the selected file or folder here and store it
-        #     selected_folder = self.get_selected_folder()
-        #     data.set_seg_results(selected_folder)
-        #     self.segmentation_results = data.segmentation_results
-        #     print("Selected file or folder:", selected_folder)
-        #     #call execute clustering here
-
-        #     # Logic to perform clustering from a file and set the clustering_results variable
-        #     clustering_results = {}  # Implement file-based clustering logic here
-        # elif source == "memory":
-        #     # Logic to perform clustering from memory and set the clustering_results variable
-        #     data.set_seg_results()
-        #     self.segmentation_results = data.segmentation_results
-        #     clustering_results = {}  # Implement memory-based clustering logic here
-
-        # # Display clustering results within the GUI
-        # self.display_clustering_results(algorithm, clustering_results)
-
-        # # You can use labels or other widgets to display the clustering results.
-
-        # # Set image paths and current image index (replace with your own data)
-        # folder_path = "scan1_pngs"
-        # self.image_paths = [os.path.join(folder_path, filename) for filename in os.listdir(folder_path) if filename.endswith(".png")]
-        # self.current_image_index = 0
-
-        # # Show or hide "Previous" and "Next" buttons based on whether images are available
-        # if self.image_paths:
-        #     self.show_current_image()
-        #     self.previous_button.pack(pady=10, anchor="center")
-        #     self.next_button.pack(pady=10, anchor="center")
-        # else:
-        #     self.previous_button.pack_forget()
-        #     self.next_button.pack_forget()
-
-    def display_clustering_results(self, algorithm, clustering_results):
+    #this isn't currently in use, any type of seg results should be displayed by one function
+    def display_clustering_results_deprecated(self, algorithm, clustering_results):
         # Create a label or canvas to display the clustering results
         self.results_label = tk.Label(self.master, text=f"Clustering Results for {algorithm}:")
         self.results_label.pack()
@@ -431,11 +402,11 @@ class Core:
 
         segment_var = tk.StringVar()
         segment_var.set(None)
-        whole_brain = tk.Radiobutton(popup_window, text="Whole Brain", variable=segment_var, value="Whole Brain")
+        whole_brain = tk.Radiobutton(popup_window, text="Whole Scan", variable=segment_var, value="Whole Scan")
         whole_brain.pack()
         segment = tk.Radiobutton(popup_window, text="Segment", variable=segment_var, value="Segment")
         segment.pack()
-        #Note: We need to grey out or otherwise deselect options for any algos but DBSCAN if whole brain selected 
+        #Note: We need to grey out or otherwise deselect options for any algos but DBSCAN if whole scan selected 
         #temporarily, just have DBSCAN be the default value
 
         # Add a separator for the second category
@@ -483,7 +454,7 @@ class Core:
                     #note, data.segmentation results is set after atlas_segment() function is called
                     tk.messagebox.showwarning(title="Invalid Selection", message="No segmentation in memory, you need to select from file.")
                     source = "file"
-            if seg_var == "Whole Brain":
+            if seg_var == "Whole Scan":
                 if not self.selected_folder:
                     tk.messagebox.showwarning(title="Invalid Selection", message="No Scan in memory, you need to select from file.")
                     source = "file"                
@@ -500,6 +471,9 @@ class Core:
                 data.segmentation_results = None
                 while not data.segmentation_results: #note, this may result in infinite loop, need some flag if window closed
                     folder = filedialog.askdirectory(title="Select folder with segmentation results")
+                    if folder == '':
+                        popup_window.destroy()
+                        return
                     #check if save folder matches expected structure
                     if data.is_segment_results_dir(folder):
                         #the function below sets data.segmentation_results to an 3d np array image dict
@@ -508,11 +482,17 @@ class Core:
                         tk.messagebox.showwarning(title="Invalid Selection", message="The folder you selected does not match the expected structure. Select a folder with sub-folders containg DCM files.")
                         # in the future, add logic to query to user if they want to do atlas seg first,
                         # if contains_only_dcms(selection) == true
-            if seg_var == "Whole Brain":
+            if seg_var == "Whole Scan":
                 folder = filedialog.askdirectory(title="Select folder with dcms")
+                if folder == '':
+                    popup_window.destroy()
+                    return
                 while not data.contains_only_dcms(folder):#note, this may result in infinite loop, need some flag if window closed
                     tk.messagebox.showwarning(title="Invalid Selection", message="Select a folder containing only DCM files.")
                     folder = filedialog.askdirectory(title="Select folder with dcms")
+                    if folder == '':
+                        popup_window.destroy()
+                        return
                 volume = data.get_3d_image(folder)
         
             
@@ -523,39 +503,75 @@ class Core:
             #user shouldn't been able to select 'from memory'
         
         if seg_var == "Segment":
-            #the if statement below checks if data.segmentation_results is not empty. It should be unnecessary later when I've added more logic.
-            if data.segmentation_results:
-                #the first argument should be a pre-atlas segmented scan, the 2nd argument should be a string of the chosen algo
-                
-                dict_of_coords_dicts = clustering.execute_seg_clustering(data.segmentation_results, algorithm, 5)
-                for region in data.segmentation_results.keys():
-                    cluster_dict = segmentation.create_seg_images_from_image(data.segmentation_results[region], dict_of_coords_dicts[region])
-                    self.show_image_results(cluster_dict)
-                    # for cluster in clustered_dict.keys():
-                    #     self.show_image_results(clustered_dict[cluster])
-                    
-        if seg_var == "Whole Brain":
-            # note, when it comes to whole brain, only the DBSCAN algorithm works at the moment
-            #the if statement below checks if the folder is not empty. It should be unnecessary later when I've added more logic.
-            if folder:
-                
+            #the first argument should be a pre-atlas segmented scan, the 2nd argument should be a string of the chosen algo
+            if algorithm == "U-net":
+                print("segment u-net")
+                self.train_unet_model(data.segmentation_results, 'internal')  # or 'skull'
 
-                #cluster coordinates returned, not noise, actual clusters for now
-                #could user select number of clusters?
-                coords_dict = clustering.execute_whole_clustering(volume, algorithm, 5)
-                
-                #seg brain with cluster coords
-                clustered_dict = segmentation.create_seg_images_from_image(volume, coords_dict)
+            else:
+                print("segment custom")
+                self.train_custom_dl_model(data.segmentation_results)
 
-                #saving clusters breaks: cluster names are integers
-                #self.save_seg_results(clustered_dict)
-                
-                self.show_image_results(clustered_dict)
-        
+
+        if seg_var == "Whole Scan":
+            if algorithm == "U-net":
+                print("whole scan u-net")
+                self.train_unet_model(volume, 'skull')  # or 'skull'
+            else:
+                print("whole scan custom")
+                self.train_custom_dl_model(volume)
+
+            
+            #self.show_seg_results(dl_dict)
+    
         # Close the popup window
         popup_window.destroy()
-            
 
+    def train_custom_dl_model(self, input):
+        print("training custom dl model")
+        dict_of_3d_arrays = {}
+        if isinstance(input, dict):
+            print("input is a dictionary.")
+            dict_of_3d_arrays = input
+        else:
+            print("input is an array.")
+            dict_of_3d_arrays["FullScan"] = input
+        classifier = deep_learning.CustomClassifierMultiModel(dict_of_3d_arrays)
+        classif_dict = classifier.trainDL()
+        results = segmentation.filter_noise_from_images(dict_of_3d_arrays, classif_dict)
+        self.show_seg_results(results)
+            
+    def train_unet_model(self, input, algorithm_type):
+        print("training U-net model")
+        dict_of_3d_arrays = {}
+        if isinstance(input, dict):
+            print("input is a dictionary.")
+            dict_of_3d_arrays = input
+        else:
+            print("input is an array.")
+            dict_of_3d_arrays["FullScan"] = input
+
+        file_names = list(dict_of_3d_arrays.keys())
+
+        # Initialize internal_folder_paths with actual paths or logic
+        internal_folder_paths = {
+            "Frontal Lobe": "Internal Segment DCM unet\Frontal",
+            "Temporal Lobe": "Internal Segment DCM unet\Temporal",
+            "Occipital Lobe": "Internal Segment DCM unet\Occipital",
+            "White Matter": "Internal Segment DCM unet\White Matter",
+        }
+
+        # Assuming 'algorithm_type' is either 'internal' or 'skull'
+        Unet_Segmentation.dlAlgorithm(
+            segmentDict=dict_of_3d_arrays,
+            file_names=file_names,
+            internal_folder_paths=internal_folder_paths,
+            binary_model_path='my_model.keras',  # Adjust as needed
+            segmentation_type=algorithm_type
+        )
+
+
+        
     def get_selected_segmentation_method(self):
         #later, this will be removed. when a button calls a function,
         #  we should know which algo is being called by passing an argument
@@ -602,8 +618,8 @@ class Core:
             "image2": data.get_3d_image("scan2"),
         }
 
-        # Call the dlAlgorithm function from deep_learning_copy module
-        unet_segmentation.dlAlgorithm(images_dict)
+        # Call the dlAlgorithm function from Unet_segmentation module
+        Unet_Segmentation.dlAlgorithm(images_dict)
 
     def custom_askdirectory(title):
         #might replace other usses of askdirectory, to display a message
@@ -623,20 +639,11 @@ class Core:
     def atlas_segment(self):
         print("Atlas Segmentation called")
         #gets selected folder global from core class
-        #if empty, have to get it
-        if(self.selected_folder == ""):
-            print("no folder selected") 
-            #prompt the user to select a folder
-            self.select_folder()
-
         # Check if the selected folder is a valid segment results directory
-        if not data.contains_only_dcms(self.selected_folder):
-            error_message = "Incorrect input folder, contains non-DCMs"
-            self.show_popup_message(error_message, close_callback=self.select_folder)
+        if (not data.contains_only_dcms(self.selected_folder) or self.selected_folder == ""):
+            self.show_popup_message("Incorrect input folder, select a folder only containing DCMs")
             # Clear the selected folder
             self.selected_folder = ""
-            # Prompt the user to select a folder again
-            self.select_folder()
             return  # Exit the function or handle the invalid folder as needed   
                
         # use functions in data to read the atlas and 
@@ -652,30 +659,56 @@ class Core:
 
              
         # call execute atlas seg, passing image, atlas and atlas colors as args
-        seg_results = segmentation.execute_atlas_seg(atlas, color_atlas, image)
+        seg_results, self.coords_dict = segmentation.execute_atlas_seg(atlas, color_atlas, image)
+        # execute_atlas_seg(...)[0] returns the seg results,
+        # execute_atlas_seg(...)[1] returns a dictionary containing the positive coordinates of the segments
+        # print(type(self.coords_dict)) #returns 'dict'
+        # print(self.coords_dict) # returns {'Skull': [[58, 2, 0], ...]}
+        avg_brightness_dict = data.avg_brightness(seg_results, self.coords_dict)
+        for key, value in avg_brightness_dict.items():
+            print(key)
+            print(value)
 
+        del seg_results["Skull"]
+        data.segmentation_results = seg_results
         # returns dict of simple itk images
         # save them as dcms to the nested folder
         # Check if the selected folder is a valid segment results directory
         
         #save seg results to file, and to data.segmentation_results
-        self.save_seg_results(seg_results)
-        
+        save_success = self.save_seg_results(seg_results)
+        if (save_success):
+            # Set a flag to indicate that atlas segmentation has been performed
+                self.atlas_segmentation_completed = True
+                print("Atlas segmentation completed")  # Add this line for debugging
+                self.change_buttons([self.select_folder_button, self.folder_label, self.atlas_segment_button, self.image_scoring_button, self.advanced_segmentation_button, self.show_image_results_button, self.view_DCMS_btn, self.save_message_label], self.master)
+        else:
+            print("Failed to save Results")
+            self.show_popup_message("Failed to save results")
         #display seg results
-        self.show_image_results(seg_results)
+        self.show_seg_results(seg_results)
 
         #here to test execute internal_atlas_seg
         #self.execute_internal_atlas_seg()
 
     def execute_internal_atlas_seg(self):
         print("Internal Atlas Segmentation")
-        internal_color_atlas = data.get_2d_png_array_list("Color Atlas internal")
-        internal_seg_results = segmentation.execute_internal_atlas_seg(data.segmentation_results, internal_color_atlas)
-        #save results, to file and data.seg results        
-        self.save_seg_results(internal_seg_results)
-        
-        #display results
-        self.show_image_results(internal_seg_results)
+        if (data.segmentation_results != None):
+            internal_color_atlas = data.get_2d_png_array_list("Color Atlas internal")
+            internal_seg_results = segmentation.execute_internal_atlas_seg(data.segmentation_results, internal_color_atlas)[0]
+            self.coords_dict = segmentation.execute_internal_atlas_seg(data.segmentation_results, internal_color_atlas)[1]
+            #print(self.coords_dict)
+
+            #save results, to file and data.seg results        
+            save_success = self.save_seg_results(internal_seg_results)
+            if (save_success):
+                print("Internal Atlas segmentation completed")  # Add this line for debugging
+            else:
+                self.show_popup_message("Failed to save results")
+                #display results
+            self.show_seg_results(internal_seg_results)
+        else:
+            self.show_popup_message("There are no atlas segmentation results saved to internally segment.")
 
     def save_seg_results(self, seg_results):
         # Ask the user to select a folder for saving the results
@@ -689,16 +722,16 @@ class Core:
                 # Save the segmentation results with the user-specified file name
                 data.store_seg_img_on_file(seg_results, self.selected_folder, f"{save_folder}/{file_name}.DCMs")
                 data.store_seg_png_on_file(seg_results, f"{save_folder}/{file_name}.PNGs")
-            # save dict of 3d np array images to data global seg results
-            # Show a message to inform the user that the folder was selected for saving
-            self.save_message = "Selected folder for saving: " + save_folder
-            self.save_message_label = tk.Label(self.master, text=self.save_message)
-            self.save_message_label.pack()
-            data.segmentation_results = seg_results       
-        # Set a flag to indicate that atlas segmentation has been performed
-        self.atlas_segmentation_completed = True
-        print("Atlas segmentation completed")  # Add this line for debugging
-        self.change_buttons([self.select_folder_button, self.folder_label, self.atlas_segment_button, self.image_scoring_button, self.advanced_segmentation_button, self.show_image_results_button, self.view_DCMS_btn, self.save_message_label], self.master)
+                # save dict of 3d np array images to data global seg results
+                # Show a message to inform the user that the folder was selected for saving
+                self.save_message = "Selected folder for saving: " + save_folder
+                self.save_message_label = tk.Label(self.master, text=self.save_message)
+                self.save_message_label.pack()
+                data.segmentation_results = seg_results
+                return True       
+                
+        #Note: returns True to indicate success, False otherwise
+        return False
 
     
 
@@ -723,9 +756,7 @@ class Core:
         # Center the popup window on the screen
         popup_window.geometry(f"+{popup_window.winfo_screenwidth() // 2 - popup_window.winfo_reqwidth() // 2}+{popup_window.winfo_screenheight() // 2 - popup_window.winfo_reqheight() // 2}")
 
-        # Start the main loop for the popup window
-        popup_window.mainloop()    
-                
+                    
 
 
         
@@ -866,18 +897,22 @@ class Core:
         self.deep_learning_page.show_buttons()"""
    
         
-    def show_image_results(self, image_dict=None):
+    def show_seg_results(self, image_dict=None):
         # This function will display segmentation results for an image
 
         if image_dict is None:
             folder = filedialog.askdirectory(title="Select folder with subfolders containing DCM files")
+            if folder == '':
+                        return
             while not data.is_segment_results_dir(folder):
                 tk.messagebox.showwarning(
                     title="Invalid Selection",
                     message="The folder you selected does not match the expected structure. Select a folder with sub-folders containing DCM files.")
                 folder = filedialog.askdirectory(title="Select folder with subfolders containing DCM files")
+                if folder == '':
+                        return
             image_dict = data.subfolders_to_dictionary(folder)
-        
+        print("Showing seg results")
         pngs_dict = data.array_dict_to_png_dict(image_dict)
 
         popup_window = tk.Toplevel(self.master)
@@ -1019,6 +1054,8 @@ class Core:
         # This function will eventually display DCMs from file
         # note, currently only works for un-segmented DCMs
         folder = filedialog.askdirectory(title="Select a folder containing only DCM files")
+        if folder == '':
+            return
         if (data.contains_only_dcms(folder)):
             # convert each file to a PNG and save it to list
             png_list = []
