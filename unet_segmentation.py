@@ -398,7 +398,3 @@ if __name__ == "__main__":
         #"image2": data.get_3d_image("scan2"),
     }
     execute_unet(sitk_images_dict)
-
-
-
-

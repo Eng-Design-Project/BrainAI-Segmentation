@@ -551,24 +551,24 @@ class Core:
             print("input is an array.")
             dict_of_3d_arrays["FullScan"] = input
 
-        file_names = list(dict_of_3d_arrays.keys())
+        #file_names = list(dict_of_3d_arrays.keys())
 
-        # Initialize internal_folder_paths with actual paths or logic
-        internal_folder_paths = {
-            "Frontal Lobe": "Internal Segment DCM unet\Frontal",
-            "Temporal Lobe": "Internal Segment DCM unet\Temporal",
-            "Occipital Lobe": "Internal Segment DCM unet\Occipital",
-            "White Matter": "Internal Segment DCM unet\White Matter",
-        }
+        # # Initialize internal_folder_paths with actual paths or logic
+        # internal_folder_paths = {
+        #     "Frontal Lobe": "Internal Segment DCM unet\Frontal",
+        #     "Temporal Lobe": "Internal Segment DCM unet\Temporal",
+        #     "Occipital Lobe": "Internal Segment DCM unet\Occipital",
+        #     "White Matter": "Internal Segment DCM unet\White Matter",
+        # }
 
         # Assuming 'algorithm_type' is either 'internal' or 'skull'
-        Unet_Segmentation.dlAlgorithm(
-            segmentDict=dict_of_3d_arrays,
-            file_names=file_names,
-            internal_folder_paths=internal_folder_paths,
-            binary_model_path='my_model.keras',  # Adjust as needed
-            segmentation_type=algorithm_type
-        )
+        # Unet_Segmentation.dlAlgorithm(
+        #     segmentDict=dict_of_3d_arrays,
+        #     file_names=file_names,
+        #     internal_folder_paths=internal_folder_paths,
+        #     binary_model_path='my_model.keras',  # Adjust as needed
+        #     segmentation_type=algorithm_type
+        # )
 
 
         
