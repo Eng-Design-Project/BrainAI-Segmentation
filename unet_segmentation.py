@@ -1,14 +1,10 @@
 import tensorflow as tf
 import numpy as np
 from scipy.ndimage import convolve
-from skimage.transform import resize
 import data
 import matplotlib.pyplot as plt
 import os
 from keras.models import load_model
-from tensorflow.keras.utils import to_categorical
-import glob
-import pydicom
 import tkinter as tk
 from tkinter import simpledialog
 

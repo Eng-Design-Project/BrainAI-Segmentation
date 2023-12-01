@@ -16,7 +16,7 @@ import clustering
 import segmentation
 import data
 import os
-import Unet_Segmentation
+import unet_segmentation
 import deep_learning
 
 
@@ -506,7 +506,7 @@ class Core:
             #the first argument should be a pre-atlas segmented scan, the 2nd argument should be a string of the chosen algo
             if algorithm == "U-net":
                 print("segment u-net")
-                self.train_unet_model(data.segmentation_results, 'internal')  # or 'skull'
+                unet_segmentation.execute_unet(data.segmentation_results)
 
             else:
                 print("segment custom")
@@ -516,7 +516,8 @@ class Core:
         if seg_var == "Whole Scan":
             if algorithm == "U-net":
                 print("whole scan u-net")
-                self.train_unet_model(volume, 'skull')  # or 'skull'
+                unet_segmentation.execute_unet(volume)
+
             else:
                 print("whole scan custom")
                 self.train_custom_dl_model(volume)
@@ -619,7 +620,7 @@ class Core:
         }
 
         # Call the dlAlgorithm function from Unet_segmentation module
-        Unet_Segmentation.dlAlgorithm(images_dict)
+        unet_segmentation.dlAlgorithm(images_dict)
 
     def custom_askdirectory(title):
         #might replace other usses of askdirectory, to display a message
