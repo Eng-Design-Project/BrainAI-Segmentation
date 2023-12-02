@@ -8,11 +8,13 @@ from keras.models import load_model
 import tkinter as tk
 from tkinter import simpledialog
 
-
-def ensure_directory_exists(path):
+'''def ensure_directory_exists(path):
     directory = os.path.dirname(path)
     if not os.path.exists(directory):
         os.makedirs(directory)
+'''
+
+
 
 # Function to split 3D images into smaller sub-arrays
 def split_into_subarrays(img_array, depth=5):
@@ -280,7 +282,8 @@ def get_unet_result_coordinates(predict_3d, threshold=0.5):
     return coordinates_dict
 
 
-def normalize_image(image):
+'''def normalize_image(image):
+
     min_val = np.min(image)
     max_val = np.max(image)
     if max_val - min_val > 0:
@@ -288,7 +291,7 @@ def normalize_image(image):
     else:
         normalized_image = image - min_val
     return normalized_image
-
+'''
 def prepare_data_for_training(subarrays, depth=5):
     X_train = []
     Y_train = []
@@ -372,16 +375,16 @@ def execute_unet(inputDict, depth=5, threshold=0.5):
             
 
 
-def display_images_for_region(all_triplets, region_name):
-    print(f"Displaying images for {region_name}...")
-    triplet_index = 0
-    while triplet_index < len(all_triplets):
-        batch_triplets = all_triplets[triplet_index:triplet_index + 3]
-        show_slices(batch_triplets)  
-        triplet_index += 3
+# def display_images_for_region(all_triplets, region_name):
+#     print(f"Displaying images for {region_name}...")
+#     triplet_index = 0
+#     while triplet_index < len(all_triplets):
+#         batch_triplets = all_triplets[triplet_index:triplet_index + 3]
+#         show_slices(batch_triplets)  
+#         triplet_index += 3
 
-        if triplet_index < len(all_triplets):
-            print(f"Continuing with more slices from {region_name}...")
+#         if triplet_index < len(all_triplets):
+#             print(f"Continuing with more slices from {region_name}...")
 
 
 
