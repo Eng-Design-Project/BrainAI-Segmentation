@@ -537,7 +537,7 @@ class Core:
             print("input is an array.")
             dict_of_3d_arrays["FullScan"] = input
         classifier = deep_learning.CustomClassifierMultiModel(dict_of_3d_arrays)
-        classif_dict = classifier.trainDL()
+        classif_dict = classifier.trainDL() # could be renamed to noise coords dict
         results = segmentation.filter_noise_from_images(dict_of_3d_arrays, classif_dict)
         self.show_seg_results(results)
             
@@ -686,7 +686,7 @@ class Core:
             print("Failed to save Results")
             self.show_popup_message("Failed to save results")
         #display seg results
-        self.show_seg_results(seg_results)
+        self.show_seg_results(seg_results, avg_brightness_dict=avg_brightness_dict)
 
         #here to test execute internal_atlas_seg
         #self.execute_internal_atlas_seg()
@@ -722,7 +722,6 @@ class Core:
                 # Save the segmentation results with the user-specified file name
                 data.store_seg_img_on_file(seg_results, self.selected_folder, f"{save_folder}/{file_name}.DCMs")
                 data.store_seg_png_on_file(seg_results, f"{save_folder}/{file_name}.PNGs")
-                #data.store_seg_jpg_on_file(seg_results, f"{save_folder}/{file_name}.jpgs")
                 # save dict of 3d np array images to data global seg results
                 # Show a message to inform the user that the folder was selected for saving
                 self.save_message = "Selected folder for saving: " + save_folder
@@ -898,7 +897,7 @@ class Core:
         self.deep_learning_page.show_buttons()"""
    
         
-    def show_seg_results(self, image_dict=None):
+    def show_seg_results(self, image_dict=None, avg_brightness_dict = None):
         # This function will display segmentation results for an image
 
         if image_dict is None:
@@ -923,6 +922,11 @@ class Core:
         segmentation_indexes = {region: 0 for region in pngs_dict.keys()}
         current_segmentation = next(iter(pngs_dict))  # Initialize with the first key
 
+        # Create a label for displaying average brightness information
+        if avg_brightness_dict:
+            avg_brightness_label = tk.Label(popup_window, text="Average Brightness is")
+            avg_brightness_label.pack()
+
         def update_image():
             index = segmentation_indexes[current_segmentation]
             image_list = pngs_dict[current_segmentation]
@@ -940,6 +944,16 @@ class Core:
             photo = ImageTk.PhotoImage(image)
             image_label.configure(image=photo)
             image_label.image = photo
+
+            # Update the average brightness label
+            # it is assumed that the current_segmentation (e.g. "Brain") corresponds to a key in avg_brightness
+            if avg_brightness_dict:
+                key = current_segmentation
+                if key in avg_brightness_dict:
+                    #avg_brightness_label.config(text=f"The average brightness for {key} is {avg_brightness_dict[key]}")
+                    # changed it so that it rounds to 2 places after the decimal
+                    avg_brightness_label.config(text=f"The average brightness for {key} is {round(avg_brightness_dict[key], 2)}")
+
 
         def handle_segment_selection(segmentation_type):
             nonlocal current_segmentation
