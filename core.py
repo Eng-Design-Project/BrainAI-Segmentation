@@ -505,9 +505,11 @@ class Core:
         if seg_var == "Segment":
             #the first argument should be a pre-atlas segmented scan, the 2nd argument should be a string of the chosen algo
             if algorithm == "U-net":
-                print("segment u-net")
-                unet_segmentation.execute_unet(data.segmentation_results)
-
+                print("segment u-net")               
+                noisecoords_dict = unet_segmentation.execute_unet(data.segmentation_results)
+                for key in noisecoords_dict.keys():
+                    print(noisecoords_dict[key])
+                    
             else:
                 print("segment custom")
                 self.train_custom_dl_model(data.segmentation_results)

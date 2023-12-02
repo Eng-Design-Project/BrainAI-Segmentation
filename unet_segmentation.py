@@ -272,14 +272,14 @@ def show_slices(triplets, threshold=0.5, brightening_factor=1.3):  # Adjust thre
 
 
 def get_unet_result_coordinates(predict_3d, threshold=0.5):
-    coordinates_dict = {}
+    coordinates_list = []
     # Get coordinates below the threshold
     for x in range(predict_3d.shape[0]):
         for y in range(predict_3d.shape[1]):
             for z in range(predict_3d.shape[2]):
-                if predict_3d[x, y, z, 0] < threshold:  # Assuming the last dimension is the channel
-                    coordinates_dict.setdefault('coordinates', []).append([x, y, z])
-    return coordinates_dict
+                if predict_3d[x, y, z] < threshold:  # Assuming the last dimension is the channel
+                    coordinates_list.append([x, y, z])
+    return coordinates_list
 
 
 '''def normalize_image(image):
@@ -354,6 +354,7 @@ def execute_unet(inputDict, depth=5, threshold=0.5):
             subarrays_split = split_into_subarrays(array3d)
             model_binary = load_model(model_paths[key], custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
             predict_3d = generate_predictions(subarrays_split, model_binary)
+            data.display_3d_array_slices(predict_3d, 5)
             coordinates_below_threshold = get_unet_result_coordinates(predict_3d, threshold)
             final_output[key] = coordinates_below_threshold
         else:
@@ -396,4 +397,5 @@ if __name__ == "__main__":
         "image1": data.get_3d_image("scan1"),
         #"image2": data.get_3d_image("scan2"),
     }
-    execute_unet(sitk_images_dict)
+    final_output = execute_unet(sitk_images_dict)
+    print(final_output)
