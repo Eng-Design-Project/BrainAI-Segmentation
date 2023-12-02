@@ -507,9 +507,12 @@ class Core:
             if algorithm == "U-net":
                 print("segment u-net")               
                 noisecoords_dict = unet_segmentation.execute_unet(data.segmentation_results)
+                unet_results = segmentation.filter_noise_from_images(data.segmentation_results, noisecoords_dict)
+                self.save_seg_results(unet_results)
+                self.show_seg_results(unet_results)
                 for key in noisecoords_dict.keys():
                     print(noisecoords_dict[key])
-                    
+
             else:
                 print("segment custom")
                 self.train_custom_dl_model(data.segmentation_results)
@@ -518,8 +521,12 @@ class Core:
         if seg_var == "Whole Scan":
             if algorithm == "U-net":
                 print("whole scan u-net")
-                unet_segmentation.execute_unet(volume)
-
+                noisecoords_dict = unet_segmentation.execute_unet(volume)
+                unet_results = segmentation.filter_noise_from_images(volume, noisecoords_dict)
+                self.save_seg_results(unet_results)
+                self.show_seg_results(unet_results)
+                for key in noisecoords_dict.keys():
+                    print(noisecoords_dict[key])
             else:
                 print("whole scan custom")
                 self.train_custom_dl_model(volume)

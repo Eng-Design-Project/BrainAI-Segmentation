@@ -145,6 +145,13 @@ def unet_generate_model(input_size=(5, 128, 128, 1)):
 
 def generate_predictions(subarrays, model):
     predictions = []
+    correct_shape_count = sum(1 for sub_arr in subarrays if sub_arr.shape == (5, 128, 128))
+
+    if correct_shape_count == 0:
+        print("No subarrays with the correct shape.")
+    if not subarrays:
+        print("Input subarrays list is empty.")
+
     for sub_arr in subarrays:
         # Check if the subarray has the correct shape for the model
         if sub_arr.shape == (5, 128, 128):
@@ -162,8 +169,13 @@ def generate_predictions(subarrays, model):
             print("Subarray with incorrect shape encountered:", sub_arr.shape)
             continue
 
-    # Concatenate all predictions along the depth axis
-    combined_prediction = np.concatenate(predictions, axis=0)
+    if len(predictions) > 0:
+        # Concatenate all predictions along the depth axis
+        combined_prediction = np.concatenate(predictions, axis=0)
+    
+    else:
+        print("predictions is empty")
+        combined_prediction = np.array([])
 
     print("generate predictions complete")
     print(combined_prediction.shape)
@@ -331,7 +343,7 @@ def get_user_selection(region_options):
     return region_selection
 
 
-def execute_unet(inputDict, depth=5, threshold=0.5):
+def execute_unet(inputDict, depth=5):
     dict_of_3d_arrays = {}
     new_dict = {}
 
@@ -350,12 +362,14 @@ def execute_unet(inputDict, depth=5, threshold=0.5):
     for key, array3d in normalizedDict.items():
         if os.path.exists(model_paths[key]):
             # Path exists
+            print(array3d.shape)
+            data.display_3d_array_slices(array3d, 5)
             print(f"The path for '{key}' exists.")
             subarrays_split = split_into_subarrays(array3d)
             model_binary = load_model(model_paths[key], custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
             predict_3d = generate_predictions(subarrays_split, model_binary)
-            data.display_3d_array_slices(predict_3d, 5)
-            coordinates_below_threshold = get_unet_result_coordinates(predict_3d, threshold)
+            
+            coordinates_below_threshold = get_unet_result_coordinates(predict_3d)
             final_output[key] = coordinates_below_threshold
         else:
             # Path does not exist
@@ -368,13 +382,12 @@ def execute_unet(inputDict, depth=5, threshold=0.5):
             model.fit(X_train, Y_train, epochs=10, batch_size=16)
             model.save(model_paths[key])
             predict_3d = generate_predictions(subarrays, model)
-            coordinates_below_threshold = get_unet_result_coordinates(predict_3d, threshold)
+            coordinates_below_threshold = get_unet_result_coordinates(predict_3d)
             final_output[key] = coordinates_below_threshold
 
     print("Final output with coordinates below the threshold:", final_output)
     return final_output
             
-
 
 # def display_images_for_region(all_triplets, region_name):
 #     print(f"Displaying images for {region_name}...")
@@ -388,8 +401,6 @@ def execute_unet(inputDict, depth=5, threshold=0.5):
 #             print(f"Continuing with more slices from {region_name}...")
 
 
-
-
 if __name__ == "__main__":
 
     # Example dictionary holding your image data for skull segmentation
@@ -397,5 +408,7 @@ if __name__ == "__main__":
         "image1": data.get_3d_image("scan1"),
         #"image2": data.get_3d_image("scan2"),
     }
-    final_output = execute_unet(sitk_images_dict)
+    results = data.set_seg_results_with_dir(r"C:\\Users\\Justin Rivera\\OneDrive\\Documents\\ED1\\Testing Atlas seg Unet.DCMs")
+    final_output = execute_unet(data.segmentation_results)
     print(final_output)
+    print(results)
