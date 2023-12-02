@@ -722,6 +722,7 @@ class Core:
                 # Save the segmentation results with the user-specified file name
                 data.store_seg_img_on_file(seg_results, self.selected_folder, f"{save_folder}/{file_name}.DCMs")
                 data.store_seg_png_on_file(seg_results, f"{save_folder}/{file_name}.PNGs")
+                #data.store_seg_jpg_on_file(seg_results, f"{save_folder}/{file_name}.jpgs")
                 # save dict of 3d np array images to data global seg results
                 # Show a message to inform the user that the folder was selected for saving
                 self.save_message = "Selected folder for saving: " + save_folder
