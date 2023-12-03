@@ -695,9 +695,13 @@ class Core:
         print("Internal Atlas Segmentation")
         if (data.segmentation_results != None):
             internal_color_atlas = data.get_2d_png_array_list("Color Atlas internal")
-            internal_seg_results = segmentation.execute_internal_atlas_seg(data.segmentation_results, internal_color_atlas)[0]
-            self.coords_dict = segmentation.execute_internal_atlas_seg(data.segmentation_results, internal_color_atlas)[1]
+            internal_seg_results, self.coords_dict = segmentation.execute_internal_atlas_seg(data.segmentation_results, internal_color_atlas)
             #print(self.coords_dict)
+            avg_brightness_dict = data.avg_brightness(internal_seg_results, self.coords_dict)
+
+            for key, value in avg_brightness_dict.items():
+                print(key)
+                print(value)
 
             #save results, to file and data.seg results        
             save_success = self.save_seg_results(internal_seg_results)
@@ -706,7 +710,7 @@ class Core:
             else:
                 self.show_popup_message("Failed to save results")
                 #display results
-            self.show_seg_results(internal_seg_results)
+            self.show_seg_results(internal_seg_results, avg_brightness_dict=avg_brightness_dict)
         else:
             self.show_popup_message("There are no atlas segmentation results saved to internally segment.")
 
