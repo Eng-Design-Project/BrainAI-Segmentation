@@ -5,14 +5,7 @@ import data
 import matplotlib.pyplot as plt
 import os
 from keras.models import load_model
-import tkinter as tk
-from tkinter import simpledialog
 
-'''def ensure_directory_exists(path):
-    directory = os.path.dirname(path)
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-'''
 
 
 
@@ -92,57 +85,6 @@ def unet_generate_model(input_size=(5, 128, 128, 1)):
     return model
 
 
-# def unet_internal(input_size=(128, 128, 1), num_classes=5):
-#     inputs = tf.keras.layers.Input(input_size)
-
-#     # Encoder layers (convolutions and pooling)
-#     conv1 = tf.keras.layers.Conv2D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(inputs)
-#     conv1 = tf.keras.layers.Conv2D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv1)
-#     pool1 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv1)
-    
-#     conv2 = tf.keras.layers.Conv2D(32, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool1)
-#     conv2 = tf.keras.layers.Conv2D(32, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv2)
-#     pool2 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv2)
-    
-#     conv3 = tf.keras.layers.Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool2)
-#     conv3 = tf.keras.layers.Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv3)
-#     pool3 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv3)
-    
-#     conv4 = tf.keras.layers.Conv2D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool3)
-#     conv4 = tf.keras.layers.Conv2D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv4)
-#     drop4 = tf.keras.layers.Dropout(0.3)(conv4)
-#     pool4 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(drop4)
-    
-#     conv5 = tf.keras.layers.Conv2D(256, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool4)
-#     conv5 = tf.keras.layers.Conv2D(256, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv5)
-#     drop5 = tf.keras.layers.Dropout(0.3)(conv5)
-
-#     # Decoder layers (up-sampling and concatenation)
-#     up6 = tf.keras.layers.UpSampling2D(size=(2, 2))(drop5)
-#     merge6 = tf.keras.layers.concatenate([drop4, up6], axis=-1)
-#     conv6 = tf.keras.layers.Conv2D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge6)
-
-#     up7 = tf.keras.layers.UpSampling2D(size=(2, 2))(conv6)
-#     merge7 = tf.keras.layers.concatenate([conv3, up7], axis=-1)
-#     conv7 = tf.keras.layers.Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge7)
-
-#     up8 = tf.keras.layers.UpSampling2D(size=(2, 2))(conv7)
-#     merge8 = tf.keras.layers.concatenate([conv2, up8], axis=-1)
-#     conv8 = tf.keras.layers.Conv2D(32, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge8)
-
-#     up9 = tf.keras.layers.UpSampling2D(size=(2, 2))(conv8)
-#     merge9 = tf.keras.layers.concatenate([conv1, up9], axis=-1)
-#     conv9 = tf.keras.layers.Conv2D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge9)
-
-#     # Output layer
-#     outputs = tf.keras.layers.Conv2D(num_classes, (1, 1), activation='softmax')(conv9)
-
-#     # Compile the model
-#     model = tf.keras.models.Model(inputs=[inputs], outputs=[outputs])
-#     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-
-#     return model
-
 def generate_predictions(subarrays, model):
     predictions = []
     correct_shape_count = sum(1 for sub_arr in subarrays if sub_arr.shape == (5, 128, 128))
@@ -201,8 +143,6 @@ def get_surrounding_slices(original_slice, sub_arrays, depth):
     return surrounding_slices
 
 
-
-    
 def normalizeTF(volume3dDict):
     normalizedDict = {}
     for key, value in volume3dDict.items():
@@ -230,6 +170,7 @@ def find_boundary(segment):
     segment_copy[~boundary] = 0  # Label the rest as 0
     return segment_copy
 
+
 '''def show_slices(triplets): This returns the images in color. This was an accident but they looked cool so I just commented it out insteaad of deleting it
     n = len(triplets)
     fig, axes = plt.subplots(1, n, figsize=(n * 6, 6))
@@ -246,6 +187,7 @@ def find_boundary(segment):
     plt.suptitle("Original and Segmented")
     plt.show()
 '''
+
 
 def show_slices(triplets, threshold=0.5, brightening_factor=1.3):  # Adjust threshold and brightening factor as needed
     n = len(triplets)
@@ -294,16 +236,7 @@ def get_unet_result_coordinates(predict_3d, threshold=0.5):
     return coordinates_list
 
 
-'''def normalize_image(image):
 
-    min_val = np.min(image)
-    max_val = np.max(image)
-    if max_val - min_val > 0:
-        normalized_image = (image - min_val) / (max_val - min_val)
-    else:
-        normalized_image = image - min_val
-    return normalized_image
-'''
 def prepare_data_for_training(subarrays, depth=5):
     X_train = []
     Y_train = []
@@ -329,18 +262,6 @@ def prepare_data_for_training(subarrays, depth=5):
     print(Y_train.shape)
 
     return X_train, Y_train
-
-
-
-def get_user_selection(region_options):
-    root = tk.Tk()
-    root.withdraw()  # Hide the main window
-
-    region_selection = simpledialog.askinteger("Select Region",
-                                               "Select the region to visualize:\n" +
-                                               "\n".join([f"{k}: {v}" for k, v in region_options.items()]),
-                                               parent=root)
-    return region_selection
 
 
 def execute_unet(inputDict, depth=5):
@@ -389,18 +310,6 @@ def execute_unet(inputDict, depth=5):
     return final_output
             
 
-# def display_images_for_region(all_triplets, region_name):
-#     print(f"Displaying images for {region_name}...")
-#     triplet_index = 0
-#     while triplet_index < len(all_triplets):
-#         batch_triplets = all_triplets[triplet_index:triplet_index + 3]
-#         show_slices(batch_triplets)  
-#         triplet_index += 3
-
-#         if triplet_index < len(all_triplets):
-#             print(f"Continuing with more slices from {region_name}...")
-
-
 if __name__ == "__main__":
 
     # Example dictionary holding your image data for skull segmentation
@@ -412,3 +321,82 @@ if __name__ == "__main__":
     final_output = execute_unet(data.segmentation_results)
     print(final_output)
     print(results)
+
+
+
+
+
+
+    # def unet_internal(input_size=(128, 128, 1), num_classes=5):
+#     inputs = tf.keras.layers.Input(input_size)
+
+#     # Encoder layers (convolutions and pooling)
+#     conv1 = tf.keras.layers.Conv2D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(inputs)
+#     conv1 = tf.keras.layers.Conv2D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv1)
+#     pool1 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv1)
+    
+#     conv2 = tf.keras.layers.Conv2D(32, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool1)
+#     conv2 = tf.keras.layers.Conv2D(32, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv2)
+#     pool2 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv2)
+    
+#     conv3 = tf.keras.layers.Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool2)
+#     conv3 = tf.keras.layers.Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv3)
+#     pool3 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv3)
+    
+#     conv4 = tf.keras.layers.Conv2D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool3)
+#     conv4 = tf.keras.layers.Conv2D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv4)
+#     drop4 = tf.keras.layers.Dropout(0.3)(conv4)
+#     pool4 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(drop4)
+    
+#     conv5 = tf.keras.layers.Conv2D(256, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool4)
+#     conv5 = tf.keras.layers.Conv2D(256, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv5)
+#     drop5 = tf.keras.layers.Dropout(0.3)(conv5)
+
+#     # Decoder layers (up-sampling and concatenation)
+#     up6 = tf.keras.layers.UpSampling2D(size=(2, 2))(drop5)
+#     merge6 = tf.keras.layers.concatenate([drop4, up6], axis=-1)
+#     conv6 = tf.keras.layers.Conv2D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge6)
+
+#     up7 = tf.keras.layers.UpSampling2D(size=(2, 2))(conv6)
+#     merge7 = tf.keras.layers.concatenate([conv3, up7], axis=-1)
+#     conv7 = tf.keras.layers.Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge7)
+
+#     up8 = tf.keras.layers.UpSampling2D(size=(2, 2))(conv7)
+#     merge8 = tf.keras.layers.concatenate([conv2, up8], axis=-1)
+#     conv8 = tf.keras.layers.Conv2D(32, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge8)
+
+#     up9 = tf.keras.layers.UpSampling2D(size=(2, 2))(conv8)
+#     merge9 = tf.keras.layers.concatenate([conv1, up9], axis=-1)
+#     conv9 = tf.keras.layers.Conv2D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge9)
+
+#     # Output layer
+#     outputs = tf.keras.layers.Conv2D(num_classes, (1, 1), activation='softmax')(conv9)
+
+#     # Compile the model
+#     model = tf.keras.models.Model(inputs=[inputs], outputs=[outputs])
+#     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+#     return model
+
+
+# def display_images_for_region(all_triplets, region_name):
+#     print(f"Displaying images for {region_name}...")
+#     triplet_index = 0
+#     while triplet_index < len(all_triplets):
+#         batch_triplets = all_triplets[triplet_index:triplet_index + 3]
+#         show_slices(batch_triplets)  
+#         triplet_index += 3
+
+#         if triplet_index < len(all_triplets):
+#             print(f"Continuing with more slices from {region_name}...")
+
+'''def normalize_image(image):
+
+    min_val = np.min(image)
+    max_val = np.max(image)
+    if max_val - min_val > 0:
+        normalized_image = (image - min_val) / (max_val - min_val)
+    else:
+        normalized_image = image - min_val
+    return normalized_image
+'''
