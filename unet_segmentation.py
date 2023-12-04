@@ -225,7 +225,7 @@ def show_slices(triplets, threshold=0.5, brightening_factor=1.3):  # Adjust thre
 
 
 
-def get_unet_result_coordinates(predict_3d, threshold=0.5):
+def get_unet_result_coordinates(predict_3d, threshold=0.3):
     coordinates_list = []
     # Get coordinates below the threshold
     for x in range(predict_3d.shape[0]):
