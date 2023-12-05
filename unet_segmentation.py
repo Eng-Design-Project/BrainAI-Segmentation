@@ -6,28 +6,31 @@ import matplotlib.pyplot as plt
 import os
 from keras.models import load_model
 
-# Function to split 3D images into smaller sub-arrays
+# Function to split a 3D image into smaller sub-arrays of a specified depth.
+# This is useful for processing large 3D images in smaller chunks.
 def split_into_subarrays(img_array, depth=5):
     total_slices = img_array.shape[0]
     sub_arrays = [img_array[i:i+depth, :, :] for i in range(0, total_slices, depth) if i+depth <= total_slices]
     return sub_arrays
 
-
+# Custom loss function for binary cross-entropy with optional weighting.
+# This can be used to give different importance to different classes during training.
 def weighted_binary_crossentropy(y_true, y_pred):
-    # Compute the binary crossentropy
     b_ce = tf.keras.backend.binary_crossentropy(y_true, y_pred)
-
-    # If you have weights to apply, modify the cross-entropy here
-    # Example: weighted_b_ce = apply_weights_to_b_ce(b_ce, weights)
-
+    # Modify this function if you need to apply weights to the binary cross-entropy.
     return b_ce
 
 
 # Function to create a U-Net model for 3D image segmentation
+# U-Net is a convolutional network architecture for fast and precise segmentation of both whole brains and segments.
 def unet_generate_model(input_size=(5, 128, 128, 1)): 
     inputs = tf.keras.layers.Input(input_size)
     
-    # Encoder layers (convolutions and pooling)
+    # Encoder part: series of convolutions and pooling layers to capture features.
+    # Each block contains Convolution -> Activation -> Convolution -> MaxPooling.
+    # The number of filters doubles with each block.
+    # Decoder part: series of upsampling and concatenation with corresponding encoder outputs.
+    # Each block contains UpSampling -> Concatenation -> Convolution -> Activation.
     conv1 = tf.keras.layers.Conv3D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(inputs)
     conv1 = tf.keras.layers.Conv3D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv1)
     pool1 = tf.keras.layers.MaxPooling3D(pool_size=(1, 2, 2))(conv1)
@@ -66,14 +69,17 @@ def unet_generate_model(input_size=(5, 128, 128, 1)):
     conv9 = tf.keras.layers.Conv3D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge9)
     
     # Define output layer
+    # Final layer: Convolution to get to the desired number of output channels.
     outputs = tf.keras.layers.Conv3D(1, (1, 1, 1), activation='sigmoid')(conv9)
     
     # Compile and return the model
+    # Creating the model and compiling it with the defined optimizer, loss function, and metrics.
     model = tf.keras.models.Model(inputs=[inputs], outputs=[outputs])
     model.compile(optimizer='adam', loss=weighted_binary_crossentropy, metrics=['accuracy'])
     return model
 
-
+# Function to generate predictions for each subarray using the provided model.
+# Useful for processing each chunk of the large 3D image separately.
 def generate_predictions(subarrays, model):
     predictions = []
     correct_shape_count = sum(1 for sub_arr in subarrays if sub_arr.shape == (5, 128, 128))
@@ -83,6 +89,8 @@ def generate_predictions(subarrays, model):
     if not subarrays:
         print("Input subarrays list is empty.")
 
+    # Iterate over each subarray, reshape it to the model's expected input shape,
+    # perform the prediction, and store the result.
     for sub_arr in subarrays:
         # Check if the subarray has the correct shape for the model
         if sub_arr.shape == (5, 128, 128):
@@ -131,9 +139,12 @@ def get_surrounding_slices(original_slice, sub_arrays, depth):
         surrounding_slices = np.pad(surrounding_slices, ((pad_before, pad_after), (0, 0), (0, 0)), 'constant')
     return surrounding_slices
 
-
+# Function to normalize 3D volumes.
+# Normalization is crucial for consistent model training and prediction.
 def normalizeTF(volume3dDict):
     normalizedDict = {}
+    # For each 3D volume, convert it to a TensorFlow tensor, find min and max,
+    # and normalize the volume to a 0-1 range.
     for key, value in volume3dDict.items():
         tensor = tf.convert_to_tensor(value, dtype=tf.float32)
         minVal = tf.reduce_min(tensor)
@@ -142,6 +153,8 @@ def normalizeTF(volume3dDict):
         normalizedDict[key] = normalizedTensor.numpy()
     return normalizedDict
 
+# Function to find the boundary of a segmented region.
+# Used in post-processing to delineate the edges of segmented regions.
 def find_boundary(segment):
     # Check if the segment is 2D or 3D and choose the kernel accordingly
     if segment.ndim == 3:  # 3D data
@@ -177,44 +190,8 @@ def find_boundary(segment):
     plt.show()
 '''
 
-
-def show_slices(triplets, threshold=0.5, brightening_factor=1.3):  # Adjust threshold and brightening factor as needed
-    n = len(triplets)
-    fig, axes = plt.subplots(2, n, figsize=(2*n, 4))
-
-    for i, (orig, pred) in enumerate(triplets):
-        orig = np.squeeze(orig).astype(np.float32)  # Ensure original is float32 to prevent clipping
-        if orig.ndim != 2:
-            raise ValueError(f"Original image has unexpected dimensions: {orig.shape}")
-
-        # Prediction processing
-        if pred.ndim == 3 and pred.shape[-1] > 1:
-            pred = np.argmax(pred, axis=-1)
-        elif pred.ndim == 3 and pred.shape[-1] == 1:
-            pred = np.squeeze(pred)
-        elif pred.ndim != 2:
-            raise ValueError(f"Prediction has unexpected dimensions: {pred.shape}")
-
-        binary_mask = pred > threshold
-
-        # Apply brightening
-        brightened_image = np.copy(orig)
-        brightened_image[binary_mask] *= brightening_factor
-        brightened_image = np.clip(brightened_image, 0, np.max(orig))  # Clip to the max of original to prevent overexposure
-
-        axes[0, i].imshow(orig, cmap="gray")
-        axes[0, i].set_title("Original")
-        axes[0, i].axis('off')
-
-        axes[1, i].imshow(brightened_image, cmap="gray")  # Show the brightened image
-        axes[1, i].set_title("Segmented")
-        axes[1, i].axis('off')
-
-    plt.show()
-
-
-
-def get_unet_result_coordinates(predict_3d, threshold=0.3):
+# Function to generate coordinates below a certain threshold from the 3D prediction.
+def get_unet_result_coordinates(predict_3d, threshold=0.7):
     coordinates_list = []
     # Get coordinates below the threshold
     for x in range(predict_3d.shape[0]):
@@ -225,7 +202,7 @@ def get_unet_result_coordinates(predict_3d, threshold=0.3):
     return coordinates_list
 
 
-
+# Processes the subarrays to create training samples and their corresponding labels.
 def prepare_data_for_training(subarrays, depth=5):
     X_train = []
     Y_train = []
@@ -252,7 +229,8 @@ def prepare_data_for_training(subarrays, depth=5):
 
     return X_train, Y_train
 
-
+# Main function to execute the U-Net process on the input data.
+# Orchestrates the whole process of loading data, training/predicting with U-Net, and processing results.
 def execute_unet(inputDict, depth=5):
     dict_of_3d_arrays = {}
     new_dict = {}
@@ -300,7 +278,6 @@ def execute_unet(inputDict, depth=5):
             
 
 if __name__ == "__main__":
-
     # Example dictionary holding your image data for skull segmentation
     sitk_images_dict = {
         "image1": data.get_3d_image("scan1"),
