@@ -300,6 +300,8 @@ class Core:
                     if data.is_segment_results_dir(folder):
                         #the function below sets data.segmentation_results to an 3d np array image dict
                         data.set_seg_results_with_dir(folder)
+                        subfolder = data.get_first_subfolder_directory(folder)
+                        self.selected_folder = subfolder
                     else:
                         tk.messagebox.showwarning(title="Invalid Selection", message="The folder you selected does not match the expected structure. Select a folder with sub-folders containg DCM files.")
                         # in the future, add logic to query to user if they want to do atlas seg first,
@@ -315,6 +317,7 @@ class Core:
                     if folder == '':
                         popup_window.destroy()
                         return
+                    self.selected_folder = folder
                 volume = data.get_3d_image(folder)
         
             
@@ -495,6 +498,8 @@ class Core:
                     if data.is_segment_results_dir(folder):
                         #the function below sets data.segmentation_results to an 3d np array image dict
                         data.set_seg_results_with_dir(folder)
+                        subfolder = data.get_first_subfolder_directory(folder)
+                        self.selected_folder = subfolder
                     else:
                         tk.messagebox.showwarning(title="Invalid Selection", message="The folder you selected does not match the expected structure. Select a folder with sub-folders containg DCM files.")
                         # in the future, add logic to query to user if they want to do atlas seg first,
@@ -510,6 +515,7 @@ class Core:
                     if folder == '':
                         popup_window.destroy()
                         return
+                self.selected_folder = folder
                 volume = data.get_3d_image(folder)
         
             

@@ -39,6 +39,17 @@ from skimage.color import rgb2gray
 #     image_3d_array = np.stack(image_array_list, axis=-1)
 #     return image_3d_array
 
+def get_first_subfolder_directory(parent_directory):
+    """
+    Returns the directory of the first subfolder in the given parent directory.
+    If there are no subfolders, returns None.
+    """
+    with os.scandir(parent_directory) as entries:
+        for entry in entries:
+            if entry.is_dir():
+                return entry.path
+    return None
+
 #currently used for loading color atlas
 def get_2d_png_array_list(directory):
     image_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".png")]

@@ -110,6 +110,7 @@ def generate_predictions(subarrays, model):
 
     if len(predictions) > 0:
         # Concatenate all predictions along the depth axis
+        print("len of predictions > 0")
         combined_prediction = np.concatenate(predictions, axis=0)
     
     else:
@@ -194,11 +195,14 @@ def find_boundary(segment):
 def get_unet_result_coordinates(predict_3d, threshold=0.4):
     coordinates_list = []
     # Get coordinates below the threshold
-    for x in range(predict_3d.shape[0]):
+    for z in range(predict_3d.shape[0]):
         for y in range(predict_3d.shape[1]):
-            for z in range(predict_3d.shape[2]):
-                if predict_3d[x, y, z] < threshold:  # Assuming the last dimension is the channel
-                    coordinates_list.append([x, y, z])
+            for x in range(predict_3d.shape[2]):
+                if predict_3d[z, y, x, 0] < threshold:  # Assuming the last dimension is the channel
+                    coordinates_list.append([z, y, x])
+                    print("coord less than threshold: ", z, y, x)
+                elif z == 20 and y == 50:
+                    print(predict_3d[z, y, x])
     return coordinates_list
 
 
@@ -233,7 +237,6 @@ def prepare_data_for_training(subarrays, depth=5):
 # Orchestrates the whole process of loading data, training/predicting with U-Net, and processing results.
 def execute_unet(inputDict, depth=5):
     dict_of_3d_arrays = {}
-    new_dict = {}
 
     if isinstance(inputDict, dict):
         print("input is a dictionary.")
@@ -251,12 +254,13 @@ def execute_unet(inputDict, depth=5):
         if os.path.exists(model_paths[key]):
             # Path exists
             print(array3d.shape)
-            data.display_3d_array_slices(array3d, 5)
+            #data.display_3d_array_slices(array3d, 5)
             print(f"The path for '{key}' exists.")
             subarrays_split = split_into_subarrays(array3d)
             model_binary = load_model(model_paths[key], custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
             predict_3d = generate_predictions(subarrays_split, model_binary)
-            
+            #data.display_3d_array_slices(predict_3d, 5)
+            print("predict shape: ", predict_3d.shape)
             coordinates_below_threshold = get_unet_result_coordinates(predict_3d)
             final_output[key] = coordinates_below_threshold
         else:
@@ -270,6 +274,7 @@ def execute_unet(inputDict, depth=5):
             model.fit(X_train, Y_train, epochs=10, batch_size=16)
             model.save(model_paths[key])
             predict_3d = generate_predictions(subarrays, model)
+            data.display_3d_array_slices(predict_3d, 5)
             coordinates_below_threshold = get_unet_result_coordinates(predict_3d)
             final_output[key] = coordinates_below_threshold
 
@@ -280,11 +285,14 @@ def execute_unet(inputDict, depth=5):
 
 if __name__ == "__main__":
     # Example dictionary holding your image data for skull segmentation
+    
+    scan = data.get_3d_image("scan1")
     sitk_images_dict = {
-        "image1": data.get_3d_image("scan1"),
+        "image1": scan,
         #"image2": data.get_3d_image("scan2"),
     }
-    results = data.set_seg_results_with_dir(r"C:\\Users\\Justin Rivera\\OneDrive\\Documents\\ED1\\Testing Atlas seg Unet.DCMs")
-    final_output = execute_unet(data.segmentation_results)
+    from tkinter import filedialog
+    seg_folder = filedialog.askdirectory(title="Select Save Folder")
+    intern_dict = data.subfolders_to_dictionary(seg_folder)
+    final_output = execute_unet(intern_dict)
     print(final_output)
-    print(results)
