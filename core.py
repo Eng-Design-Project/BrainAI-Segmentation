@@ -403,6 +403,9 @@ class Core:
         separator1 = ttk.Separator(popup_window, orient="horizontal")
         separator1.pack(fill="x", padx=20, pady=5)
 
+        segment_description = tk.Label(popup_window, text="Choose 'Whole Scan' for clustering the entire scan or 'Segment' to select the results of segmentation.")
+        segment_description.pack()
+
         segment_var = tk.StringVar()
         segment_var.set(None)
         whole_brain = tk.Radiobutton(popup_window, text="Whole Scan", variable=segment_var, value="Whole Scan")
@@ -416,6 +419,8 @@ class Core:
         separator2 = ttk.Separator(popup_window, orient="horizontal")
         separator2.pack(fill="x", padx=20, pady=5)
 
+        algorithm_description = tk.Label(popup_window, text="Select a deep learning algorithm to also view its description.")
+        algorithm_description.pack()
         # Create radio buttons for clustering algorithm options
         algorithm_var = tk.StringVar()
         algorithm_var.set(None)
@@ -427,6 +432,9 @@ class Core:
         # Add a separator for the third category
         separator3 = ttk.Separator(popup_window, orient="horizontal")
         separator3.pack(fill="x", padx=20, pady=5)
+
+        source_description = tk.Label(popup_window, text="Choose the data source for deep learning.")
+        source_description.pack()
 
         # Create radio buttons for data source options
         source_var = tk.StringVar()
