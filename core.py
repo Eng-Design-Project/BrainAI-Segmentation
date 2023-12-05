@@ -13,6 +13,7 @@ from tkinter import Toplevel, Radiobutton, Button, StringVar
 
 
 
+
 #import deep_learning
 import clustering
 import segmentation
@@ -416,10 +417,10 @@ class Core:
         # Create radio buttons for clustering algorithm options
         algorithm_var = tk.StringVar()
         algorithm_var.set(None)
-        kmeans_option = tk.Radiobutton(popup_window, text="U-net", variable=algorithm_var, value="U-net")
-        kmeans_option.pack()
-        dbscan_option = tk.Radiobutton(popup_window, text="Custom", variable=algorithm_var, value="Custom")
-        dbscan_option.pack()
+        unet_option = tk.Radiobutton(popup_window, text="U-net", variable=algorithm_var, value="U-net", command=lambda:self.show_algorithm_description("U-net","The primary goal is to accurately identify regions of interest within 3D medical images. It can take a dictionary of 3D medical images, train U-Net models for each image, or load pre-trained models if available. The models are used to generate segmentation predictions, and the code extracts coordinates below a specified threshold where segmentation is detected."))
+        unet_option.pack()
+        custom_option = tk.Radiobutton(popup_window, text="Custom", variable=algorithm_var, value="Custom", command=lambda:self.show_algorithm_description("Custom","This Deep Learning Algorithm uses a heuristic based on voxel density to generate initial training data. Afterwards, it relies on user feedback to train the model, smoothing the edges of segments created by other segmentation approaches."))
+        custom_option.pack()
 
         # Add a separator for the third category
         separator3 = ttk.Separator(popup_window, orient="horizontal")
@@ -506,7 +507,7 @@ class Core:
             #the first argument should be a pre-atlas segmented scan, the 2nd argument should be a string of the chosen algo
             if algorithm == "U-net":
                 print("segment u-net")
-                self.train_unet_model(data.segmentation_results, 'internal')  # or 'skull'
+                Unet_Segmentation.execute_unet(data.segmentation_results)
                 
             else:
                 print("segment custom")
@@ -516,7 +517,8 @@ class Core:
         if seg_var == "Whole Scan":
             if algorithm == "U-net":
                 print("whole scan u-net")
-                self.train_unet_model(volume, 'skull')  # or 'skull'
+                Unet_Segmentation.execute_unet(volume)
+                
             else:
                 print("whole scan custom")
                 self.train_custom_dl_model(volume)
@@ -541,34 +543,8 @@ class Core:
         results = segmentation.filter_noise_from_images(dict_of_3d_arrays, classif_dict)
         data.display_seg_np_images(results)
 
-    def train_unet_model(self, input, algorithm_type):
-        print("training U-net model")
-        dict_of_3d_arrays = {}
-        if isinstance(input, dict):
-            print("input is a dictionary.")
-            dict_of_3d_arrays = input
-        else:
-            print("input is an array.")
-            dict_of_3d_arrays["FullScan"] = input
-
-        file_names = list(dict_of_3d_arrays.keys())
-
-        # Initialize internal_folder_paths with actual paths or logic
-        internal_folder_paths = {
-            "Frontal Lobe": "Internal Segment DCM unet\Frontal",
-            "Temporal Lobe": "Internal Segment DCM unet\Temporal",
-            "Occipital Lobe": "Internal Segment DCM unet\Occipital",
-            "White Matter": "Internal Segment DCM unet\White Matter",
-        }
-
-        # Assuming 'algorithm_type' is either 'internal' or 'skull'
-        Unet_Segmentation.dlAlgorithm(
-            segmentDict=dict_of_3d_arrays,
-            file_names=file_names,
-            internal_folder_paths=internal_folder_paths,
-            binary_model_path='my_model.keras',  # Adjust as needed
-            segmentation_type=algorithm_type
-        )
+    
+        
             
 
 
@@ -709,8 +685,12 @@ class Core:
             
             if file_name:
                 # Save the segmentation results with the user-specified file name
+                template_dir = self.selected_folder  # Assuming this holds the path to the template directory
+
                 data.store_seg_img_on_file(seg_results, self.selected_folder, f"{save_folder}/{file_name}.DCMs")
                 data.store_seg_png_on_file(seg_results, f"{save_folder}/{file_name}.PNGs")
+                data.store_seg_jpg_on_file(seg_results, template_dir, f"{save_folder}/{file_name}.JPGs")
+
                 # save dict of 3d np array images to data global seg results
                 # Show a message to inform the user that the folder was selected for saving
                 self.save_message = "Selected folder for saving: " + save_folder
@@ -718,7 +698,7 @@ class Core:
                 self.save_message_label.pack()
                 data.segmentation_results = seg_results
                 return True       
-                
+                      
         #Note: returns True to indicate success, False otherwise
         return False
 
@@ -927,8 +907,8 @@ class Core:
 
            
 
-            # Crop the image
-            image = data.crop_image_to_boundary(image, border=5)
+            """# Crop the image
+            image = data.crop_image_to_boundary(image, border=5)"""
 
             # Check if the whole image is white
             if is_image_all_white(image):
@@ -941,7 +921,12 @@ class Core:
             # Resize the image to 224x224 using LANCZOS
             image = image.resize((224, 224), Image.Resampling.LANCZOS)
 
-            photo = ImageTk.PhotoImage(image)
+            # Bring brain edges to boundary
+            image_array = np.array(image)
+            boundary_image_array = data.bring_edges_to_boundary(image_array)
+            boundary_image = Image.fromarray((boundary_image_array * 255).astype('uint8'), 'L')
+
+            photo = ImageTk.PhotoImage(boundary_image)
             image_label.configure(image=photo)
             image_label.image = photo
 

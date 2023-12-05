@@ -1,14 +1,18 @@
 import matplotlib.pyplot as plt
+from PIL import Image, ImageOps
+
 import numpy as np
 import skimage
 import os
 import pydicom
 from pydicom.dataset import Dataset
-from skimage.transform import resize
+from skimage.transform import resize, rescale
 from scipy.ndimage import zoom
 import subprocess
 import sys
 from PIL import Image
+from skimage.feature import canny
+from skimage.color import rgb2gray
 #from pydicom import dcmread
 
 #tried to use to load color atlas, to hard to parse coords
@@ -324,8 +328,11 @@ def save_3d_img_to_png(image_array, new_dir):
     # Iterate through the slices and save each one as PNG
     for z in range(num_slices):
         slice_image_np = image_array[z, :, :]
+
+        # Process the slice image
+        processed_slice_image_np = bring_edges_to_boundary(slice_image_np)
         # Resize the slice
-        pil_img = Image.fromarray(slice_image_np)
+        pil_img = Image.fromarray(processed_slice_image_np)
         resized_img = pil_img.resize((224, 224), Image.Resampling.LANCZOS)
         resized_slice_image_np = np.array(resized_img)
         # Normalize the slice for better contrast in the PNG
@@ -638,42 +645,71 @@ def contains_only_dcms(directory):
 
     return True
 
-def save_3d_array_as_jpegs(array, output_dir):
-    """
-    Saves each slice of a 3D numpy array as a separate JPEG file.
-    Each slice is resized to 224x224 pixels.
-    """
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    
-    for i in range(array.shape[0]):
-        # Extract the slice
-        slice = array[i, :, :]
+def save_3d_img_to_jpg(image_array, new_dir):
+    # Check if the directory exists, if not, create it
+    if not os.path.exists(new_dir):
+        os.makedirs(new_dir)
+
+    # Get the number of slices in the z dimension
+    num_slices = image_array.shape[0]
+
+    # Iterate through the slices and save each one as JPG
+    for z in range(num_slices):
+        slice_image_np = image_array[z, :, :]
+
+        # Process the slice image with bring_edges_to_boundary function
+        processed_slice_image_np = bring_edges_to_boundary(slice_image_np)  # Assuming this function is defined elsewhere
+
         # Resize the slice
-        resized_slice = resize(slice, (224, 224), anti_aliasing=True)
-        # Convert to uint8
-        resized_slice = (255 * resized_slice).astype(np.uint8)
+        pil_img = Image.fromarray(processed_slice_image_np)
+        resized_img = pil_img.resize((224, 224), Image.Resampling.LANCZOS)
+        resized_slice_image_np = np.array(resized_img)
+
+        # Normalize the slice for better contrast in the JPEG
+        resized_slice_image_np = np.interp(resized_slice_image_np, (resized_slice_image_np.min(), resized_slice_image_np.max()), (0, 255))
+        resized_slice_image_np = np.uint8(resized_slice_image_np)
+
+        # Create a filename for the slice
+        filename = os.path.join(new_dir, f"slice_{z:03d}.jpg")
+
         # Save the slice as JPEG
-        Image.fromarray(resized_slice).save(os.path.join(output_dir, f'slice_{i:03d}.jpeg'), 'JPEG')
+        plt.imsave(filename, resized_slice_image_np, cmap='gray')
 
-def convert_pngs_to_jpegs(input_dir, output_dir):
-    """
-    Converts PNG images in a directory to 224x224 JPEG images.
-    Saves the converted JPEGs in the specified output directory.
-    """
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+        print(f"Saved slice {z} to {filename}")
 
-    for filename in os.listdir(input_dir):
-        if filename.endswith(".png"):
-            # Read the image
-            img_path = os.path.join(input_dir, filename)
-            img = Image.open(img_path)
-            # Resize and save as JPEG
-            img.resize((224, 224)).convert('RGB').save(os.path.join(output_dir, filename.replace('.png', '.jpeg')), 'JPEG')
+    print(f"Saved 3D image slices as JPEG in {new_dir}")
+
+def convert_png_to_jpg(source_dir, target_dir, quality=95):
+    """
+    Convert all PNG images in a directory to grayscale JPG format.
+
+    Args:
+    source_dir (str): Directory containing PNG images.
+    target_dir (str): Directory where JPG images will be saved.
+    quality (int): Quality of JPG images, between 0 and 95.
+    """
+    # Process each file in the source directory
+    for file_name in os.listdir(source_dir):
+        if file_name.endswith(".png"):
+            # Construct full file path
+            file_path = os.path.join(source_dir, file_name)
+
+            # Open the image
+            with Image.open(file_path) as img:
+                # Convert the image to Grayscale
+                grayscale_img = img.convert('L')
+
+                # Construct the output file path
+                jpg_file_name = os.path.splitext(file_name)[0] + '.jpg'
+                jpg_file_path = os.path.join(target_dir, jpg_file_name)
+
+                # Save the image in JPG format with specified quality
+                grayscale_img.save(jpg_file_path, 'JPEG', quality=quality)
+
+                print(f"Converted '{file_name}' to '{jpg_file_name}'")
             
-def crop_image_to_boundary(image, border=5):
-    """
+"""def crop_image_to_boundary(image, border=5):
+    
     Crop an image so that any edge is within 5 pixels of the image boundary.
 
     Args:
@@ -682,7 +718,7 @@ def crop_image_to_boundary(image, border=5):
 
     Returns:
     PIL.Image: The cropped image.
-    """
+    
     # Convert image to numpy array
     np_image = np.array(image)
 
@@ -706,7 +742,256 @@ def crop_image_to_boundary(image, border=5):
 
     # Crop and return the image
     cropped_image = image.crop((xmin, ymin, xmax, ymax))
-    return cropped_image                            
+    return cropped_image"""    
+
+def bring_edges_to_boundary(image_array, boundary=5, target_size=(224, 224)):
+    # Determine if the image is grayscale or color
+    is_color = len(image_array.shape) == 3
+
+    # Convert to grayscale for edge detection
+    gray_image = rgb2gray(image_array) if is_color else image_array
+
+    # Detect edges
+    edges = canny(gray_image)
+
+    # Find the coordinates of the detected edges
+    rows, cols = np.where(edges)
+
+    if rows.size > 0 and cols.size > 0:
+        # Crop the image to bring edges to the desired boundary
+        min_row, max_row = max(np.min(rows) - boundary, 0), min(np.max(rows) + boundary, image_array.shape[0])
+        min_col, max_col = max(np.min(cols) - boundary, 0), min(np.max(cols) + boundary, image_array.shape[1])
+        cropped_image = image_array[min_row:max_row, min_col:max_col]
+
+        # Calculate the aspect ratio of the cropped image
+        height, width = cropped_image.shape[:2]
+        aspect_ratio = height / width
+
+        # Calculate new size maintaining aspect ratio
+        if height > width:
+            new_height = target_size[0]
+            new_width = round(new_height / aspect_ratio)
+        else:
+            new_width = target_size[1]
+            new_height = round(new_width * aspect_ratio)
+
+        # Resize the image maintaining the aspect ratio
+        resized_image = resize(cropped_image, (new_height, new_width), anti_aliasing=True)
+
+        # Calculate padding to reach target size
+        pad_height = target_size[0] - new_height
+        pad_width = target_size[1] - new_width
+
+        # Define padding for color and grayscale images
+        if is_color:
+            pad_width_tuple = ((pad_height//2, pad_height - pad_height//2), (pad_width//2, pad_width - pad_width//2), (0, 0))
+        else:
+            pad_width_tuple = ((pad_height//2, pad_height - pad_height//2), (pad_width//2, pad_width - pad_width//2))
+
+        # Pad the resized image to match target size
+        final_image = np.pad(resized_image, pad_width_tuple, mode='constant', constant_values=0)
+    else:
+        # If no edges are found, use the original image
+        final_image = resize(image_array, target_size, anti_aliasing=True)
+
+    return final_image
+
+def crop_3d_grayscale_image(image):
+    """
+    Crops a 3D grayscale image (4D array with single color channel) to remove surrounding black voxels.
+
+    Args:
+    image (np.array): The 4D grayscale image array to be cropped.
+
+    Returns:
+    np.array: Cropped image array.
+    """
+
+    # Find indices where the voxel is not black (0)
+    non_black_indices = np.where(image[:, :, :, 0] != 0)
+
+    # Find min and max indices along each axis
+    min_x, max_x = non_black_indices[0].min(), non_black_indices[0].max()
+    min_y, max_y = non_black_indices[1].min(), non_black_indices[1].max()
+    min_z, max_z = non_black_indices[2].min(), non_black_indices[2].max()
+
+    # Crop the image
+    cropped_image = image[min_x:max_x+1, min_y:max_y+1, min_z:max_z+1, :]
+
+    return cropped_image 
+
+
+"""def bring_edges_to_boundary(image_array, boundary=5):
+    # Determine if the image is grayscale or color
+    is_color = len(image_array.shape) == 3
+
+    # Convert to grayscale for edge detection
+    gray_image = rgb2gray(image_array) if is_color else image_array
+
+    # Detect edges
+    edges = canny(gray_image)
+
+    # Find the coordinates of the detected edges
+    rows, cols = np.where(edges)
+
+    # Check if rows and cols are not empty
+    if rows.size > 0 and cols.size > 0:
+        min_row, max_row = np.min(rows), np.max(rows)
+        min_col, max_col = np.min(cols), np.max(cols)
+
+        # Calculate new boundaries considering the desired boundary space
+        min_row = max(min_row - boundary, 0)
+        min_col = max(min_col - boundary, 0)
+        max_row = min(max_row + boundary, image_array.shape[0])
+        max_col = min(max_col + boundary, image_array.shape[1])
+
+        # Crop the image to bring edges to the desired boundary
+        cropped_image = image_array[min_row:max_row, min_col:max_col]
+
+        # Define padding for color and grayscale images
+        if is_color:
+            pad_width = ((boundary, boundary), (boundary, boundary), (0, 0))
+        else:
+            pad_width = ((boundary, boundary), (boundary, boundary))
+
+        # Pad the cropped image
+        padded_image = np.pad(cropped_image, pad_width, mode='constant', constant_values=0)
+    else:
+        # If no edges are found, use the original image
+        padded_image = image_array
+
+    # Resize if necessary to fit into 224x224
+    final_image = resize(padded_image, (224, 224), anti_aliasing=True)
+
+    return final_image""" 
+    
+       
+
+"""def store_seg_jpg_on_file(input_dir, temp_dir, output_dir):
+    
+  #  Processes images in a directory by zooming in on edges and then converting them to JPEGs.
+   # :param input_dir: Directory with input PNG images.
+    #:param temp_dir: Temporary directory to store processed images before conversion.
+   # :param output_dir: Directory to store the final JPEG images.
+
+    if not os.path.exists(temp_dir):
+        os.makedirs(temp_dir)
+
+    # Process each image in the input directory
+    for filename in os.listdir(input_dir):
+        if filename.endswith(".png"):
+            # Read the image
+            img_path = os.path.join(input_dir, filename)
+            img = Image.open(img_path)
+            img_array = np.array(img)
+
+            # Apply 'bring_edges_to_boundary'
+            processed_img_array = bring_edges_to_boundary(img_array)
+
+            # Convert numpy array back to an Image object
+            processed_img = Image.fromarray(processed_img_array)
+
+            # Save the processed image temporarily
+            temp_img_path = os.path.join(temp_dir, filename)
+            processed_img.save(temp_img_path)
+
+    # Convert the processed images to JPEGs
+    convert_pngs_to_jpegs(temp_dir, output_dir)""" 
+
+def store_seg_jpg(image_dict, jpeg_dir):
+    # Ensure the JPEG directory exists
+    if not os.path.exists(jpeg_dir):
+        os.makedirs(jpeg_dir)
+    
+    for key in image_dict:
+        if key != "Skull":
+            # Making a subfolder based on the brain region name
+            sub_dir = os.path.join(jpeg_dir, key)
+            os.makedirs(sub_dir, exist_ok=True)
+
+            # Save the images in PNG format temporarily
+            temp_png_dir = os.path.join(sub_dir, 'temp_png')
+            os.makedirs(temp_png_dir, exist_ok=True)
+            save_3d_img_to_png(image_dict[key], temp_png_dir)
+
+            # Convert the PNG images to JPG format and save them in the main directory
+            convert_png_to_jpg(temp_png_dir, sub_dir)
+
+            # Remove the temporary PNG files and directory
+            for file_name in os.listdir(temp_png_dir):
+                os.remove(os.path.join(temp_png_dir, file_name))
+            os.rmdir(temp_png_dir)    
+
+def pad_to_aspect_ratio(image, target_size, background_color=0):
+    """
+    Pad an image to a given aspect ratio.
+
+    Args:
+    image (PIL.Image): The image to pad.
+    target_size (tuple): The target width and height.
+    background_color (int): The color to use for padding (grayscale).
+
+    Returns:
+    PIL.Image: Padded Image.
+    """
+    width, height = image.size
+    target_width, target_height = target_size
+
+    # Calculate the new size, maintaining the aspect ratio
+    aspect_ratio = width / height
+    target_aspect_ratio = target_width / target_height
+
+    if aspect_ratio > target_aspect_ratio:
+        # Image is wider than desired aspect ratio
+        new_height = int(width / target_aspect_ratio)
+        offset = (new_height - height) // 2
+        padded = ImageOps.expand(image, (0, offset, 0, offset), fill=background_color)
+    else:
+        # Image is taller than desired aspect ratio
+        new_width = int(height * target_aspect_ratio)
+        offset = (new_width - width) // 2
+        padded = ImageOps.expand(image, (offset, 0, offset, 0), fill=background_color)
+
+    return padded.resize(target_size, Image.LANCZOS)           
+
+  
+
+def store_seg_jpg_on_file(seg_dict, template_dir, new_dir):
+    """
+    Store segmentation results as JPEG images in specified directory.
+
+    :param seg_dict: Dictionary with keys as region names and values as 3D numpy arrays.
+    :param template_dir: Directory containing DICOM files for metadata.
+    :param new_dir: Directory where JPEG images will be saved.
+    """
+    # Ensure the new directory exists
+    if not os.path.exists(new_dir):
+        os.makedirs(new_dir)
+
+    # Iterate through each segmented region in the dictionary
+    for region_name, seg_array in seg_dict.items():
+        # Create a subdirectory for each region
+        region_dir = os.path.join(new_dir, region_name)
+        if not os.path.exists(region_dir):
+            os.makedirs(region_dir)
+
+        # Iterate through each slice of the 3D array
+        for i, slice_array in enumerate(seg_array):
+            # Normalize and convert slice to uint8
+            slice_array_normalized = (np.clip(slice_array, 0, np.max(slice_array)) / np.max(slice_array) * 255).astype(np.uint8)
+
+            # Create a PIL image from the numpy array
+            slice_image = Image.fromarray(slice_array_normalized)
+
+            # Pad and resize the image
+            resized_image = pad_to_aspect_ratio(slice_image, (224, 224))
+
+            # Construct the filename for the slice
+            slice_filename = os.path.join(region_dir, f"{region_name}_slice_{i:03d}.jpg")
+            resized_image.save(slice_filename, format='JPEG', quality=100)
+
+            print(f"Saved {slice_filename} in {region_dir}")
+
 
 
 if __name__ == "__main__":

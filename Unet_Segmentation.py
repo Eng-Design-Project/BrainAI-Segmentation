@@ -9,18 +9,8 @@ from keras.models import load_model
 from tensorflow.keras.utils import to_categorical
 import glob
 import pydicom
-
-def load_dcm_images_from_folder(folder, target_size=(128, 128)):
-    images = []
-    for dcm_path in glob.glob(folder + '/*.dcm'):  
-        dcm = pydicom.dcmread(dcm_path)
-        img = dcm.pixel_array
-        if img.dtype != np.float32:
-            img = img.astype(np.float32)
-        img = resize(img, target_size, preserve_range=True)
-        img = normalize_image(img)  # Normalize the image
-        images.append(img[..., np.newaxis])  # Add channel dimension
-    return np.array(images)
+import tkinter as tk
+from tkinter import simpledialog
 
 
 def ensure_directory_exists(path):
@@ -34,21 +24,30 @@ def split_into_subarrays(img_array, depth=5):
     sub_arrays = [img_array[i:i+depth, :, :] for i in range(0, total_slices, depth) if i+depth <= total_slices]
     return sub_arrays
 
+# def weighted_binary_crossentropy(y_true, y_pred):
+#     # custom weights for binary cross entropy
+#     weight_0 = 1.0  # for regions
+#     weight_1 = 2.0  # for boundaries
+#     b_ce = tf.keras.backend.binary_crossentropy(y_true, y_pred)
+#     weight_vector = y_true * weight_1 + (1. - y_true) * weight_0
+#     weighted_b_ce = weight_vector * b_ce
+#     return tf.keras.backend.mean(weighted_b_ce)
+
 def weighted_binary_crossentropy(y_true, y_pred):
-    # custom weights for binary cross entropy
-    weight_0 = 1.0  # for regions
-    weight_1 = 2.0  # for boundaries
+    # Compute the binary crossentropy
     b_ce = tf.keras.backend.binary_crossentropy(y_true, y_pred)
-    weight_vector = y_true * weight_1 + (1. - y_true) * weight_0
-    weighted_b_ce = weight_vector * b_ce
-    return tf.keras.backend.mean(weighted_b_ce)
+
+    # If you have weights to apply, modify the cross-entropy here
+    # Example: weighted_b_ce = apply_weights_to_b_ce(b_ce, weights)
+
+    return b_ce
 
 
 # Function to create a U-Net model for 3D image segmentation
-def unet(input_size=(5, 128, 128, 1)):  # Notice the change in the last dimension
+def unet_generate_model(input_size=(5, 128, 128, 1)): 
     inputs = tf.keras.layers.Input(input_size)
     
-# Encoder layers (convolutions and pooling)
+    # Encoder layers (convolutions and pooling)
     conv1 = tf.keras.layers.Conv3D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(inputs)
     conv1 = tf.keras.layers.Conv3D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv1)
     pool1 = tf.keras.layers.MaxPooling3D(pool_size=(1, 2, 2))(conv1)
@@ -94,56 +93,83 @@ def unet(input_size=(5, 128, 128, 1)):  # Notice the change in the last dimensio
     model.compile(optimizer='adam', loss=weighted_binary_crossentropy, metrics=['accuracy'])
     return model
 
-def unet_internal(input_size=(128, 128, 1), num_classes=5):
-    inputs = tf.keras.layers.Input(input_size)
 
-    # Encoder layers (convolutions and pooling)
-    conv1 = tf.keras.layers.Conv2D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(inputs)
-    conv1 = tf.keras.layers.Conv2D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv1)
-    pool1 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv1)
+# def unet_internal(input_size=(128, 128, 1), num_classes=5):
+#     inputs = tf.keras.layers.Input(input_size)
+
+#     # Encoder layers (convolutions and pooling)
+#     conv1 = tf.keras.layers.Conv2D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(inputs)
+#     conv1 = tf.keras.layers.Conv2D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv1)
+#     pool1 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv1)
     
-    conv2 = tf.keras.layers.Conv2D(32, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool1)
-    conv2 = tf.keras.layers.Conv2D(32, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv2)
-    pool2 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv2)
+#     conv2 = tf.keras.layers.Conv2D(32, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool1)
+#     conv2 = tf.keras.layers.Conv2D(32, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv2)
+#     pool2 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv2)
     
-    conv3 = tf.keras.layers.Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool2)
-    conv3 = tf.keras.layers.Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv3)
-    pool3 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv3)
+#     conv3 = tf.keras.layers.Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool2)
+#     conv3 = tf.keras.layers.Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv3)
+#     pool3 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(conv3)
     
-    conv4 = tf.keras.layers.Conv2D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool3)
-    conv4 = tf.keras.layers.Conv2D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv4)
-    drop4 = tf.keras.layers.Dropout(0.3)(conv4)
-    pool4 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(drop4)
+#     conv4 = tf.keras.layers.Conv2D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool3)
+#     conv4 = tf.keras.layers.Conv2D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv4)
+#     drop4 = tf.keras.layers.Dropout(0.3)(conv4)
+#     pool4 = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(drop4)
     
-    conv5 = tf.keras.layers.Conv2D(256, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool4)
-    conv5 = tf.keras.layers.Conv2D(256, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv5)
-    drop5 = tf.keras.layers.Dropout(0.3)(conv5)
+#     conv5 = tf.keras.layers.Conv2D(256, 3, activation='relu', padding='same', kernel_initializer='he_normal')(pool4)
+#     conv5 = tf.keras.layers.Conv2D(256, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv5)
+#     drop5 = tf.keras.layers.Dropout(0.3)(conv5)
 
-    # Decoder layers (up-sampling and concatenation)
-    up6 = tf.keras.layers.UpSampling2D(size=(2, 2))(drop5)
-    merge6 = tf.keras.layers.concatenate([drop4, up6], axis=-1)
-    conv6 = tf.keras.layers.Conv2D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge6)
+#     # Decoder layers (up-sampling and concatenation)
+#     up6 = tf.keras.layers.UpSampling2D(size=(2, 2))(drop5)
+#     merge6 = tf.keras.layers.concatenate([drop4, up6], axis=-1)
+#     conv6 = tf.keras.layers.Conv2D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge6)
 
-    up7 = tf.keras.layers.UpSampling2D(size=(2, 2))(conv6)
-    merge7 = tf.keras.layers.concatenate([conv3, up7], axis=-1)
-    conv7 = tf.keras.layers.Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge7)
+#     up7 = tf.keras.layers.UpSampling2D(size=(2, 2))(conv6)
+#     merge7 = tf.keras.layers.concatenate([conv3, up7], axis=-1)
+#     conv7 = tf.keras.layers.Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge7)
 
-    up8 = tf.keras.layers.UpSampling2D(size=(2, 2))(conv7)
-    merge8 = tf.keras.layers.concatenate([conv2, up8], axis=-1)
-    conv8 = tf.keras.layers.Conv2D(32, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge8)
+#     up8 = tf.keras.layers.UpSampling2D(size=(2, 2))(conv7)
+#     merge8 = tf.keras.layers.concatenate([conv2, up8], axis=-1)
+#     conv8 = tf.keras.layers.Conv2D(32, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge8)
 
-    up9 = tf.keras.layers.UpSampling2D(size=(2, 2))(conv8)
-    merge9 = tf.keras.layers.concatenate([conv1, up9], axis=-1)
-    conv9 = tf.keras.layers.Conv2D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge9)
+#     up9 = tf.keras.layers.UpSampling2D(size=(2, 2))(conv8)
+#     merge9 = tf.keras.layers.concatenate([conv1, up9], axis=-1)
+#     conv9 = tf.keras.layers.Conv2D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge9)
 
-    # Output layer
-    outputs = tf.keras.layers.Conv2D(num_classes, (1, 1), activation='softmax')(conv9)
+#     # Output layer
+#     outputs = tf.keras.layers.Conv2D(num_classes, (1, 1), activation='softmax')(conv9)
 
-    # Compile the model
-    model = tf.keras.models.Model(inputs=[inputs], outputs=[outputs])
-    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+#     # Compile the model
+#     model = tf.keras.models.Model(inputs=[inputs], outputs=[outputs])
+#     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
-    return model
+#     return model
+
+def generate_predictions(subarrays, model):
+    predictions = []
+    for sub_arr in subarrays:
+        # Check if the subarray has the correct shape for the model
+        if sub_arr.shape == (5, 128, 128):
+            # Reshape the subarray to include the batch size and channel dimensions
+            sub_arr_reshaped = np.expand_dims(sub_arr, axis=0)  # Adds the batch size dimension
+            sub_arr_reshaped = np.expand_dims(sub_arr_reshaped, axis=-1)  # Adds the channel dimension
+
+            # Generate prediction
+            pred = model.predict(sub_arr_reshaped)
+
+            # Keep the prediction in 4D (including the channel dimension) and store it
+            pred_4d = pred[0, :, :, :, :]  # Shape: [depth, height, width, channels]
+            predictions.append(pred_4d)
+        else:
+            print("Subarray with incorrect shape encountered:", sub_arr.shape)
+            continue
+
+    # Concatenate all predictions along the depth axis
+    combined_prediction = np.concatenate(predictions, axis=0)
+
+    print("generate predictions complete")
+    print(combined_prediction.shape)
+    return combined_prediction
 
 
 def get_surrounding_slices(original_slice, sub_arrays, depth):
@@ -165,6 +191,8 @@ def get_surrounding_slices(original_slice, sub_arrays, depth):
     return surrounding_slices
 
 
+
+    
 def normalizeTF(volume3dDict):
     normalizedDict = {}
     for key, value in volume3dDict.items():
@@ -241,8 +269,19 @@ def show_slices(triplets, threshold=0.5, brightening_factor=1.3):  # Adjust thre
         axes[1, i].set_title("Segmented")
         axes[1, i].axis('off')
 
-    plt.suptitle("Original and Brightened Segmented")
     plt.show()
+
+
+
+def get_unet_result_coordinates(predict_3d, threshold=0.5):
+    coordinates_dict = {}
+    # Get coordinates below the threshold
+    for x in range(predict_3d.shape[0]):
+        for y in range(predict_3d.shape[1]):
+            for z in range(predict_3d.shape[2]):
+                if predict_3d[x, y, z, 0] < threshold:  # Assuming the last dimension is the channel
+                    coordinates_dict.setdefault('coordinates', []).append([x, y, z])
+    return coordinates_dict
 
 
 def normalize_image(image):
@@ -254,138 +293,108 @@ def normalize_image(image):
         normalized_image = image - min_val
     return normalized_image
 
-
-def prepare_data_for_training(img_array, depth=5, num_classes=5):
+def prepare_data_for_training(subarrays, depth=5):
     X_train = []
     Y_train = []
 
-    sub_arrays = [img_array[i:i + depth] for i in range(0, img_array.shape[0], depth) if i + depth <= img_array.shape[0]]
-    for sub_arr in sub_arrays:
-        middle_slice = sub_arr[depth // 2]
+    for sub_arr in subarrays:
+        if sub_arr.shape[0] == depth:
+            # Generate the boundary for the middle slice
+            #middle_slice = sub_arr[depth // 2]
+            boundary = find_boundary(sub_arr)
 
-        # Generate the boundary and one-hot encode it
-        boundary = find_boundary(middle_slice)
-        boundary_one_hot = to_categorical(boundary, num_classes=num_classes)
+            # Add channel dimension to each slice in the sub-array and to the boundary
+            sub_arr_processed = sub_arr[..., np.newaxis]
+            boundary_processed = boundary[..., np.newaxis]
 
-        X_train.append(middle_slice[..., np.newaxis])  # Add channel dimension
-        Y_train.append(boundary_one_hot)
+            X_train.append(sub_arr_processed)
+            Y_train.append(boundary_processed)
 
+    # Convert lists to numpy arrays
     X_train = np.array(X_train)
-    Y_train = np.array(Y_train).reshape(-1, 128, 128, num_classes)
+    Y_train = np.array(Y_train)
+
+    print(X_train.shape)
+    print(Y_train.shape)
 
     return X_train, Y_train
 
-def dlAlgorithm(segmentDict, file_names, depth=5, binary_model_path='my_model.keras',
-                internal_folder_paths=None, segmentation_type='internal'):
 
-    normalizedDict = normalizeTF(segmentDict) if segmentDict is not None else None
-    all_triplets = []
 
-    if segmentation_type == 'skull':
-        if os.path.exists(binary_model_path):
-            model_binary = load_model(binary_model_path, custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
-            for key, sub_array in zip(file_names, normalizedDict.values()):
-                sub_arrays_split = split_into_subarrays(sub_array, depth)
-                for idx, sub_arr in enumerate(sub_arrays_split):
-                    surrounding_slices = get_surrounding_slices(sub_arr[2], sub_arrays_split, depth)
-                    sub_arr_exp = np.expand_dims(np.expand_dims(surrounding_slices, axis=0), axis=-1)
-                    pred = model_binary.predict(sub_arr_exp)
-                    middle_index = depth // 2
-                    slices_triplet = (surrounding_slices[middle_index], pred[0][middle_index])
-                    all_triplets.append(slices_triplet)
+def get_user_selection(region_options):
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+
+    region_selection = simpledialog.askinteger("Select Region",
+                                               "Select the region to visualize:\n" +
+                                               "\n".join([f"{k}: {v}" for k, v in region_options.items()]),
+                                               parent=root)
+    return region_selection
+
+
+def execute_unet(inputDict, depth=5, threshold=0.5):
+    dict_of_3d_arrays = {}
+    new_dict = {}
+
+    if isinstance(inputDict, dict):
+        print("input is a dictionary.")
+        dict_of_3d_arrays = inputDict
+    else:
+        print("input is an array.")
+        dict_of_3d_arrays["FullScan"] = inputDict
+
+    normalizedDict = normalizeTF(dict_of_3d_arrays)
+    model_paths = {key: f"{key}_model.keras" for key in normalizedDict.keys()}
+
+    final_output = {}
+
+    for key, array3d in normalizedDict.items():
+        if os.path.exists(model_paths[key]):
+            # Path exists
+            print(f"The path for '{key}' exists.")
+            subarrays_split = split_into_subarrays(array3d)
+            model_binary = load_model(model_paths[key], custom_objects={"weighted_binary_crossentropy": weighted_binary_crossentropy})
+            predict_3d = generate_predictions(subarrays_split, model_binary)
+            coordinates_below_threshold = get_unet_result_coordinates(predict_3d, threshold)
+            final_output[key] = coordinates_below_threshold
         else:
-            print("Binary segmentation model path does not exist. Please check the path and try again.")
-            return
+            # Path does not exist
+            print(f"The path for '{key}' does not exist.")
+            model = unet_generate_model()
+            subarrays = split_into_subarrays(array3d)
+            print(subarrays[0].shape)
+            print(f"Training new model for {key}...")
+            X_train, Y_train = prepare_data_for_training(subarrays)
+            model.fit(X_train, Y_train, epochs=10, batch_size=16)
+            model.save(model_paths[key])
+            predict_3d = generate_predictions(subarrays, model)
+            coordinates_below_threshold = get_unet_result_coordinates(predict_3d, threshold)
+            final_output[key] = coordinates_below_threshold
 
-    elif segmentation_type == 'internal':
-        
-        region_options = {
-            1: "Frontal Lobe",
-            2: "Temporal Lobe",
-            3: "Occipital Lobe",
-            4: "White Matter"
-        }
-
-        region_selection = int(input("Select the region to visualize (1-Frontal, 2-Temporal, 3-Occipital, 4-White Matter): ").strip())
-        region_to_view = region_options.get(region_selection, None)
-        
-        if region_to_view:
-            folder_path = internal_folder_paths[region_to_view]
-            model_path = os.path.join(folder_path, f"{region_to_view.lower().replace(' ', '_')}_model.keras")
-            if not os.path.exists(model_path):
-                print(f"Training new model for {region_to_view}...")
-                images = load_dcm_images_from_folder(folder_path)
-                X_train, Y_train = prepare_data_for_training(images, depth=depth, num_classes=5)
-                model = unet_internal(input_size=(128, 128, 1), num_classes=5)
-                model.fit(X_train, Y_train, epochs=25, batch_size=16)
-                ensure_directory_exists(folder_path)
-                model.save(model_path)
-            else:
-                print(f"Loading model for {region_to_view} from {model_path}...")
-                model = load_model(model_path)
+    print("Final output with coordinates below the threshold:", final_output)
+    return final_output
             
-            images = load_dcm_images_from_folder(folder_path)
-            for slice_idx in range(images.shape[0]):  # Iterate through each slice in the loaded images
-                slice_2d = images[slice_idx, :, :, 0]  
-                slice_2d_normalized = normalize_image(slice_2d)
-                slice_2d_normalized = np.expand_dims(slice_2d_normalized, axis=-1)
-                slice_2d_normalized = np.expand_dims(slice_2d_normalized, axis=0)
-                pred = model.predict(slice_2d_normalized)
-                all_triplets.append((slice_2d, pred[0])) 
 
-    # Visualization loop
-    if all_triplets:
-        print("Processing complete, now displaying images.")
-        triplet_index = 0
-        while triplet_index < len(all_triplets):
-            batch_triplets = all_triplets[triplet_index:triplet_index + 3]
-            show_slices(batch_triplets)  
-            triplet_index += 3
-            if triplet_index < len(all_triplets):
-                proceed = input("Would you like to see more slices? (y/n): ").strip().lower()
-                if proceed != 'y':
-                    break
-    print("All images have been processed.")
+
+def display_images_for_region(all_triplets, region_name):
+    print(f"Displaying images for {region_name}...")
+    triplet_index = 0
+    while triplet_index < len(all_triplets):
+        batch_triplets = all_triplets[triplet_index:triplet_index + 3]
+        show_slices(batch_triplets)  
+        triplet_index += 3
+
+        if triplet_index < len(all_triplets):
+            print(f"Continuing with more slices from {region_name}...")
 
 
 
 
 if __name__ == "__main__":
-    # Paths to the folders containing images for each brain region
-
-    internal_folder_paths = {
-        "Frontal Lobe": "Internal Segment DCM unet\\Frontal",
-        "Temporal Lobe": "Internal Segment DCM unet\\Temporal",
-        "Occipital Lobe": "Internal Segment DCM unet\\Occipital",
-        "White Matter": "Internal Segment DCM unet\\White Matter",
-    }
 
     # Example dictionary holding your image data for skull segmentation
     sitk_images_dict = {
         "image1": data.get_3d_image("scan1"),
-        "image2": data.get_3d_image("scan2"),
+        #"image2": data.get_3d_image("scan2"),
     }
-    file_names = list(sitk_images_dict.keys())
-
-    # Mapping of user input to segmentation types
-    segmentation_options = {
-        "1": "internal",
-        "2": "skull"
-    }
-
-    user_input = input("Choose segmentation type (1 for 'internal' or 2 for 'skull'): ").strip()
-    segmentation_type = segmentation_options.get(user_input, None)
-
-    if segmentation_type:
-        dlAlgorithm(
-            segmentDict=sitk_images_dict,
-            file_names=file_names,
-            internal_folder_paths=internal_folder_paths if segmentation_type == "internal" else None,
-            binary_model_path='my_model.keras' if segmentation_type == "skull" else None,
-            segmentation_type=segmentation_type
-        )
-    else:
-        print("Invalid input. Please enter 1 for internal segmentation or 2 for skull segmentation.")
-
-
-
+    execute_unet(sitk_images_dict)
