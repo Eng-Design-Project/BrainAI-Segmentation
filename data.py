@@ -654,7 +654,8 @@ def avg_brightness(img_dict, coords_dict):
 
             print('AVERAGE BRIGHTNESS')
             print(avg_brightness)
-            avg_brightness = avg_brightness / count
+            if count != 0:
+                avg_brightness = avg_brightness / count
         brightness_dict[region] = avg_brightness * 255
 
     return brightness_dict
