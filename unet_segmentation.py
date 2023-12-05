@@ -191,7 +191,7 @@ def find_boundary(segment):
 '''
 
 # Function to generate coordinates below a certain threshold from the 3D prediction.
-def get_unet_result_coordinates(predict_3d, threshold=0.7):
+def get_unet_result_coordinates(predict_3d, threshold=0.4):
     coordinates_list = []
     # Get coordinates below the threshold
     for x in range(predict_3d.shape[0]):
@@ -276,6 +276,7 @@ def execute_unet(inputDict, depth=5):
     print("Final output with coordinates below the threshold:", final_output)
     return final_output
             
+
 
 if __name__ == "__main__":
     # Example dictionary holding your image data for skull segmentation
