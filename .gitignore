@@ -11,3 +11,7 @@ reg png/
 scipy reg image dcm/
 scipy reg png/
 *.pyc
+__pycache__/
+*.pyc
+__pycache__/Unet_Segmentation.cpython-311.pyc
+__pycache__
