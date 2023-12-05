@@ -978,30 +978,6 @@ def crop_3d_grayscale_image(image):
     # Convert the processed images to JPEGs
     convert_pngs_to_jpegs(temp_dir, output_dir)""" 
 
-def store_seg_jpg(image_dict, jpeg_dir):
-    # Ensure the JPEG directory exists
-    if not os.path.exists(jpeg_dir):
-        os.makedirs(jpeg_dir)
-    
-    for key in image_dict:
-        if key != "Skull":
-            # Making a subfolder based on the brain region name
-            sub_dir = os.path.join(jpeg_dir, key)
-            os.makedirs(sub_dir, exist_ok=True)
-
-            # Save the images in PNG format temporarily
-            temp_png_dir = os.path.join(sub_dir, 'temp_png')
-            os.makedirs(temp_png_dir, exist_ok=True)
-            save_3d_img_to_png(image_dict[key], temp_png_dir)
-
-            # Convert the PNG images to JPG format and save them in the main directory
-            convert_png_to_jpg(temp_png_dir, sub_dir)
-
-            # Remove the temporary PNG files and directory
-            for file_name in os.listdir(temp_png_dir):
-                os.remove(os.path.join(temp_png_dir, file_name))
-            os.rmdir(temp_png_dir)    
-
 def pad_to_aspect_ratio(image, target_size, background_color=0):
     """
     Pad an image to a given aspect ratio.
@@ -1035,50 +1011,63 @@ def pad_to_aspect_ratio(image, target_size, background_color=0):
     return padded.resize(target_size, Image.LANCZOS)           
 
   
-
-def store_seg_jpg_on_file(seg_dict, template_dir, new_dir):
-    """
-    Store segmentation results as JPEG images in specified directory.
-
-    :param seg_dict: Dictionary with keys as region names and values as 3D numpy arrays.
-    :param template_dir: Directory containing DICOM files for metadata.
-    :param new_dir: Directory where JPEG images will be saved.
-    """
-    # Ensure the new directory exists
+def store_seg_jpg_on_file(dict, new_dir):
+    # Check if the directory exists, if not, create it (higher level folder)
     if not os.path.exists(new_dir):
         os.makedirs(new_dir)
+    
+    for key in dict:
+        if key != "Skull":
+            # making a sub folder based on the brain region name
+            sub_dir = os.path.join(new_dir, key)
+            os.makedirs(sub_dir)
 
-    # Iterate through each segmented region in the dictionary
-    for region_name, seg_array in seg_dict.items():
-        # Create a subdirectory for each region
-        region_dir = os.path.join(new_dir, region_name)
-        if not os.path.exists(region_dir):
-            os.makedirs(region_dir)
+            save_3d_img_to_jpg(dict[key], sub_dir)
+            #print("key:", key)
+# def store_seg_jpg_on_file(seg_dict, new_dir):
+#     """
+#     Store segmentation results as JPEG images in specified directory.
 
-        # Iterate through each slice of the 3D array
-        for i, slice_array in enumerate(seg_array):
-            # Normalize and convert slice to uint8
-            slice_array_normalized = (np.clip(slice_array, 0, np.max(slice_array)) / np.max(slice_array) * 255).astype(np.uint8)
+#     :param seg_dict: Dictionary with keys as region names and values as 3D numpy arrays.
+#     :param template_dir: Directory containing DICOM files for metadata.
+#     :param new_dir: Directory where JPEG images will be saved.
+#     """
+#     # Ensure the new directory exists
+#     if not os.path.exists(new_dir):
+#         os.makedirs(new_dir)
 
-            # Create a PIL image from the numpy array
-            slice_image = Image.fromarray(slice_array_normalized)
+#     # Iterate through each segmented region in the dictionary
+#     for region_name, seg_array in seg_dict.items():
+#         # Create a subdirectory for each region
+#         region_dir = os.path.join(new_dir, region_name)
+#         if not os.path.exists(region_dir):
+#             os.makedirs(region_dir)
 
-            # Pad and resize the image
-            resized_image = pad_to_aspect_ratio(slice_image, (224, 224))
+#         # Iterate through each slice of the 3D array
+#         for i, slice_array in enumerate(seg_array):
+#             # Normalize and convert slice to uint8
+#             slice_array_normalized = (np.clip(slice_array, 0, np.max(slice_array)) / np.max(slice_array) * 255).astype(np.uint8)
 
-            # Construct the filename for the slice
-            slice_filename = os.path.join(region_dir, f"{region_name}_slice_{i:03d}.jpg")
-            resized_image.save(slice_filename, format='JPEG', quality=100)
+#             # Create a PIL image from the numpy array
+#             slice_image = Image.fromarray(slice_array_normalized)
 
-            print(f"Saved {slice_filename} in {region_dir}")
+#             # Pad and resize the image
+#             resized_image = pad_to_aspect_ratio(slice_image, (224, 224))
+
+#             # Construct the filename for the slice
+#             slice_filename = os.path.join(region_dir, f"{region_name}_slice_{i:03d}.jpg")
+#             resized_image.save(slice_filename, format='JPEG', quality=100)
+
+#             print(f"Saved {slice_filename} in {region_dir}")
 
 
 
 if __name__ == "__main__":
-    print("data module test")
-    test_subfolders_to_dictionary("scan 1 atlas seg results")
-    # test_dir = "scan1"
-    # test_pydicom_arr = get_3d_image(test_dir)
+    
+    test_dir = "scan1"
+    test_pydicom_arr = get_3d_image(test_dir)
+    save_3d_img_to_jpg(test_pydicom_arr, "test_jpg_scan1")
+
     # display_3d_array_slices(test_pydicom_arr, 20)
     
     # print(is_segment_results_dir("atl_segmentation_DCMs"))

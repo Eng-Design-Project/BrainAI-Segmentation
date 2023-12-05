@@ -738,10 +738,10 @@ class Core:
             if file_name:
                 # Save the segmentation results with the user-specified file name
                 template_dir = self.selected_folder  # Assuming this holds the path to the template directory
-
-                data.store_seg_img_on_file(seg_results, self.selected_folder, f"{save_folder}/{file_name}.DCMs")
+                #Note: could self.selected folder be empty accidentally?
+                data.store_seg_img_on_file(seg_results, template_dir, f"{save_folder}/{file_name}.DCMs")
                 data.store_seg_png_on_file(seg_results, f"{save_folder}/{file_name}.PNGs")
-                data.store_seg_jpg_on_file(seg_results, template_dir, f"{save_folder}/{file_name}.JPGs")
+                data.store_seg_jpg_on_file(seg_results, f"{save_folder}/{file_name}.JPGs")
 
                 # save dict of 3d np array images to data global seg results
                 # Show a message to inform the user that the folder was selected for saving
