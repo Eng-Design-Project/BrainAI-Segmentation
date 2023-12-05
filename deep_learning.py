@@ -130,7 +130,7 @@ class CustomClassifierMultiModel:
             optimizer = self.optimizer_dict[region]
             region_labels = self.labeled_data[region]
             model.compile(optimizer=optimizer, loss="sparse_categorical_crossentropy", metrics=["accuracy"])
-            model.fit(self.windows_dict[region], region_labels, epochs=10)
+            model.fit(self.windows_dict[region], region_labels, epochs=3)
 
     def trainDL(self, user_score=0):
         classification_dict = {}
@@ -148,7 +148,13 @@ class CustomClassifierMultiModel:
             # Predictions
             predictions = model.predict(windows)
             predicted_labels = np.argmax(predictions, axis=1)
-            classified_indices = self.indices_dict[predicted_labels == 1].tolist()
+            
+            #get the indices array for the current region
+            region_indices = self.indices_dict[region]
+
+            #use the boolean array (predicted_labels == 1) to filter the indices
+            classified_indices = region_indices[predicted_labels == 1].tolist()
+
             classification_dict[region] = classified_indices
 
         return classification_dict
@@ -206,9 +212,9 @@ if __name__ == '__main__':
     
 
     #need to put execution in for loop, get user_score each time
-    #need to generate some labeled data: handmake a brain with neat boundary, extract windows, label all windows 1
-    #or use atlas and make a heuristic to generate labeled windows: if >30% of window > 0, 1, else 0
     #need to save model between runs somehow
+    #if score > x, restart process with new results (so new boundary windows can shift over time)
+    #if score > x+, finish
    
 
 '''

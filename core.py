@@ -19,7 +19,7 @@ import clustering
 import segmentation
 import data
 import os
-import Unet_Segmentation
+import unet_segmentation
 import deep_learning
 
 
@@ -78,6 +78,8 @@ class Core:
         self.atlas_segmentation_completed = False  # Initialize the attribute as False
         # Add a variable to track the state of clustering description visibility
         self.show_clustering_description = False
+        # Add a variable to track the positive coordinates of each region
+        self.coords_dict = {} #this class var should be updated whenever atlas seg or internal seg is run
 
 
         self.master.title("QuickSeg")
@@ -326,8 +328,8 @@ class Core:
             #the first argument should be a pre-atlas segmented scan, the 2nd argument should be a string of the chosen algo
             dict_of_coords_dicts = clustering.execute_seg_clustering(data.segmentation_results, algorithm, 5)
             for region in data.segmentation_results.keys():
-                cluster_dict = segmentation.create_seg_images_from_image(data.segmentation_results[region], dict_of_coords_dicts[region])
-                self.show_seg_results(cluster_dict)
+                clustered_dict = segmentation.create_seg_images_from_image(data.segmentation_results[region], dict_of_coords_dicts[region])
+                self.show_seg_results(clustered_dict)
                 # for cluster in clustered_dict.keys():
                 #     self.show_image_results(clustered_dict[cluster])
                     
@@ -506,19 +508,28 @@ class Core:
         if seg_var == "Segment":
             #the first argument should be a pre-atlas segmented scan, the 2nd argument should be a string of the chosen algo
             if algorithm == "U-net":
-                print("segment u-net")
-                Unet_Segmentation.execute_unet(data.segmentation_results)
-                
+                print("segment u-net")               
+                noisecoords_dict = unet_segmentation.execute_unet(data.segmentation_results)
+                unet_results = segmentation.filter_noise_from_images(data.segmentation_results, noisecoords_dict)
+                self.save_seg_results(unet_results)
+                self.show_seg_results(unet_results)
+                for key in noisecoords_dict.keys():
+                    print(noisecoords_dict[key])
+
             else:
                 print("segment custom")
                 self.train_custom_dl_model(data.segmentation_results)
-            
-                    
+
+
         if seg_var == "Whole Scan":
             if algorithm == "U-net":
                 print("whole scan u-net")
-                Unet_Segmentation.execute_unet(volume)
-                
+                noisecoords_dict = unet_segmentation.execute_unet(volume)
+                unet_results = segmentation.filter_noise_from_images(volume, noisecoords_dict)
+                self.save_seg_results(unet_results)
+                self.show_seg_results(unet_results)
+                for key in noisecoords_dict.keys():
+                    print(noisecoords_dict[key])
             else:
                 print("whole scan custom")
                 self.train_custom_dl_model(volume)
@@ -539,13 +550,38 @@ class Core:
             print("input is an array.")
             dict_of_3d_arrays["FullScan"] = input
         classifier = deep_learning.CustomClassifierMultiModel(dict_of_3d_arrays)
-        classif_dict = classifier.trainDL()
+        classif_dict = classifier.trainDL() # could be renamed to noise coords dict
         results = segmentation.filter_noise_from_images(dict_of_3d_arrays, classif_dict)
-        data.display_seg_np_images(results)
-
-    
-        
+        self.show_seg_results(results)
             
+    def train_unet_model(self, input, algorithm_type):
+        print("training U-net model")
+        dict_of_3d_arrays = {}
+        if isinstance(input, dict):
+            print("input is a dictionary.")
+            dict_of_3d_arrays = input
+        else:
+            print("input is an array.")
+            dict_of_3d_arrays["FullScan"] = input
+
+        #file_names = list(dict_of_3d_arrays.keys())
+
+        # # Initialize internal_folder_paths with actual paths or logic
+        # internal_folder_paths = {
+        #     "Frontal Lobe": "Internal Segment DCM unet\Frontal",
+        #     "Temporal Lobe": "Internal Segment DCM unet\Temporal",
+        #     "Occipital Lobe": "Internal Segment DCM unet\Occipital",
+        #     "White Matter": "Internal Segment DCM unet\White Matter",
+        # }
+
+        # Assuming 'algorithm_type' is either 'internal' or 'skull'
+        # Unet_Segmentation.dlAlgorithm(
+        #     segmentDict=dict_of_3d_arrays,
+        #     file_names=file_names,
+        #     internal_folder_paths=internal_folder_paths,
+        #     binary_model_path='my_model.keras',  # Adjust as needed
+        #     segmentation_type=algorithm_type
+        # )
 
 
         
@@ -595,8 +631,8 @@ class Core:
             "image2": data.get_3d_image("scan2"),
         }
 
-        # Call the dlAlgorithm function from deep_learning_copy module
-        Unet_Segmentation.dlAlgorithm(images_dict)
+        # Call the dlAlgorithm function from Unet_segmentation module
+        unet_segmentation.dlAlgorithm(images_dict)
 
     def custom_askdirectory(title):
         #might replace other usses of askdirectory, to display a message
@@ -636,7 +672,16 @@ class Core:
 
              
         # call execute atlas seg, passing image, atlas and atlas colors as args
-        seg_results = segmentation.execute_atlas_seg(atlas, color_atlas, image)
+        seg_results, self.coords_dict = segmentation.execute_atlas_seg(atlas, color_atlas, image)
+        # execute_atlas_seg(...)[0] returns the seg results,
+        # execute_atlas_seg(...)[1] returns a dictionary containing the positive coordinates of the segments
+        # print(type(self.coords_dict)) #returns 'dict'
+        # print(self.coords_dict) # returns {'Skull': [[58, 2, 0], ...]}
+        avg_brightness_dict = data.avg_brightness(seg_results, self.coords_dict)
+        for key, value in avg_brightness_dict.items():
+            print(key)
+            print(value)
+
         del seg_results["Skull"]
         data.segmentation_results = seg_results
         # returns dict of simple itk images
@@ -654,7 +699,7 @@ class Core:
             print("Failed to save Results")
             self.show_popup_message("Failed to save results")
         #display seg results
-        self.show_seg_results(seg_results)
+        self.show_seg_results(seg_results, avg_brightness_dict=avg_brightness_dict)
 
         #here to test execute internal_atlas_seg
         #self.execute_internal_atlas_seg()
@@ -663,7 +708,14 @@ class Core:
         print("Internal Atlas Segmentation")
         if (data.segmentation_results != None):
             internal_color_atlas = data.get_2d_png_array_list("Color Atlas internal")
-            internal_seg_results = segmentation.execute_internal_atlas_seg(data.segmentation_results, internal_color_atlas)
+            internal_seg_results, self.coords_dict = segmentation.execute_internal_atlas_seg(data.segmentation_results, internal_color_atlas)
+            #print(self.coords_dict)
+            avg_brightness_dict = data.avg_brightness(internal_seg_results, self.coords_dict)
+
+            for key, value in avg_brightness_dict.items():
+                print(key)
+                print(value)
+
             #save results, to file and data.seg results        
             save_success = self.save_seg_results(internal_seg_results)
             if (save_success):
@@ -671,7 +723,7 @@ class Core:
             else:
                 self.show_popup_message("Failed to save results")
                 #display results
-            self.show_seg_results(internal_seg_results)
+            self.show_seg_results(internal_seg_results, avg_brightness_dict=avg_brightness_dict)
         else:
             self.show_popup_message("There are no atlas segmentation results saved to internally segment.")
 
@@ -866,7 +918,7 @@ class Core:
         self.deep_learning_page.show_buttons()"""
    
         
-    def show_seg_results(self, image_dict=None):
+    def show_seg_results(self, image_dict=None, avg_brightness_dict = None):
         # This function will display segmentation results for an image
 
         if image_dict is None:
@@ -899,6 +951,10 @@ class Core:
             diff_img = ImageChops.difference(img, white_img)
             # If the difference is all black, the input image is all white
             return not diff_img.getbbox()
+        # Create a label for displaying average brightness information
+        if avg_brightness_dict:
+            avg_brightness_label = tk.Label(popup_window, text="Average Brightness is")
+            avg_brightness_label.pack()
 
         def update_image():
             index = segmentation_indexes[current_segmentation]
@@ -929,6 +985,16 @@ class Core:
             photo = ImageTk.PhotoImage(boundary_image)
             image_label.configure(image=photo)
             image_label.image = photo
+
+            # Update the average brightness label
+            # it is assumed that the current_segmentation (e.g. "Brain") corresponds to a key in avg_brightness
+            if avg_brightness_dict:
+                key = current_segmentation
+                if key in avg_brightness_dict:
+                    #avg_brightness_label.config(text=f"The average brightness for {key} is {avg_brightness_dict[key]}")
+                    # changed it so that it rounds to 2 places after the decimal
+                    avg_brightness_label.config(text=f"The average brightness for {key} is {round(avg_brightness_dict[key], 2)}")
+
 
         def handle_segment_selection(segmentation_type):
             nonlocal current_segmentation

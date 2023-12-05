@@ -541,6 +541,7 @@ def set_seg_results_with_dir(directory = "atl_segmentation_DCMs"):
     
 # set_seg_results()
 
+#this function needs fixing, there should be a for loop like in the function below it.
 #this function has been changed, it now returns a single NORMALIZED average.
 #this function takes a 3d numpy image, returns a single number as the average of (46) averages
 def average_overall_brightness_3d(image):
@@ -558,6 +559,7 @@ def average_overall_brightness_3d(image):
     overall_average_brightness = np.mean(normalized_image_averages)
     return overall_average_brightness
 
+# added another fix to this function.
 # this fuction has been changed, it now returns NORMALIZED (between [0, 255]) averages
 # if the argument is a 3d image with 46 slices, this function will return a numpy array with 46 averages
 # each average can be accessed by typical indexing, e.g. average_brightness[0] returns first average, ...[45] returns last, etc.
@@ -565,16 +567,26 @@ def array_of_average_pixel_brightness_3d(images):
     # Ensure the input is a numpy array
     if not isinstance(images, np.ndarray):
         raise ValueError("Input must be a numpy array")
-    
     # Ensure the input is a 3D array
     if len(images.shape) != 3:
         raise ValueError("Input must be a 3D array of grayscale images")
 
-    # Normalize each image to the range [0, 255]
-    normalized_images = (images - np.min(images)) / (np.max(images) - np.min(images)) * 255
+    num_slices, height, width = images.shape
 
-    # Calculate the average pixel brightness for all normalized images
-    average_brightness = np.mean(normalized_images, axis=(1, 2))
+    # Initialize an array to store the normalized average brightness for each image
+    average_brightness = np.zeros(num_slices)
+
+    for i in range(num_slices):
+        # Check if the range is zero to avoid division by zero
+        if np.max(images[i]) - np.min(images[i]) == 0:
+            normalized_image = images[i]  # Avoid normalization if the range is zero
+        else:
+            # Normalize each image to the range [0, 255]
+            normalized_image = (images[i] - np.min(images[i])) / (np.max(images[i]) - np.min(images[i])) * 255
+
+        # Calculate the average pixel brightness for the normalized image
+        average_brightness[i] = np.mean(normalized_image)
+
     return average_brightness
 
 # this function returns the normalized [0,255] avg brightness of a single 2d grayscale numpy image
@@ -593,6 +605,73 @@ def avg_brightness_2d(image):
     # Calculate the average pixel brightness of the normalized image
     average_brightness = np.mean(normalized_image)
     return average_brightness
+
+# img_dict is a dictionary of 3d arrays, and coords dict is a dict of lists of coordinates
+# they both have matching regions, then it goes through the regions and finds the brighntess of a pixel
+# for every coordinate in the list of coordinates, normalizes it, calculates the average of all of them,
+# and appends to a dict key = region, value = average brightness
+# and returns average brightness dictionary
+def avg_brightness(img_dict, coords_dict):
+    # Ensure the input is a numpy array
+    brightness_dict = {}
+
+    for region in img_dict.keys():
+        if not isinstance(img_dict[region], np.ndarray):
+            raise ValueError("Input must be a numpy array")
+
+        avg_brightness = 0
+        max = np.max(img_dict[region])
+        min = np.min(img_dict[region])
+        print("MIN:")
+        print(min)
+        print("MAX:")
+        print(max)
+        if max - min == 0:
+            continue
+        else:
+            print("LENGTH:")
+            print(len(coords_dict[region]))
+            print('LAST ELEMENT')
+            print(coords_dict[region][len(coords_dict[region])-1])
+            print(img_dict[region].shape[0])
+            print(img_dict[region].shape[1])
+            print(img_dict[region].shape[2])
+            count = 0
+            normalized_image = min_max_normalize(img_dict[region])
+            for i in range(len(coords_dict[region])):
+                x, y, z = coords_dict[region][i]
+                if (0 <= x < img_dict[region].shape[0]) and \
+                    (0 <= y < img_dict[region].shape[1]) and \
+                    (0 <= z < img_dict[region].shape[2]):
+                    count+=1
+                    pixel_value = normalized_image[z, y, x]
+                    # Normalize each image to the range [0, 255]
+                    # pixel_value = ((pixel_value - min) / (max - min)) * 255
+                    # Calculate the average pixel brightness for the normalized image
+                    if z > 44:
+                        print(pixel_value)
+                    avg_brightness += pixel_value
+
+            print('AVERAGE BRIGHTNESS')
+            print(avg_brightness)
+            avg_brightness = avg_brightness / count
+        brightness_dict[region] = avg_brightness * 255
+
+    return brightness_dict
+
+def min_max_normalize(arr):
+    arr64 = arr.astype(np.float64)
+
+    min_val = np.min(arr64)
+    max_val = np.max(arr64)
+
+    # Check if max and min values are the same (to avoid division by zero)
+    if max_val - min_val == 0:
+        return arr64
+
+    normalized_arr64 = (arr64 - min_val) / (max_val - min_val)
+    return normalized_arr64
+
 
 def is_segment_results_dir(directory):
     """

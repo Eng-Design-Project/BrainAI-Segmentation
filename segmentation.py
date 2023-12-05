@@ -77,23 +77,33 @@ def test_scipy_register_images(atlas, image):
 #expand region of interest
 #this adds an extra layer of pixels to a segmented image from the original image
 #takes 3d np array images now
-def expand_roi(original_arr, segment_arr):
+def expand_roi(original_arr, segment_arr, layers=5):
+    """
+    Expand the region of interest in the segment_arr based on the original_arr.
+    
+    :param original_arr: The original array.
+    :param segment_arr: The array representing the segment to be expanded.
+    :param layers: Number of layers to expand.
+    :return: The expanded segment array.
+    """
 
     # Define a kernel for 3D convolution that checks for 26 neighbors in 3D
     kernel = np.ones((3, 3, 3))
-    kernel[1, 1, 1] = 0
-    
-    # Convolve with the segment to find the boundary of ROI
-    boundary = convolve(segment_arr > 0, kernel) > 0
-    boundary[segment_arr > 0] = 0  # Remove areas that are already part of the segment
-    
-    # Create a copy of the segment
+    kernel[1, 1, 1] = 0  # We don't want the center pixel
+
+    # Initialize the expanded segment array with the initial segment
     expanded_segment_arr = segment_arr.copy()
-    
-    # Copy pixel values from the original image to the boundary in the expanded segment
-    expanded_segment_arr[boundary] = original_arr[boundary]
-    
+
+    for _ in range(layers):
+        # Convolve with the segment to find the boundary of ROI
+        boundary = convolve(expanded_segment_arr > 0, kernel) > 0
+        boundary[expanded_segment_arr > 0] = 0  # Remove areas that are already part of the segment
+
+        # Copy pixel values from the original image to the boundary in the expanded segment
+        expanded_segment_arr[boundary] = original_arr[boundary]
+
     return expanded_segment_arr
+
 
 # Example usage:
 # original = np.random.rand(10, 10, 10)
@@ -454,7 +464,9 @@ def execute_atlas_seg(atlas, atlas_colors, image):
     for region, segment in final_dict.items():
         final_dict[region] = expand_roi(reg_image, segment)
 
-    return final_dict
+    #return final_dict
+    #return region_to_coord_dict and final dict (it'll return a tuple)
+    return final_dict, region_to_coord_dict
 
 #can only be done after normal atlas seg
 def execute_internal_atlas_seg(image_dict: dict, internal_color_atlas: list) -> dict:
@@ -473,9 +485,12 @@ def execute_internal_atlas_seg(image_dict: dict, internal_color_atlas: list) -> 
 
             internal_color_atlas_coords = encode_atlas_colors(internal_color_atlas, color_to_region_dict)
             internal_dict = create_seg_images_from_image(image_dict[region], internal_color_atlas_coords)
+            for internal_region, segment in internal_dict.items():
+                internal_dict[internal_region] = expand_roi(image_dict[region], segment)
 
+    #return internal_dict
+    return internal_dict, internal_color_atlas_coords
 
-    return internal_dict
 
 
 
@@ -487,10 +502,11 @@ if __name__ == "__main__":
     #data.display_3d_array_slices(image, 10)
     
     color_atlas = data.get_2d_png_array_list("color atlas")
+    print(color_atlas.shape)
     seg_results = execute_atlas_seg(atlas, color_atlas, image)
     
     internal_color_atlas = data.get_2d_png_array_list("Color Atlas internal")
-    internal_seg_results = execute_internal_atlas_seg(seg_results, internal_color_atlas)
+    internal_seg_results = execute_internal_atlas_seg(seg_results, internal_color_atlas)[0]
 
     data.display_seg_np_images(internal_seg_results)
 
