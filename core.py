@@ -403,7 +403,7 @@ class Core:
         separator1 = ttk.Separator(popup_window, orient="horizontal")
         separator1.pack(fill="x", padx=20, pady=5)
 
-        segment_description = tk.Label(popup_window, text="Choose 'Whole Scan' for clustering the entire scan or 'Segment' to select the results of segmentation.")
+        segment_description = tk.Label(popup_window, text="Choose 'Whole Scan' for using deep learning on the entire scan or 'Segment' to select the results of segmentation.")
         segment_description.pack()
 
         segment_var = tk.StringVar()
