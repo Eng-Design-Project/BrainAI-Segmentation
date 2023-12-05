@@ -457,8 +457,14 @@ class Core:
 
 
     def handle_deeplearning_selection(self, popup_window, seg_var, algorithm, source):
+        # Check if any of the parameters is None
+        if seg_var is None or algorithm is None or source is None:
+            tk.messagebox.showwarning("Warning", "Please select all options before proceeding.")
+            return 
         folder = "" #this variable is local to the function
         print(source,", ", seg_var, ", ",algorithm )
+       
+        
         if source == "memory":
             if seg_var == "Segment":
                 if not data.segmentation_results:
@@ -1115,67 +1121,80 @@ class Core:
     #     popup_window.geometry("300x300")  # Adjust width and height as needed
 
     def view_DCMs_from_file(self):
-        # This function will eventually display DCMs from file
-        # note, currently only works for un-segmented DCMs
         folder = filedialog.askdirectory(title="Select a folder containing only DCM files")
         if folder == '':
             return
-        if (data.contains_only_dcms(folder)):
-            # convert each file to a PNG and save it to list
-            png_list = []
+        if data.contains_only_dcms(folder):
             np_3d = data.get_3d_image(folder)
             png_list = data.convert_3d_numpy_to_png_list(np_3d)
 
-            #create the popup
+            # Process each image in png_list
+            processed_png_list = [data.bring_edges_to_boundary(np.array(image)) for image in png_list]
+
+            # Create the popup window
             popup_wind = tk.Toplevel(self.master)
             popup_wind.title("DCM images in Folder")
             curr_index = 0
 
-            def handle_nex():
+            # Function to handle 'Next' button click
+            def handle_next():
                 nonlocal curr_index
-                curr_index +=1
-                if curr_index >= len(png_list):
-                    curr_index = 0  # Cycle back to the first image
-                update() 
-                
+                curr_index += 1
+                update()
+
+            # Function to handle 'Previous' button click
             def handle_prev():
                 nonlocal curr_index
-                curr_index -=1
-                if curr_index < 0:
-                    curr_index = len(png_list) - 1  # Cycle back to the last image                
-                update() 
-                
+                curr_index -= 1
+                update()
+
+            # Function to update the displayed image
             def update():
-                nonlocal png_list, curr_index
-                image = png_list[curr_index]
+                nonlocal curr_index
+                nonlocal processed_png_list
+
+                # Ensure the current index is within bounds
+                curr_index = curr_index % len(processed_png_list)
+
+                # Convert processed image to correct format for display
+                processed_image = processed_png_list[curr_index]
+                if processed_image.dtype != np.uint8:
+                    processed_image = (255 * processed_image).astype(np.uint8)
+
+                # Convert numpy array to PIL Image and then to ImageTk.PhotoImage
+                image = Image.fromarray(processed_image)
                 photo = ImageTk.PhotoImage(image)
+
+                # Update the image label
                 image_label.configure(image=photo)
                 image_label.image = photo
-                # Update the label to show the current index
-                index_label.config(text=f"Image {curr_index + 1} out of {len(png_list)}")
 
+                # Update the index label
+                index_label.config(text=f"Image {curr_index + 1} of {len(processed_png_list)}")
+
+            # Image display label
             image_label = tk.Label(popup_wind)
             image_label.pack()
-            
-            # Add a label to display the current index
+
+            # Index display label
             index_label = tk.Label(popup_wind, text="")
             index_label.pack()
 
+            # Navigation buttons
             button_frame = tk.Frame(popup_wind)
             button_frame.pack()
             prev_btn = tk.Button(button_frame, text="Previous", command=handle_prev)
-            nex_btn = tk.Button(button_frame, text="Next", command=handle_nex)
-
-
+            nex_btn = tk.Button(button_frame, text="Next", command=handle_next)
             prev_btn.pack(side="left", padx=10)
             nex_btn.pack(side="right", padx=10)
+
+            # Initialize the display
             update()
 
-            popup_wind.geometry("400x300")  # Adjust width and height as needed
-
-        #else if the folder does not have DCMs...  
+            # Set window size (adjust as needed)
+            popup_wind.geometry("400x300")
         else:
-            tk.messagebox.showwarning(title="Invalid Selection", message="Select a folder containg only DCM files.") 
+            messagebox.showwarning(title="Invalid Selection", message="Select a folder containing only DCM files.")
 
     def change_buttons(self, show_list, parent):
         self.forget_all_packed_widgets(parent)
