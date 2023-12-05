@@ -10,3 +10,4 @@ reg pngs/
 reg png/
 scipy reg image dcm/
 scipy reg png/
+.pyc
