@@ -245,11 +245,12 @@ def create_seg_images_from_image(image, region_dict):
 
 def filter_noise_from_images(images, noise_coords_dict):
     # Check if images is a dictionary or a NumPy array and adjust accordingly
+    images_dict = {}
     if isinstance(images, dict):
         images_dict = images
     else:
         # If images is a NumPy array, convert it into a dictionary
-        images_dict = {"Brain": images}
+        images_dict = {"FullScan": images}
     
     # Ensure the noise coordinates dictionary has keys that exist in the images dictionary
     if not set(noise_coords_dict.keys()).issubset(set(images_dict.keys())):

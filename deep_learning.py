@@ -110,31 +110,52 @@ def train_model_with_user_feedback(model, windows, user_score, optimizer):
 
     
 class CustomClassifierMultiModel:
-    def __init__(self, dict_of_np_arrays):
+    def __init__(self, dict_of_np_arrays, custom_models_dir=None):
         self.normalized_data = normalize_np_dict(dict_of_np_arrays)
-        self.model_dict = {region: buildPixelModel() for region in self.normalized_data.keys()}
         self.optimizer_dict = {region: tf.keras.optimizers.Adam() for region in self.normalized_data.keys()}
         self.windows_dict = {}
         self.indices_dict = {}
-        
+        self.model_dict = {}
+
         #extract windows from input data
         for region, seg_volume in self.normalized_data.items():
             windows, indices = extract_windows(seg_volume)
             self.windows_dict[region] = windows[..., np.newaxis]
             self.indices_dict[region] = indices
-        
-        self.labeled_data = generate_heuristic_labeled_data(self.windows_dict)
+        if not custom_models_dir:
+            loaded = self.load_models("custom_models")
+        else:
+            loaded = self.load_models(custom_models_dir)
+        if not loaded:
+            self.model_dict = {region: buildPixelModel() for region in self.normalized_data.keys()}
 
-        for region, seg_volume in self.normalized_data.items():
-            model = self.model_dict[region]
-            optimizer = self.optimizer_dict[region]
-            region_labels = self.labeled_data[region]
-            model.compile(optimizer=optimizer, loss="sparse_categorical_crossentropy", metrics=["accuracy"])
-            model.fit(self.windows_dict[region], region_labels, epochs=3)
+            self.labeled_data = generate_heuristic_labeled_data(self.windows_dict)
 
-    def trainDL(self, user_score=0):
+            for region, seg_volume in self.normalized_data.items():
+                model = self.model_dict[region]
+                optimizer = self.optimizer_dict[region]
+                region_labels = self.labeled_data[region]
+                model.compile(optimizer=optimizer, loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+                model.fit(self.windows_dict[region], region_labels, epochs=3)
+            self.save_models("custom_models")
+
+    def trainDL(self, score_dict=None, dict_of_np_arrays=None):
         classification_dict = {}
+        #if dict_of_np_arrays is provided, update windows_dict and indices_dict
+        if dict_of_np_arrays is not None:
+            self.normalized_data = normalize_np_dict(dict_of_np_arrays)
+            for region, seg_volume in self.normalized_data.items():
+                if region in self.model_dict:
+                    windows, indices = extract_windows(seg_volume)
+                    self.windows_dict[region] = windows[..., np.newaxis]
+                    self.indices_dict[region] = indices
+                else:
+                    print(f"No model found for region {region}")
+        if not score_dict:
+            score_dict = {key: 0.5 for key in self.normalized_data.keys()}
+
         for region, windows in self.windows_dict.items():
+            
             model = self.model_dict[region]
             optimizer = self.optimizer_dict[region]
 
@@ -143,7 +164,7 @@ class CustomClassifierMultiModel:
                 print(f"No windows to process for region: {region}")
                 continue
 
-            train_model_with_user_feedback(model, windows, user_score, optimizer)
+            train_model_with_user_feedback(model, windows, score_dict[region], optimizer)
 
             # Predictions
             predictions = model.predict(windows)
@@ -159,7 +180,7 @@ class CustomClassifierMultiModel:
 
         return classification_dict
     
-    def save_models(self, save_dir):
+    def save_models(self, save_dir="custom_models"):
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         
@@ -168,28 +189,61 @@ class CustomClassifierMultiModel:
             model.save(model_path)
         print(f"All models saved in {save_dir}")
     
-    def load_models(self, save_dir):
+    def load_models(self, save_dir="custom_models"):
+        load_flag = True
         for region in self.normalized_data.keys():
             model_path = os.path.join(save_dir, f'model_{region}.h5')
             if os.path.exists(model_path):
                 self.model_dict[region] = tf.keras.models.load_model(model_path)
             else:
+                load_flag = False
                 print(f"No saved model found for region {region} in {save_dir}")
+        return load_flag
     
     def predict(self, dict_of_np_arrays):
+        self.normalized_data = normalize_np_dict(dict_of_np_arrays)
         predictions_dict = {}
-        for region, seg_volume in dict_of_np_arrays.items():
+        for region, seg_volume in self.normalized_data.items():
             if region in self.model_dict:
-                windows, _ = extract_windows(seg_volume)
-                windows = windows[..., np.newaxis]
+                windows, indices = extract_windows(seg_volume)
+                self.windows_dict[region] = windows[..., np.newaxis]
+                self.indices_dict[region] = indices
                 model = self.model_dict[region]
                 predictions = model.predict(windows)
                 predicted_labels = np.argmax(predictions, axis=1)
-                predictions_dict[region] = predicted_labels
+
+                #get the indices array for the current region
+                region_indices = self.indices_dict[region]
+                #use the boolean array (predicted_labels == 1) to filter the indices
+                classified_indices = region_indices[predicted_labels == 1].tolist()
+
+                predictions_dict[region] = classified_indices
+                #print(classified_indices)
             else:
                 print(f"No model found for region {region}")
         return predictions_dict
+    
+    def save_model(self, model_key=None, save_dir="new_custom_models"):
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
 
+        if model_key:
+            # Save only the specified model
+            if model_key in self.model_dict:
+                model = self.model_dict[model_key]
+                model_path = os.path.join(save_dir, f'model_{model_key}.h5')
+                model.save(model_path)
+                print(f"Model for '{model_key}' saved in {save_dir}")
+            else:
+                print(f"No model found for the key '{model_key}'")
+        else:
+            # Save all models
+            for region, model in self.model_dict.items():
+                model_path = os.path.join(save_dir, f'model_{region}.h5')
+                model.save(model_path)
+            print(f"All models saved in {save_dir}")
+
+    
 if __name__ == '__main__':
     print("running dl module")
     # classifier = CustomClassifierSingleModel()

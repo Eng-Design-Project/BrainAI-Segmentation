@@ -105,11 +105,11 @@ class Core:
         self.internal_atlas_segment_button.pack_forget()
         
         # Image scoring button
-        self.image_scoring_button = tk.Button(self.master, text="Score Images", command=self.test_open_image_popup)
-        self.image_scoring_button.pack(pady=20)
+        #self.image_scoring_button = tk.Button(self.master, text="Score Images", command=self.test_open_image_popup)
+        #self.image_scoring_button.pack(pady=20)
 
         # Advanced segmentation button
-        self.advanced_segmentation_button = tk.Button(self.master, text="Advanced Segmentation", command=lambda: self.change_buttons([self.select_folder_button, self.folder_label, self.image_scoring_button, self.deep_learning_button, self.clustering_button, self.save_message_label, self.advanced_back_button], self.master))
+        self.advanced_segmentation_button = tk.Button(self.master, text="Advanced Segmentation", command=lambda: self.change_buttons([self.select_folder_button, self.folder_label, self.deep_learning_button, self.clustering_button, self.save_message_label, self.advanced_back_button], self.master))
         self.advanced_segmentation_button.pack(pady=20)
 
         # Clustering button
@@ -119,7 +119,7 @@ class Core:
         self.deep_learning_button = tk.Button(self.master, text="Deep Learning", command=lambda:self.deep_learning_click())
 
         # Advanced segmentation back button
-        self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.select_folder_button, self.folder_label, self.atlas_segment_button, self.image_scoring_button, self.advanced_segmentation_button, self.show_image_results_button, self.view_DCMS_btn, self.toggle_desc_button, self.save_message_label], self.master))
+        self.advanced_back_button = tk.Button(self.master, text="Back", command=lambda:self.change_buttons([self.select_folder_button, self.folder_label, self.atlas_segment_button, self.advanced_segmentation_button, self.show_image_results_button, self.view_DCMS_btn, self.toggle_desc_button, self.save_message_label], self.master))
 
         """self.image_file_path = 'mytest.png'
         self.image_button = tk.Button(self.master, text="Display Image", command=self.display_file_png)
@@ -538,6 +538,8 @@ class Core:
 
             else:
                 print("segment custom")
+                # Close the popup window
+                popup_window.destroy()
                 self.train_custom_dl_model(data.segmentation_results)
 
 
@@ -552,6 +554,8 @@ class Core:
                     print(noisecoords_dict[key])
             else:
                 print("whole scan custom")
+                # Close the popup window
+                popup_window.destroy()
                 self.train_custom_dl_model(volume)
 
             
@@ -569,10 +573,240 @@ class Core:
         else:
             print("input is an array.")
             dict_of_3d_arrays["FullScan"] = input
-        classifier = deep_learning.CustomClassifierMultiModel(dict_of_3d_arrays)
-        classif_dict = classifier.trainDL() # could be renamed to noise coords dict
-        results = segmentation.filter_noise_from_images(dict_of_3d_arrays, classif_dict)
-        self.show_seg_results(results)
+        #need to add arg to following line: a custom model dir
+        def user_response(answer):
+            print(f"User responded: {'Yes' if answer else 'No'}")
+            custom_model_dir = None
+            if answer:
+                custom_model_dir = filedialog.askdirectory(title="Select Save Folder")
+            classifier = deep_learning.CustomClassifierMultiModel(dict_of_3d_arrays, custom_model_dir)
+            noise_coords_dict = classifier.predict(dict_of_3d_arrays)
+            #print(noise_coords_dict["FullScan"])
+            results_dict = segmentation.filter_noise_from_images(dict_of_3d_arrays, noise_coords_dict)
+            #self.show_seg_results(results_dict)
+            def on_continue_training():
+                self.custom_training_step(classifier, None, results_dict)
+
+            def on_save_results():
+                # Implement or pass the logic for saving results
+                self.save_seg_results(results_dict)
+
+            self.continue_training_popup(results_dict, on_continue_training, on_save_results)
+        self.ask_user_question("Would you like to use your own models?", response_callback=user_response)
+
+    def continue_training_popup(self, image_dict, continue_training_callback, save_results_callback):
+        popup_window = tk.Toplevel(self.master)
+        popup_window.title("Training Results")
+
+        # Assuming data.array_dict_to_png_dict is a function you have defined
+        pngs_dict = data.array_dict_to_png_dict(image_dict)
+
+        # New dictionary to keep track of indexes for each segmentation type
+        segmentation_indexes = {region: 0 for region in pngs_dict.keys()}
+        current_segmentation = next(iter(pngs_dict))  # Initialize with the first key
+
+        image_label = tk.Label(popup_window)
+        image_label.pack()
+
+        def update_image():
+            index = segmentation_indexes[current_segmentation]
+            image_list = pngs_dict[current_segmentation]
+            image = image_list[index]
+            photo = ImageTk.PhotoImage(image)
+            image_label.configure(image=photo)
+            image_label.image = photo
+
+        def handle_segment_selection(segmentation_type):
+            nonlocal current_segmentation
+            current_segmentation = segmentation_type
+            update_image()
+
+        def handle_previous():
+            segmentation_indexes[current_segmentation] = (segmentation_indexes[current_segmentation] - 1) % len(pngs_dict[current_segmentation])
+            update_image()
+
+        def handle_next():
+            segmentation_indexes[current_segmentation] = (segmentation_indexes[current_segmentation] + 1) % len(pngs_dict[current_segmentation])
+            update_image()
+
+        button_frame = tk.Frame(popup_window)
+        button_frame.pack()
+
+        # Create Previous/Next buttons
+        previous_button = tk.Button(button_frame, text="Previous", command=handle_previous)
+        next_button = tk.Button(button_frame, text="Next", command=handle_next)
+        previous_button.pack(side="left", padx=10)
+        next_button.pack(side="right", padx=10)
+
+        # Create buttons for each region in the image dictionary
+        for region in pngs_dict.keys():
+            btn = tk.Button(popup_window, text=region, command=lambda r=region: handle_segment_selection(r))
+            btn.pack(pady=2)  # Adjust padding as needed
+
+        update_image()
+        popup_window.geometry("400x400")  # Adjust width and height as needed
+
+        # Button logic can be added here
+        def save_results():
+            save_results_callback()  # Implement saving logic here
+
+        def continue_training():
+            popup_window.destroy()
+            continue_training_callback()  # Implement continue training logic here
+
+        # Add 'Save Results' button
+        save_results_button = tk.Button(popup_window, text="Save Segmentation Results", command=save_results)
+        save_results_button.pack(pady=5)
+
+        # Add 'Continue Training' button
+        continue_training_button = tk.Button(popup_window, text="Continue Training", command=continue_training)
+        continue_training_button.pack(pady=5)
+
+        def finalize():
+            popup_window.destroy()
+
+        # Add a finalize button
+        finalize_button = tk.Button(popup_window, text="Finalize", command=finalize)
+        finalize_button.pack(pady=10)
+        
+    
+    def custom_training_step(self, classifier, score_dict=None, dict_of_3d_arrays=None):
+        print("Training run")
+        noise_coords_dict = classifier.trainDL(score_dict, dict_of_3d_arrays)
+        results_dict = segmentation.filter_noise_from_images(dict_of_3d_arrays, noise_coords_dict)
+
+        def on_popup_complete(updated_score_dict):
+            print("ran image scoring popup")
+            avg_score = 0
+            region_count = 0
+            for region in updated_score_dict.keys():
+                print(updated_score_dict[region])
+                avg_score += updated_score_dict[region]
+            if region_count > 0:
+                avg_score = avg_score/region_count
+            if avg_score < 9:
+                self.custom_training_step(classifier, updated_score_dict, dict_of_3d_arrays)
+        def save_model(current_segment):
+            print("saving model")
+            save_folder = filedialog.askdirectory(title="Select Save Folder")
+            classifier.save_model(current_segment, save_folder)
+            self.show_popup_message(current_segment, "model saved")
+        def on_save_results():
+                # Implement or pass the logic for saving results
+                self.save_seg_results(results_dict)
+
+        self.open_image_scoring_popup(results_dict, cont_training_callback=on_popup_complete, save_model_callback=save_model, save_results_callback=on_save_results)
+
+
+    def open_image_scoring_popup(self, image_dict, cont_training_callback, save_model_callback, save_results_callback):
+        score_dictionary = {}
+        
+        # Assuming data.array_dict_to_png_dict is a function you have defined
+        pngs_dict = data.array_dict_to_png_dict(image_dict)
+
+        popup_window = tk.Toplevel(self.master)
+        popup_window.title("Results of Segmentation")
+
+        # New dictionary to keep track of indexes for each segmentation type
+        segmentation_indexes = {region: 0 for region in pngs_dict.keys()}
+        current_segmentation = next(iter(pngs_dict))  # Initialize with the first key
+
+        image_label = tk.Label(popup_window)
+        image_label.pack()
+
+        # Score scale
+        score_scale = tk.Scale(popup_window, from_=0, to=10, orient="horizontal")
+        score_scale.pack()
+
+
+        def score_image():
+            score = score_scale.get()
+            score_dictionary[current_segmentation] = score
+            print(f"Scored {current_segmentation}: {score}")
+
+        score_button = tk.Button(popup_window, text="Score Segmentation", command=score_image)
+        score_button.pack()
+
+        def handle_segment_selection(segmentation_type):
+            nonlocal current_segmentation
+            current_segmentation = segmentation_type
+            update_image()
+
+        def handle_previous():
+            segmentation_indexes[current_segmentation] = (segmentation_indexes[current_segmentation] - 1) % len(pngs_dict[current_segmentation])
+            update_image()
+
+        def handle_next():
+            segmentation_indexes[current_segmentation] = (segmentation_indexes[current_segmentation] + 1) % len(pngs_dict[current_segmentation])
+            update_image()
+
+        button_frame = tk.Frame(popup_window)
+        button_frame.pack()
+
+        # Create Previous/Next buttons
+        previous_button = tk.Button(button_frame, text="Previous", command=handle_previous)
+        next_button = tk.Button(button_frame, text="Next", command=handle_next)
+        previous_button.pack(side="left", padx=10)
+        next_button.pack(side="right", padx=10)
+
+        # Create buttons for each region in the image dictionary
+        for region in pngs_dict.keys():
+            btn = tk.Button(popup_window, text=region, command=lambda r=region: handle_segment_selection(r))
+            btn.pack(pady=2)  # Adjust padding as needed
+
+        # Function to handle model saving
+        def save_model():
+            save_model_callback(current_segmentation)
+            print(f"Model updated for {current_segmentation}")
+        
+        # Button logic can be added here
+        def save_results():
+            save_results_callback()  # Implement saving logic here
+
+        # Add 'Save Results' button
+        save_results_button = tk.Button(popup_window, text="Save Segmentation Results", command=save_results)
+        save_results_button.pack(pady=5)
+        
+        # Create the model update button
+        save_model_button = tk.Button(popup_window, text=f"Update Saved {current_segmentation} Model", command=save_model)
+        save_model_button.pack(pady=2)
+
+        def update_image():
+            index = segmentation_indexes[current_segmentation]
+            image_list = pngs_dict[current_segmentation]
+            image = image_list[index]
+            photo = ImageTk.PhotoImage(image)
+            image_label.configure(image=photo)
+            image_label.image = photo
+            # Update scale to current score or default
+            score_scale.set(score_dictionary.get(current_segmentation, 0))
+            # Update the save model button text
+            save_model_button.config(text=f"Update Saved {current_segmentation} Model")
+
+        update_image()
+        popup_window.geometry("400x400")  # Adjust width and height as needed 
+
+        def finalize_scoring():
+            popup_window.destroy()  # This closes the popup window
+            for key in score_dictionary.keys():
+                print(score_dictionary[key])
+            cont_training_callback(score_dictionary)
+        
+        
+
+        # Add a finalize button
+        finalize_button = tk.Button(popup_window, text="Finalize Score and Continue Training", command=finalize_scoring)
+        finalize_button.pack() 
+
+        
+  
+
+        #min_score = 1 # Minimum possible score
+        #max_score = 10 # Maximum possible score
+
+            # Normalize the scores between 0 and 1
+        #normalized_score1 = (score1 - min_score) / (max_score - min_score)
+        #normalized_score2 = (score2 - min_score) / (max_score - min_score)
             
     def train_unet_model(self, input, algorithm_type):
         print("training U-net model")
@@ -654,6 +888,27 @@ class Core:
         # Call the dlAlgorithm function from Unet_segmentation module
         unet_segmentation.dlAlgorithm(images_dict)
 
+    def ask_user_question(self, question, response_callback):
+        # Popup window
+        popup = tk.Toplevel()
+        popup.title("User Question")
+
+        # Question text
+        label = tk.Label(popup, text=question)
+        label.pack(padx=20, pady=10)
+
+        # Function to handle button click
+        def on_button_click(answer):
+            popup.destroy()
+            response_callback(answer)
+
+        # Yes and No buttons
+        yes_button = tk.Button(popup, text="Yes", command=lambda: on_button_click(True))
+        no_button = tk.Button(popup, text="No", command=lambda: on_button_click(False))
+
+        yes_button.pack(side="left", padx=(20, 10), pady=20)
+        no_button.pack(side="right", padx=(10, 20), pady=20)
+
     def custom_askdirectory(title):
         #might replace other usses of askdirectory, to display a message
 
@@ -714,7 +969,7 @@ class Core:
             # Set a flag to indicate that atlas segmentation has been performed
                 self.atlas_segmentation_completed = True
                 print("Atlas segmentation completed")  # Add this line for debugging
-                self.change_buttons([self.select_folder_button, self.folder_label, self.atlas_segment_button, self.image_scoring_button, self.advanced_segmentation_button, self.show_image_results_button, self.view_DCMS_btn, self.save_message_label], self.master)
+                self.change_buttons([self.select_folder_button, self.folder_label, self.atlas_segment_button, self.advanced_segmentation_button, self.show_image_results_button, self.view_DCMS_btn, self.save_message_label], self.master)
         else:
             print("Failed to save Results")
             self.show_popup_message("Failed to save results")
@@ -833,7 +1088,7 @@ class Core:
             png_file_path = os.path.join(output_dir, f"{key}.png")
             data.save_sitk_3d_img_to_dcm(seg_result, dcm_file_path)
             data.save_sitk_3d_img_to_png(seg_result, png_file_path)"""
-
+    '''
     def test_open_image_popup(self):
         folder = filedialog.askdirectory(title="Select folder with subfolders containing DCM files")
         while not data.is_segment_results_dir(folder):
@@ -843,93 +1098,9 @@ class Core:
             folder = filedialog.askdirectory(title="Select folder with subfolders containing DCM files")
         image_dict = data.subfolders_to_dictionary(folder)
         scores_dict = self.open_image_scoring_popup(image_dict)
-        
+    '''        
 
-    def open_image_scoring_popup(self, image_dict):
-        score_dictionary = {}
-        
-        # Assuming data.array_dict_to_png_dict is a function you have defined
-        pngs_dict = data.array_dict_to_png_dict(image_dict)
-
-        popup_window = tk.Toplevel(self.master)
-        popup_window.title("Results of Segmentation")
-
-        # New dictionary to keep track of indexes for each segmentation type
-        segmentation_indexes = {region: 0 for region in pngs_dict.keys()}
-        current_segmentation = next(iter(pngs_dict))  # Initialize with the first key
-
-        image_label = tk.Label(popup_window)
-        image_label.pack()
-
-        # Score scale
-        score_scale = tk.Scale(popup_window, from_=0, to=10, orient="horizontal")
-        score_scale.pack()
-
-        def update_image():
-            index = segmentation_indexes[current_segmentation]
-            image_list = pngs_dict[current_segmentation]
-            image = image_list[index]
-            photo = ImageTk.PhotoImage(image)
-            image_label.configure(image=photo)
-            image_label.image = photo
-            # Update scale to current score or default
-            score_scale.set(score_dictionary.get(current_segmentation, 0))
-
-        def score_image():
-            score = score_scale.get()
-            score_dictionary[current_segmentation] = score
-            print(f"Scored {current_segmentation}: {score}")
-
-        score_button = tk.Button(popup_window, text="Score Image", command=score_image)
-        score_button.pack()
-
-        def handle_segment_selection(segmentation_type):
-            nonlocal current_segmentation
-            current_segmentation = segmentation_type
-            update_image()
-
-        def handle_previous():
-            segmentation_indexes[current_segmentation] = (segmentation_indexes[current_segmentation] - 1) % len(pngs_dict[current_segmentation])
-            update_image()
-
-        def handle_next():
-            segmentation_indexes[current_segmentation] = (segmentation_indexes[current_segmentation] + 1) % len(pngs_dict[current_segmentation])
-            update_image()
-
-        button_frame = tk.Frame(popup_window)
-        button_frame.pack()
-
-        # Create Previous/Next buttons
-        previous_button = tk.Button(button_frame, text="Previous", command=handle_previous)
-        next_button = tk.Button(button_frame, text="Next", command=handle_next)
-        previous_button.pack(side="left", padx=10)
-        next_button.pack(side="right", padx=10)
-
-        # Create buttons for each region in the image dictionary
-        for region in pngs_dict.keys():
-            btn = tk.Button(popup_window, text=region, command=lambda r=region: handle_segment_selection(r))
-            btn.pack(pady=2)  # Adjust padding as needed
-
-        update_image()
-        popup_window.geometry("400x400")  # Adjust width and height as needed 
-
-        def finalize_scoring():
-            popup_window.destroy()  # This closes the popup window
-            for key in score_dictionary.keys():
-                print(score_dictionary[key])
-            return score_dictionary
-
-        # Add a finalize button
-        finalize_button = tk.Button(popup_window, text="Finalize Scoring", command=finalize_scoring)
-        finalize_button.pack() 
-  
-
-        #min_score = 1 # Minimum possible score
-        #max_score = 10 # Maximum possible score
-
-            # Normalize the scores between 0 and 1
-        #normalized_score1 = (score1 - min_score) / (max_score - min_score)
-        #normalized_score2 = (score2 - min_score) / (max_score - min_score)
+    
 
     """def show_clustering_buttons(self):
         self.clustering_page.show_buttons()
