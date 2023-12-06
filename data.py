@@ -323,7 +323,7 @@ def save_3d_img_to_dcm(array, template_dir, new_dir):
         # Save the dataset using pydicom
         pydicom.write_file(filename, ds, write_like_original=False)
 
-        print(f"Saved slice {z} to {filename}")
+        #print(f"Saved slice {z} to {filename}")
 
     print(f"Saved 3D image to {new_dir}")
 
@@ -356,7 +356,7 @@ def save_3d_img_to_png(image_array, new_dir):
         # Save the slice as PNG
         plt.imsave(filename, resized_slice_image_np, cmap='gray')
 
-        print(f"Saved slice {z} to {filename}")
+        #print(f"Saved slice {z} to {filename}")
 
     print(f"Saved 3D image slices as PNG in {new_dir}")
 
@@ -631,8 +631,8 @@ def avg_brightness(img_dict, coords_dict):
             raise ValueError("Input must be a numpy array")
 
         avg_brightness = 0
-        max = np.max(img_dict[region])
-        min = np.min(img_dict[region])
+        max = np.max(img_dict[region]).astype(np.float64)
+        min = np.min(img_dict[region]).astype(np.float64)
         print("MIN:")
         print(min)
         print("MAX:")
@@ -655,12 +655,12 @@ def avg_brightness(img_dict, coords_dict):
                     (0 <= y < img_dict[region].shape[1]) and \
                     (0 <= z < img_dict[region].shape[2]):
                     count+=1
-                    pixel_value = normalized_image[z, y, x]
+                    pixel_value = normalized_image[x, y, z]
                     # Normalize each image to the range [0, 255]
                     # pixel_value = ((pixel_value - min) / (max - min)) * 255
                     # Calculate the average pixel brightness for the normalized image
-                    if z > 44:
-                        print(pixel_value)
+                    # if z > 44:
+                    #     print(pixel_value)
                     avg_brightness += pixel_value
 
             print('AVERAGE BRIGHTNESS')
@@ -766,7 +766,7 @@ def save_3d_img_to_jpg(image_array, new_dir):
         # Save the slice as JPEG
         plt.imsave(filename, resized_slice_image_np, cmap='gray')
 
-        print(f"Saved slice {z} to {filename}")
+        #print(f"Saved slice {z} to {filename}")
 
     print(f"Saved 3D image slices as JPEG in {new_dir}")
 

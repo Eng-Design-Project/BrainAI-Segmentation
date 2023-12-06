@@ -76,33 +76,66 @@ def test_scipy_register_images(atlas, image):
 
 #expand region of interest
 #this adds an extra layer of pixels to a segmented image from the original image
-#takes 3d np array images now
-def expand_roi(original_arr, segment_arr, layers=5):
+#takes 3d np array images nowimport numpy as np
+def expand_roi(original_arr, segment_arr, layers=10, threshold=0.4):
     """
-    Expand the region of interest in the segment_arr based on the original_arr.
+    Expand the region of interest in the segment_arr based on the original_arr,
+    only including voxels in the original_arr above a certain threshold.
     
     :param original_arr: The original array.
     :param segment_arr: The array representing the segment to be expanded.
     :param layers: Number of layers to expand.
-    :return: The expanded segment array.
+    :param threshold: The threshold as a percentage (0 to 1) of the range of values in original_arr.
+    :return: The expanded segment array and a list of added voxel coordinates as lists.
     """
+
+    # Convert the original array to float to handle large range of values
+    original_arr_float = original_arr.astype(np.float64)
+
+    # Determine the min and max values in the original array
+    min_val, max_val = np.min(original_arr_float), np.max(original_arr_float)
+
+    # Convert threshold from a relative value to an absolute value
+    absolute_threshold = min_val + threshold * (max_val - min_val)
 
     # Define a kernel for 3D convolution that checks for 26 neighbors in 3D
     kernel = np.ones((3, 3, 3))
-    kernel[1, 1, 1] = 0  # We don't want the center pixel
+    kernel[1, 1, 1] = 0  # Exclude the center pixel
 
     # Initialize the expanded segment array with the initial segment
     expanded_segment_arr = segment_arr.copy()
+    added_voxels = []
 
     for _ in range(layers):
         # Convolve with the segment to find the boundary of ROI
         boundary = convolve(expanded_segment_arr > 0, kernel) > 0
-        boundary[expanded_segment_arr > 0] = 0  # Remove areas that are already part of the segment
+        boundary[expanded_segment_arr > 0] = 0  # Remove areas already in the segment
 
-        # Copy pixel values from the original image to the boundary in the expanded segment
-        expanded_segment_arr[boundary] = original_arr[boundary]
+        # Determine voxels to be added based on the threshold
+        above_threshold = (original_arr_float >= absolute_threshold)
+        valid_expansion = np.logical_and(boundary, above_threshold)
 
-    return expanded_segment_arr
+        # Record the coordinates of the added voxels as lists
+        added_voxels.extend([list(coord) for coord in zip(*np.where(valid_expansion))])
+
+        # Update the expanded segment array
+        expanded_segment_arr[valid_expansion] = original_arr_float[valid_expansion]
+        absolute_threshold = absolute_threshold*1.8
+
+    return expanded_segment_arr, added_voxels
+
+
+
+def combine_unique_lists(list1, list2):
+    # Convert inner lists to tuples and add them to a set for uniqueness
+    unique_tuples = set(tuple(element) for element in list1 + list2)
+
+    # Convert tuples back to lists
+    combined_unique_list = [list(element) for element in unique_tuples]
+
+    return combined_unique_list
+
+
 
 
 # Example usage:
@@ -470,7 +503,8 @@ def execute_atlas_seg(atlas, atlas_colors, image):
 
     #expand roi
     for region, segment in final_dict.items():
-        final_dict[region] = expand_roi(reg_image, segment)
+        final_dict[region], added_coords = expand_roi(reg_image, segment, )
+        region_to_coord_dict[region] = combine_unique_lists(region_to_coord_dict[region], added_coords)
 
     #return final_dict
     #return region_to_coord_dict and final dict (it'll return a tuple)
@@ -494,7 +528,8 @@ def execute_internal_atlas_seg(image_dict: dict, internal_color_atlas: list) -> 
             internal_color_atlas_coords = encode_atlas_colors(internal_color_atlas, color_to_region_dict)
             internal_dict = create_seg_images_from_image(image_dict[region], internal_color_atlas_coords)
             for internal_region, segment in internal_dict.items():
-                internal_dict[internal_region] = expand_roi(image_dict[region], segment)
+                internal_dict[internal_region], added_coords = expand_roi(image_dict[region], segment)
+                internal_color_atlas_coords[internal_region] = combine_unique_lists(internal_color_atlas_coords[internal_region], added_coords)
 
     #return internal_dict
     return internal_dict, internal_color_atlas_coords
