@@ -329,7 +329,7 @@ class Core:
         
         if seg_var == "Segment":
             #the first argument should be a pre-atlas segmented scan, the 2nd argument should be a string of the chosen algo
-            dict_of_coords_dicts = clustering.execute_seg_clustering(data.segmentation_results, algorithm, 5)
+            dict_of_coords_dicts = clustering.execute_seg_clustering(data.segmentation_results, algorithm, 2, 0.8, 5)
             for region in data.segmentation_results.keys():
                 clustered_dict = segmentation.create_seg_images_from_image(data.segmentation_results[region], dict_of_coords_dicts[region])
                 self.show_seg_results(clustered_dict)
@@ -341,7 +341,7 @@ class Core:
         
             #cluster coordinates returned, not noise, actual clusters for now
             #could user select number of clusters?
-            coords_dict = clustering.execute_whole_clustering(volume, algorithm, 5)
+            coords_dict = clustering.execute_whole_clustering(volume, algorithm, 2, 0.8, 5)
             
             #seg brain with cluster coords
             clustered_dict = segmentation.create_seg_images_from_image(volume, coords_dict)
