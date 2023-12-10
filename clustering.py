@@ -14,11 +14,15 @@ import data
 import segmentation
 
 
-# 3d clahe enhancement w sliding window
-# takes np array, input has to be 3d volume
-# outputs enhanced 3d volume array
+###SHARED FUNCTIONS###
 
 def clahe_enhance(volume, kernel_size=(3, 3, 3)):
+    """
+    - 3d clahe enhancement w sliding window
+    - takes np array, input has to be 3d volume
+    - outputs enhanced 3d volume array
+    """
+
     # You can apply CLAHE on a per-slice basis if the volume is too large
     enhanced = np.empty_like(volume, dtype=np.uint8)  # change dtype to uint8 if you want 8-bit output
     for i in range(volume.shape[0]):
@@ -29,27 +33,17 @@ def clahe_enhance(volume, kernel_size=(3, 3, 3)):
     return enhanced
 
 
-# filter that applies smoothing to the volume
-
 def apply_gaussian_filter(volume, sigma=1):
+    """
+    filter that applies smoothing to the volume
+    """
     return gaussian(volume, sigma=sigma)
 
-# roi function
-# wanting results to be as accurate as possible has caused RAM issues with all 3
-# clustering methods. any little bit saved could make a difference so this eliminates
-# the outer 15 pixels from each slice (cross-referenced acroos multiple scans; 15 is the max to ensure no real data is lost)
-def clustering_roi(volume, border = 15):
-    depth, height, width = volume.shape
-    return volume[:, border:height-border, border:width-border]
-
-# mask non-zero voxels
 def create_non_zero_mask(volume, threshold=0):
+    """
+    mask from non-zero (black) voxels
+    """
     return volume > threshold
-'''
-    if mask.ndim ==2:
-        mask = np.repeat(mask[:, :, np.newaxis], volume.shape[2], axis = 2)
-    return mask
-'''
 
 # same normalization function from core
 def clustering_normalize(arr):
@@ -72,9 +66,13 @@ def clustering_normalize(arr):
 ## DBSCAN ##
 # from core:
     # run "db_execute" to execute the algorithm
-    # call "db_output" to display output
-
 def db_preprocess(volume):
+    """
+    - call gaussian filter
+    - the sobel operator is run on all three axis; it's a tensity-based edge detection algorithm
+    - gradient magnitude is just the sum of the three sobel operator results-
+        to actually apply the edge detection algo to the full scan
+    """
 
     gaussian_filtered_volume = gaussian_filter(volume, sigma = 2)
 
@@ -87,19 +85,26 @@ def db_preprocess(volume):
 
 # Apply DBSCAN to preprocessed data
 def db_clustering(volume, eps, min_samples):
+    """
+    - call the preprocessing function
+    - call the normalization function
+    - call the non-zero mask
+    - set the normalized volume
+    - reshape the volume into a 2d array
+    - run dbscan clustering (both the eps, and min_samples values are inputted in the core)
+    - fit the model and combine data [predict cluster labels for each voxel]
+    - apply cluster labels to the full volume
+    """
     db_preprocessed_volume = db_preprocess(volume)
     
     db_normalized_volume = clustering_normalize(db_preprocessed_volume)
 
-    # Create non-zero mask
     non_zero_mask = create_non_zero_mask(db_normalized_volume)
 
     db_normalized_volume = np.maximum(db_normalized_volume, 0)
 
-    # Reshaping volume into a 2D array
     reshaped_volume = db_normalized_volume[non_zero_mask].reshape(-1, 1)
 
-    # DBSCAN clustering
     dbscan = DBSCAN(eps=eps, min_samples=min_samples)
 
     labels = dbscan.fit_predict(reshaped_volume)
@@ -111,17 +116,6 @@ def db_clustering(volume, eps, min_samples):
     return full_volume_labels, dbscan.components_
 
 
-'''
-# Calculates the average brightness for each cluster
-def db_calculate_brightness(db_cluster_centers, db_labeled_volume):
-    avg_brightness = {}
-    for label in np.unique(db_labeled_volume):
-        if label != -1:  # Exclude noise points
-            cluster_voxels = db_labeled_volume == label
-            avg_brightness[label] = np.mean(db_cluster_centers[cluster_voxels])
-    return avg_brightness
-'''
-
 def db_calculate_brightness(db_cluster_centers, db_labeled_volume):
     avg_brightness = {}
     for label in np.unique(db_labeled_volume):
@@ -130,37 +124,46 @@ def db_calculate_brightness(db_cluster_centers, db_labeled_volume):
             avg_brightness[str(label)] = np.mean(db_cluster_centers[cluster_voxels])
     return avg_brightness
 
-'''
-# Extract 3D coordinates of voxels for each cluster
-def db_extract_coordinates(db_labeled_volume):
-    db_coordinates = {}
 
-    for label in np.unique(db_labeled_volume):
-        if label != -1:  # Exclude noise points
-            db_coords = np.argwhere(db_labeled_volume == label)
-            db_coordinates[label] = db_coords
-    return db_coordinates
-'''
 def db_extract_coordinates(db_labeled_volume):
+    """
+    - initialize library to store coordinates
+    - iterate through each unique label
+    - exclude noise points
+    - find all coordinates that apply to current cluster
+    - convert labels to strings and store in the dictionary
+    """
     db_coordinates = {}
     for label in np.unique(db_labeled_volume):
-        if label != -1:  # Exclude noise points
+        if label != -1:  
             db_coords = np.argwhere(db_labeled_volume == label)
             db_coordinates[str(label)] = db_coords
     return db_coordinates
 
 
-
 # Execute DBSCAN clustering
 def db_execute(volume, n_clusters, eps, min_samples):
+    """
+    this is the function that's called when the user wants to run dbscan:
+    - preprocess
+    - normalize
+    - run dbscan clustering
+    - extract cluster coordinates
+    - calculate avg brightness of cluster
+    """
     db_preprocessed_volume = db_preprocess(volume)
+    
     db_normalized_volume = clustering_normalize(db_preprocessed_volume)
+    
     db_labeled_volume, db_cluster_centers = db_clustering(db_normalized_volume, eps=eps, min_samples=min_samples)
+    
     db_coordinates = db_extract_coordinates(db_labeled_volume)
+    
     avg_brightness = db_calculate_brightness(db_cluster_centers, db_labeled_volume)
+    
     return db_coordinates, db_labeled_volume, avg_brightness
 
-# Output function for DBSCAN
+# possible additional future output - not currently used
 def db_output(db_coordinates, avg_brightness):
     db_result = "Average Cluster Brightness:\n"
     for key, value in avg_brightness.items():
@@ -169,7 +172,6 @@ def db_output(db_coordinates, avg_brightness):
     db_result += "\n3D Coordinates of Clusters:\n"
     for key, value in db_coordinates.items():
         db_result += f"{key} : {value}\n"
-
     return db_result
 
 
@@ -177,9 +179,12 @@ def db_output(db_coordinates, avg_brightness):
 ## K-MEANS ##
 # from core:
     # run "km_execute" to execute the algorithm
-    # call "km_output" to display output
 
 def km_preprocess(volume):
+    """
+    - call gaussian filter
+    - call 3d clahe enhancement function
+    """
 
     gaussian_filtered_volume = gaussian_filter(volume, sigma=1)
 
@@ -189,9 +194,17 @@ def km_preprocess(volume):
 
 
 # apply kmeans to preprocessed data
-# initialize with specificied number of clusters to find
-# maximum iterations are normally lower, but since we don't have a large dataset (in terms of kmeans), 1000 gave the most consistent outputs
 def km_clustering(volume, n_clusters, n_init='auto', max_iter=1000):
+    """
+    - call the preprocessing function
+    - call the normalization function
+    - call the non-zero mask
+    - set the normalized volume
+    - reshape the volume into a 2d array
+    - run kmeans clustering (the n_clusters value is inputted in the core)
+    - fit the model and combine data [predict cluster labels for each voxel]
+    - apply cluster labels to the full volume
+    """
 
     km_preprocessed_volume = km_preprocess(volume)
 
@@ -200,43 +213,18 @@ def km_clustering(volume, n_clusters, n_init='auto', max_iter=1000):
     non_zero_mask = create_non_zero_mask(km_normalized_volume)
 
     km_normalized_volume = np.maximum(km_normalized_volume, 0)
-    # reshaping volume into a 2d array
-    # each would be a different voxel
+
     reshaped_volume = km_normalized_volume[non_zero_mask].reshape(-1, 1)
 
-    # k-means++ is just the intialization method (set to auto so we dont need to actually change it each time we're running a new dataset)
     kmeans = KMeans(n_clusters=n_clusters, init='k-means++', n_init=n_init, max_iter=max_iter)
 
-    # fit model and combined data
-    # predict cluster labels for each voxel
     labels = kmeans.fit_predict(reshaped_volume)
 
     full_volume_labels = np.full(volume.shape, -1)
     full_volume_labels[non_zero_mask] = labels
 
-    # matches labels to original volume shape, and returns them
     return full_volume_labels, kmeans.cluster_centers_
 
-
-'''
-# same brightness function, except this one's based on centers instead
-def km_calculate_brightness(km_cluster_centers):
-    avg_brightness = {}
-    for label, center in enumerate(km_cluster_centers):
-        avg_brightness[label] = center[0]
-    return avg_brightness
-
-# extracts 3d coordinates of voxels
-# applied to each cluster label in the volume
-def km_extract_coordinates(km_labeled_volume):
-    km_coordinates = {}
-
-    # this is where it iterates over each unique label in the volume
-    for label in np.unique(km_labeled_volume):
-        km_coords = np.argwhere(km_labeled_volume == label)
-        km_coordinates[label] = km_coords
-    return km_coordinates
-'''
 
 def km_calculate_brightness(km_cluster_centers):
     avg_brightness = {}
@@ -245,6 +233,12 @@ def km_calculate_brightness(km_cluster_centers):
     return avg_brightness
 
 def km_extract_coordinates(km_labeled_volume):
+    """
+    - initialize library to store coordinates
+    - iterate through each unique label
+    - find all coordinates that apply to current cluster
+    - convert labels to strings and store in the dictionary
+    """
     km_coordinates = {}
     for label in np.unique(km_labeled_volume):
         km_coords = np.argwhere(km_labeled_volume == label)
@@ -252,14 +246,21 @@ def km_extract_coordinates(km_labeled_volume):
     return km_coordinates
 
 
-# this would be called from core to execute all of the above
 def km_execute(volume, n_clusters, eps, min_samples):
+    """
+    this is the function that's called when the user wants to run kmeans:
+    - preprocess
+    - normalize
+    - run kmeans clustering
+    - extract cluster coordinates
+    """
     km_preprocessed_volume = km_preprocess(volume)
     km_normalized_volume = clustering_normalize(km_preprocessed_volume)
     km_labeled_volume, km_cluster_centers = km_clustering(km_normalized_volume, n_clusters=n_clusters)
     km_coordinates = km_extract_coordinates(km_labeled_volume)
     return km_coordinates, km_labeled_volume, km_calculate_brightness(km_cluster_centers)
 
+# possible additional future output - not currently used
 def km_output(km_coordinates, avg_brightness):
     km_result = "Average Cluster Brightness:\n"
     for key, value in avg_brightness.items():
@@ -272,85 +273,16 @@ def km_output(km_coordinates, avg_brightness):
     return km_result
 
 
-
-## Hierarchical - Ward##
-# from core:
-    # run "hr_execute" to execute the algorithm
-    # call "hr_output" to display output
-
-def hr_preprocess(volume):
-
-    gaussian_filtered_volume = gaussian_filter(volume, sigma=1.5)
-
-    clahe_enhanced_volume = clahe_enhance(gaussian_filtered_volume, kernel_size=(2, 2, 2))
-
-    opened_volume = morphology.opening(clahe_enhanced_volume, morphology.ball(2))
-
-    return opened_volume
-
-
-def ward_clustering(volume, n_clusters):
-
-    hr_preprocessed_volume = hr_preprocess(volume)
-
-    hr_normalized_volume = clustering_normalize(hr_preprocessed_volume)
-
-    non_zero_mask = create_non_zero_mask(hr_normalized_volume)
-
-    hr_normalized_volume = np.maximum(hr_normalized_volume, 0)
-
-    reshaped_volume = hr_normalized_volume[non_zero_mask].reshape(-1, 1)
-
-    # perform hierarchical clustering
-    # can do the euclidean affinity matrix and ward linkage through the same agglomerative clustering submodule
-    # this helps a bit with the memory issue since we're not runnign them separately anymore
-    hr_ward = AgglomerativeClustering(n_clusters=n_clusters, affinity='euclidean', linkage='ward') # ward minimizes the "within-cluster" variance
-    labels = hr_ward.fit_predict(reshaped_volume)
-
-    full_volume_labels = np.full(volume.shape, -1)
-    full_volume_labels[non_zero_mask] = labels
-
-    return full_volume_labels
-
-
-# although it's the same function as above, it's not the best yet since i'm still testing which hr cluster features would be best to call here
-def hr_calculate_brightness(hr_labeled_volume):
-    avg_brightness = {}
-    unique_labels = np.unique(hr_labeled_volume)
-    for label in unique_labels:
-        avg_brightness[label] = np.mean(hr_labeled_volume[hr_labeled_volume == label])
-    return avg_brightness
-
-def hr_extract_coordinates(hr_labeled_volume):
-    return km_extract_coordinates(hr_labeled_volume)
-
-
-def hr_execute(volume, n_clusters, eps, min_samples):
-    hr_preprocessed_volume = hr_preprocess(volume)
-    hr_normalized_volume = clustering_normalize(hr_preprocessed_volume)
-    hr_labeled_volume = ward_clustering(hr_normalized_volume, n_clusters=n_clusters)
-    hr_coordinates = hr_extract_coordinates(hr_labeled_volume)
-    return hr_coordinates, hr_labeled_volume, hr_calculate_brightness(hr_labeled_volume)
-
-
-def hr_output(hr_coordinates, avg_brightness):
-    hr_result = "Average Cluster Brightness:\n"
-    for key, value in avg_brightness.items():
-        hr_result += f"{key} : {value}\n"
-
-    hr_result += "\n3D Coordinates of Clusters:\n"
-    for key, value in hr_coordinates.items():
-        hr_result += f"{key} : {value}\n"
-
-    return hr_result
-
-
-
-
 ## Hierarchical - SLINK##
+# from core:
+    # run "sl_execute" to execute the algorithm
 
-def hr_preprocess(volume):
-
+def sl_preprocess(volume):
+    """
+    - call gaussian filter
+    - call 3d clahe enhancement function
+    - morphological opening - removes white spots from foreground
+    """
     gaussian_filtered_volume = gaussian_filter(volume, sigma=1.5)
 
     clahe_enhanced_volume = clahe_enhance(gaussian_filtered_volume, kernel_size=(2, 2, 2))
@@ -360,7 +292,17 @@ def hr_preprocess(volume):
     return opened_volume
 
 def slink_clustering(volume, n_clusters):
-    sl_preprocessed_volume = hr_preprocess(volume)
+    """
+    - call the preprocessing function
+    - call the normalization function
+    - call the non-zero mask
+    - set the normalized volume
+    - reshape the volume into a 2d array
+    - run single-linkage agglomerative clustering (the n_clusters value is inputted in the core)
+    - fit the model and combine data [predict cluster labels for each voxel]
+    - apply cluster labels to the full volume
+    """
+    sl_preprocessed_volume = sl_preprocess(volume)
 
     sl_normalized_volume = clustering_normalize(sl_preprocessed_volume)
 
@@ -370,7 +312,7 @@ def slink_clustering(volume, n_clusters):
 
     reshaped_volume = sl_normalized_volume[non_zero_mask].reshape(-1, 1)
 
-    # Single Linkage Clustering
+    # Single Linkage Hierarchical Clustering
     slink = AgglomerativeClustering(n_clusters=n_clusters, linkage='single')
 
     labels = slink.fit_predict(reshaped_volume)
@@ -387,31 +329,34 @@ def sl_calculate_brightness(sl_labeled_volume):
         avg_brightness[str(label)] = np.mean(sl_labeled_volume[sl_labeled_volume == label])
     return avg_brightness
 
-'''
 def sl_extract_coordinates(sl_labeled_volume):
-    sl_coordinates = {}
-
-    for label in np.unique(sl_labeled_volume):
-        sl_coords = np.argwhere(sl_labeled_volume == label)
-        sl_coordinates[label] = sl_coords
-    return sl_coordinates
-'''
-def sl_execute(volume, n_clusters, eps, min_samples):
-    sl_preprocessed_volume = hr_preprocess(volume)
-    sl_normalized_volume = clustering_normalize(sl_preprocessed_volume)
-    sl_labeled_volume = slink_clustering(sl_normalized_volume, n_clusters=n_clusters)
-    sl_coordinates = sl_extract_coordinates(sl_labeled_volume)
-    return sl_coordinates, sl_labeled_volume, sl_calculate_brightness(sl_labeled_volume)
-
-def sl_extract_coordinates(sl_labeled_volume):
+    """
+    - initialize library to store coordinates
+    - iterate through each unique label
+    - find all coordinates that apply to current cluster
+    - convert labels to strings and store in the dictionary
+    """
     sl_coordinates = {}
     for label in np.unique(sl_labeled_volume):
         sl_coords = np.argwhere(sl_labeled_volume == label)
         sl_coordinates[str(label)] = sl_coords
     return sl_coordinates
 
+def sl_execute(volume, n_clusters, eps, min_samples):
+    """
+    this is the function that's called when the user wants to run hierarchical:
+    - preprocess
+    - normalize
+    - run hierarchical clustering
+    - extract cluster coordinates
+    """
+    sl_preprocessed_volume = sl_preprocess(volume)
+    sl_normalized_volume = clustering_normalize(sl_preprocessed_volume)
+    sl_labeled_volume = slink_clustering(sl_normalized_volume, n_clusters=n_clusters)
+    sl_coordinates = sl_extract_coordinates(sl_labeled_volume)
+    return sl_coordinates, sl_labeled_volume, sl_calculate_brightness(sl_labeled_volume)
 
-
+# possible additional future output - not currently used
 def sl_output(sl_coordinates):
     sl_result = "Average Cluster Brightness:\n"
     for key, value in avg_brightness.items():
@@ -723,97 +668,5 @@ def display_slices(volume, labels, cluster_coords, brain_mask, skull_mask):
         # display full processed image
         display_rgb_image(rgb_img, z)
 
-# SITK TO PYDICOM - MD
-# original:
-'''
-def execute_clustering(sitk_dict, algo):
-    output_coords = {} # initialize sitk dictionary to store output
-    algos_dict = {
-        'dbscan_3d': dbscan_3d
-    }
-
-    for key in sitk_dict:
-
-        # perform dbscan and get labeled volume, coordinates, and binary masks for each slice in the output dictionary
-        labeled_volume, cluster_coords, brain_mask, skull_mask = algos_dict[algo](sitk_dict.key)
-
-        # determine coordinates
-        brain_cluster_coordinates, skull_cluster_coordinates = cluster_coordinates(cluster_coords, brain_mask, skull_mask)
-
-        # dictionary to store output coordinates
-        output_coords[key] = brain_cluster_coordinates
-        #display_slices(volume, labeled_volume, cluster_coords, brain_mask, skull_mask)
-    #dbscan optimized for entire brain, not atlas segments, currently outputs brain coords as opposed to "skull coords"
-    return output_coords
-'''
 
 
-
-
-
-
-
-
-"""
-## DBSCAN ##
-# from core:
-    # run "db_execute" to execute the algorithm
-    # call "db_output" to display output
-
-
-# Apply DBSCAN to preprocessed data
-def dbscan_clustering(volume):
-
-    db_preprocessed_volume = clustering_preprocess(volume)
-
-    #non_zero_mask = create_non_zero_mask(db_preprocessed_volume)
-
-    # Reshape volume into a 2D array
-    reshaped_volume = db_preprocessed_volume.reshape(-1, 1)
-
-    # DBSCAN clustering
-    dbscan = DBSCAN(eps=eps, min_samples=min_samples)
-
-    # Fit model to combined data and predict cluster labels
-    labels = dbscan.fit_predict(reshaped_volume)
-
-    full_volume_labels = np.full(volume.shape, -1)
-    full_volume_labels = labels
-
-    return full_volume_labels, dbscan.cluster_centers_
-
-def db_calculate_brightness(db_cluster_centers):
-    avg_brightness = {}
-    for label, center in enumerate(db_cluster_centers):
-        avg_brightness[label] = center[0]
-    return avg_brightness
-
-# Extract 3D coordinates of voxels (Same as K-Means)
-def db_extract_coordinates(db_labeled_volume):
-    db_coordinates = {}
-
-    # this is where it iterates over each unique label in the volume
-    for label in np.unique(db_labeled_volume):
-        db_coords = np.argwhere(db_labeled_volume == label)
-        db_coordinates[label] = db_coords
-    return db_coordinates
-
-# Execute DBSCAN clustering (similar structure to K-Means)
-def db_execute(volume, eps=1.5, min_samples=6):
-    db_preprocessed_volume = clustering_preprocess(volume)
-    db_labeled_volume, db_cluster_centers = dbscan_clustering(volume)
-    db_coordinates = db_extract_coordinates(db_labeled_volume)
-    return db_coordinates, db_labeled_volume, db_calculate_brightness(db_cluster_centers)
-
-# Output function (similar structure to K-Means)
-def db_output(db_coordinates, avg_brightness):
-    db_result = "Average Cluster Brightness:\n"
-    for key, value in avg_brightness.items():
-        db_result += f"{key} : {value}\n"
-
-    db_result += "\n3D Coordinates of Clusters:\n"
-    for key, value in db_coordinates.items():
-        db_result += f"{key} : {value}\n"
-
-    return db_result
-"""
