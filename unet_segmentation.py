@@ -200,7 +200,7 @@ def get_unet_result_coordinates(predict_3d, threshold=0.4):
             for x in range(predict_3d.shape[2]):
                 if predict_3d[z, y, x, 0] < threshold:  # Assuming the last dimension is the channel
                     coordinates_list.append([z, y, x])
-                    print("coord less than threshold: ", z, y, x)
+                    #print("coord less than threshold: ", z, y, x)
                 elif z == 20 and y == 50:
                     print(predict_3d[z, y, x])
     return coordinates_list
